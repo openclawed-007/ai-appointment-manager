@@ -22,7 +22,7 @@ function closeModal(modalId) {
 }
 
 function toMoney(cents = 0) {
-  return cents > 0 ? `$${(cents / 100).toFixed(0)}` : 'Free';
+  return cents > 0 ? `£${(cents / 100).toFixed(0)}` : 'Free';
 }
 
 function toTime12(time24 = '09:00') {
@@ -72,6 +72,10 @@ function setActiveView(view) {
     n.classList.toggle('active', n.dataset.view === view);
   });
 
+  document.querySelectorAll('.mobile-nav-item').forEach((n) => {
+    n.classList.toggle('active', n.dataset.view === view);
+  });
+
   document.querySelectorAll('.app-view').forEach((section) => {
     section.classList.toggle('active', section.dataset.view === view);
   });
@@ -81,6 +85,13 @@ function bindNavigation() {
   document.querySelectorAll('.nav-item').forEach((item) => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
+      const targetView = item.dataset.view || 'dashboard';
+      setActiveView(targetView);
+    });
+  });
+
+  document.querySelectorAll('.mobile-nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
       const targetView = item.dataset.view || 'dashboard';
       setActiveView(targetView);
     });
@@ -381,7 +392,7 @@ async function submitType(e) {
       body: JSON.stringify({
         name: data.name,
         durationMinutes: Number(data.durationMinutes || 30),
-        priceCents: Number(data.priceUsd || 0) * 100,
+        priceCents: Number(data.priceGbp ?? data.priceUsd ?? 0) * 100,
         locationMode: data.locationMode
       })
     });
