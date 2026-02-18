@@ -46,6 +46,30 @@
     border: 1px solid var(--border);
 }
 
+/* Keep appointment rows aligned across all entries */
+#appointments-table .data-row {
+    grid-template-columns: minmax(180px, 1.3fr) minmax(170px, 1fr) 110px 110px minmax(330px, 1.2fr);
+}
+
+#appointments-table .data-row>div {
+    min-width: 0;
+}
+
+#appointments-table .data-row>div:nth-child(2),
+#appointments-table .data-row>div:nth-child(3),
+#appointments-table .data-row>div:nth-child(4) {
+    white-space: nowrap;
+}
+
+#appointments-table .row-actions {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+#appointments-table .row-actions .btn-secondary {
+    white-space: nowrap;
+}
+
 /* ── Booking Page ── */
 .booking-shell {
     min-height: 100vh;

@@ -598,6 +598,8 @@ function setActiveView(view) {
   document.querySelectorAll('.app-view').forEach((section) => {
     section.classList.toggle('active', section.dataset.view === view);
   });
+
+  if (view === 'appointments') void loadAppointmentsTable();
 }
 
 function getActiveView() {
@@ -1209,7 +1211,7 @@ function renderAppointmentsTable(appointments = []) {
       (a) => `
       <div class="data-row" data-id="${a.id}">
         <div><strong>${escapeHtml(a.clientName)}</strong><div class="pill">${escapeHtml(a.typeName)}</div></div>
-        <div>${escapeHtml(a.date)}</div>
+        <div>${escapeHtml(formatScheduleDate(a.date))}</div>
         <div>${toTime12(a.time)}</div>
         <div><span class="pill">${escapeHtml(a.status)}</span></div>
         <div class="row-actions">
@@ -1324,7 +1326,9 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
 }
 
 async function loadAppointmentsTable() {
-  const query = state.viewAll ? '' : `?date=${encodeURIComponent(state.selectedDate)}`;
+  const activeView = getActiveView();
+  const showAll = activeView === 'appointments' || state.viewAll;
+  const query = showAll ? '' : `?date=${encodeURIComponent(state.selectedDate)}`;
   const { appointments } = await api(`/api/appointments${query}`);
   renderAppointmentsTable(appointments);
 }
