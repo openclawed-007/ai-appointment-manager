@@ -272,10 +272,10 @@
                                 <div class="form-group"><label>Business Name</label><input name="businessName" required /></div>
                                 <div class="form-group"><label>Owner Email</label><input name="ownerEmail" type="email" /></div>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group timezone-group">
                                 <label>Timezone</label>
-                                <input name="timezone" id="timezone-input" list="timezone-options" value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
-                                <datalist id="timezone-options"></datalist>
+                                <input name="timezone" id="timezone-input" autocomplete="off" value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
+                                <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox" aria-label="Timezone suggestions"></div>
                             </div>
                             <div class="form-actions"><button type="submit" class="btn-primary">Save Settings</button></div>
                         </form>

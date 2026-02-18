@@ -207,10 +207,7 @@ function bindKeyboard() {
   });
 }
 
-function populateTimezoneOptions() {
-  const datalist = document.getElementById('timezone-options');
-  if (!datalist) return;
-
+function getTimezoneValues() {
   const fallback = [
     'Europe/London',
     'America/New_York',
@@ -222,11 +219,50 @@ function populateTimezoneOptions() {
     'Australia/Sydney'
   ];
 
-  const values = typeof Intl.supportedValuesOf === 'function'
+  return typeof Intl.supportedValuesOf === 'function'
     ? Intl.supportedValuesOf('timeZone')
     : fallback;
+}
 
-  datalist.innerHTML = values.map((tz) => `<option value="${tz}"></option>`).join('');
+function setupTimezoneSearch() {
+  const input = document.getElementById('timezone-input');
+  const suggestions = document.getElementById('timezone-suggestions');
+  if (!input || !suggestions) return;
+
+  const allZones = getTimezoneValues();
+
+  const render = (query = '') => {
+    const q = query.trim().toLowerCase();
+    const filtered = allZones
+      .filter((tz) => !q || tz.toLowerCase().includes(q))
+      .slice(0, 40);
+
+    if (!filtered.length) {
+      suggestions.innerHTML = '<div class="timezone-option muted">No matches</div>';
+      suggestions.classList.remove('hidden');
+      return;
+    }
+
+    suggestions.innerHTML = filtered
+      .map((tz) => `<button type="button" class="timezone-option" data-timezone="${tz}">${tz}</button>`)
+      .join('');
+
+    suggestions.classList.remove('hidden');
+
+    suggestions.querySelectorAll('.timezone-option[data-timezone]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        input.value = btn.dataset.timezone;
+        suggestions.classList.add('hidden');
+      });
+    });
+  };
+
+  input.addEventListener('focus', () => render(input.value));
+  input.addEventListener('input', () => render(input.value));
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => suggestions.classList.add('hidden'), 120);
+  });
 }
 
 function renderTypeSelector(types) {
@@ -579,7 +615,7 @@ async function init() {
   bindCalendarNav();
   bindKeyboard();
   bindForms();
-  populateTimezoneOptions();
+  setupTimezoneSearch();
 
   const todayInput = document.querySelector('input[name="date"]');
   if (todayInput) todayInput.value = state.selectedDate;

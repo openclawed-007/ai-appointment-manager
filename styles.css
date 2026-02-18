@@ -350,6 +350,50 @@ body {
     display: none;
 }
 
+.timezone-group {
+    position: relative;
+}
+
+.timezone-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+}
+
+.timezone-suggestions.hidden {
+    display: none;
+}
+
+.timezone-option {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.timezone-option:hover {
+    background: var(--bg-tertiary);
+}
+
+.timezone-option.muted {
+    color: var(--text-muted);
+    cursor: default;
+}
+
 .btn-primary {
     display: flex;
     align-items: center;
