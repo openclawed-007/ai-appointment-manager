@@ -460,6 +460,22 @@ body {
     color: var(--primary-dark);
 }
 
+.account-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 220px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Content Wrapper */
 .content-wrapper {
     flex: 1;
@@ -1608,6 +1624,67 @@ body {
     display: none;
 }
 
+.auth-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+}
+
+.auth-shell.hidden {
+    display: none;
+}
+
+.auth-card {
+    width: min(560px, 100%);
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: var(--shadow-xl);
+}
+
+.auth-card h2 {
+    margin-bottom: 6px;
+}
+
+.auth-card p {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+}
+
+.auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.auth-tab {
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.auth-tab.active {
+    border-color: var(--primary-light);
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--primary-dark);
+}
+
+.auth-form.hidden {
+    display: none;
+}
+
 /* Responsive */
 @media (max-width: 1280px) {
     .stats-grid {
@@ -1648,6 +1725,12 @@ body {
 
     .header-actions {
         justify-content: space-between;
+    }
+
+    .account-chip {
+        max-width: none;
+        width: 100%;
+        justify-content: center;
     }
     
     .content-wrapper {
@@ -1740,6 +1823,11 @@ body {
 
     .header-actions .btn-secondary {
         display: none;
+    }
+
+    .header-actions #btn-logout {
+        display: inline-flex;
+        justify-content: center;
     }
 
     .data-row {

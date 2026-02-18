@@ -78,7 +78,9 @@
                     <input id="global-search" type="text" placeholder="Search appointments, clients, or types...">
                 </div>
                 <div class="header-actions">
-                    <a class="btn-secondary" href="/book" target="_blank" rel="noopener">Public Booking Page</a>
+                    <span class="account-chip" id="account-chip"></span>
+                    <a class="btn-secondary" id="btn-public-booking" href="/book" target="_blank" rel="noopener">Public Booking Page</a>
+                    <button class="btn-secondary" id="btn-logout" type="button">Logout</button>
                     <button class="icon-btn" id="btn-notifications" type="button" aria-label="Notifications">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -403,6 +405,36 @@
         <button class="mobile-nav-item" data-view="ai" type="button">AI</button>
         <button class="mobile-nav-item" data-view="settings" type="button">Settings</button>
     </nav>
+
+    <div class="auth-shell hidden" id="auth-shell">
+        <div class="auth-card">
+            <h2>Sign in to IntelliSchedule</h2>
+            <p>Use your business owner account to access your workspace.</p>
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" data-auth-tab="login">Login</button>
+                <button type="button" class="auth-tab" data-auth-tab="signup">Create Account</button>
+            </div>
+
+            <form id="auth-login-form" class="auth-form">
+                <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
+                <div class="form-group"><label>Password</label><input name="password" type="password" required /></div>
+                <div class="form-actions"><button type="submit" class="btn-primary">Sign In</button></div>
+            </form>
+
+            <form id="auth-signup-form" class="auth-form hidden">
+                <div class="form-row">
+                    <div class="form-group"><label>Business Name</label><input name="businessName" required /></div>
+                    <div class="form-group"><label>Your Name</label><input name="name" required /></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
+                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="8" required /></div>
+                </div>
+                <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" /></div>
+                <div class="form-actions"><button type="submit" class="btn-primary">Create Account</button></div>
+            </form>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

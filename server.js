@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const express = require('express');
 const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
@@ -11,6 +12,10 @@ const PORT = Number(process.env.PORT || 3000);
 
 const USE_POSTGRES = Boolean(process.env.DATABASE_URL);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
+const SESSION_COOKIE = 'sid';
+const SESSION_DAYS = 30;
+const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || 'owner@example.com';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
 
 let sqlite = null;
 let pgPool = null;
@@ -71,11 +76,101 @@ async function dbAll(sqliteSql, postgresSql, params = []) {
   return sqlite.prepare(sqliteSql).all(...params);
 }
 
+function slugifyBusinessName(input = '') {
+  const base = String(input || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'business';
+}
+
+function hashPassword(password = '') {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password = '', stored = '') {
+  const [salt, hash] = String(stored || '').split(':');
+  if (!salt || !hash) return false;
+  const attempt = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(attempt, 'hex'));
+}
+
+function makeSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashSessionToken(token = '') {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function parseCookies(req) {
+  const raw = String(req.headers.cookie || '');
+  const out = {};
+  raw.split(';').forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx <= 0) return;
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    out[key] = decodeURIComponent(value);
+  });
+  return out;
+}
+
+function setSessionCookie(res, token) {
+  const maxAge = SESSION_DAYS * 24 * 60 * 60;
+  res.setHeader(
+    'Set-Cookie',
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`
+  );
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+
+function addSqliteColumnIfMissing(tableName, columnName, definitionSql) {
+  const cols = sqlite.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (!cols.some((c) => String(c.name) === String(columnName))) {
+    sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+  }
+}
+
 async function initDb() {
   if (USE_POSTGRES) {
     await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS businesses (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        owner_email TEXT,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        business_id INTEGER NOT NULL REFERENCES businesses(id),
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'owner',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY,
+        business_id INTEGER,
         business_name TEXT NOT NULL,
         owner_email TEXT,
         timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles'
@@ -83,6 +178,7 @@ async function initDb() {
 
       CREATE TABLE IF NOT EXISTS appointment_types (
         id SERIAL PRIMARY KEY,
+        business_id INTEGER,
         name TEXT NOT NULL,
         duration_minutes INTEGER NOT NULL DEFAULT 45,
         price_cents INTEGER NOT NULL DEFAULT 0,
@@ -94,6 +190,7 @@ async function initDb() {
 
       CREATE TABLE IF NOT EXISTS appointments (
         id SERIAL PRIMARY KEY,
+        business_id INTEGER,
         type_id INTEGER REFERENCES appointment_types(id),
         title TEXT,
         client_name TEXT NOT NULL,
@@ -108,31 +205,71 @@ async function initDb() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS business_settings (
+        business_id INTEGER PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
+        business_name TEXT NOT NULL,
+        owner_email TEXT,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles'
+      );
+
       CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
       CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+      CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
 
+    await pgPool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS business_id INTEGER');
+    await pgPool.query('ALTER TABLE appointment_types ADD COLUMN IF NOT EXISTS business_id INTEGER');
+    await pgPool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS business_id INTEGER');
+    await pgPool.query('CREATE INDEX IF NOT EXISTS idx_settings_business ON settings(business_id)');
+    await pgPool.query('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
+    await pgPool.query('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
+
+    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliSchedule';
+    const defaultSlug = slugifyBusinessName(defaultBusinessName);
+    const businessRow = (
+      await pgPool.query(
+        `INSERT INTO businesses (name, slug, owner_email, timezone)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+         RETURNING *`,
+        [
+          defaultBusinessName,
+          defaultSlug,
+          process.env.OWNER_EMAIL || null,
+          process.env.TIMEZONE || 'America/Los_Angeles'
+        ]
+      )
+    ).rows[0];
+
     await pgPool.query(
-      `INSERT INTO settings (id, business_name, owner_email, timezone)
-       VALUES (1, $1, $2, $3)
-       ON CONFLICT (id) DO NOTHING`,
-      [
-        process.env.BUSINESS_NAME || 'IntelliSchedule',
-        process.env.OWNER_EMAIL || null,
-        process.env.TIMEZONE || 'America/Los_Angeles'
-      ]
+      `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (business_id) DO UPDATE SET
+         business_name = EXCLUDED.business_name,
+         owner_email = COALESCE(business_settings.owner_email, EXCLUDED.owner_email),
+         timezone = COALESCE(business_settings.timezone, EXCLUDED.timezone)`,
+      [businessRow.id, defaultBusinessName, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles']
     );
 
-    const typeCount = Number((await pgPool.query('SELECT COUNT(*)::int as c FROM appointment_types')).rows[0].c);
-    if (!typeCount) {
+    await pgPool.query('UPDATE settings SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
+    await pgPool.query('UPDATE appointment_types SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
+    await pgPool.query('UPDATE appointments SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
+
+    const existingTypeCount = Number(
+      (await pgPool.query('SELECT COUNT(*)::int AS c FROM appointment_types WHERE business_id = $1', [businessRow.id])).rows[0].c
+    );
+    if (!existingTypeCount) {
       await pgPool.query(
-        `INSERT INTO appointment_types (name, duration_minutes, price_cents, location_mode, color)
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
          VALUES
-           ($1, $2, $3, $4, $5),
-           ($6, $7, $8, $9, $10),
-           ($11, $12, $13, $14, $15),
-           ($16, $17, $18, $19, $20)`,
+           ($1, $2, $3, $4, $5, $6),
+           ($1, $7, $8, $9, $10, $11),
+           ($1, $12, $13, $14, $15, $16),
+           ($1, $17, $18, $19, $20, $21)`,
         [
+          businessRow.id,
           'Consultation', 45, 15000, 'office', COLORS[0],
           'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
           'Review', 60, 20000, 'virtual', COLORS[2],
@@ -140,10 +277,51 @@ async function initDb() {
         ]
       );
     }
+
+    const existingUser = await pgPool.query('SELECT id FROM users WHERE email = $1', [DEFAULT_ADMIN_EMAIL.toLowerCase()]);
+    if (!existingUser.rowCount) {
+      await pgPool.query(
+        `INSERT INTO users (business_id, name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4, 'owner')`,
+        [businessRow.id, 'Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD)]
+      );
+    }
   } else {
     sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS businesses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        slug TEXT UNIQUE NOT NULL,
+        owner_email TEXT,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'owner',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(business_id) REFERENCES businesses(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        business_id INTEGER NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(business_id) REFERENCES businesses(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
+        business_id INTEGER,
         business_name TEXT NOT NULL,
         owner_email TEXT,
         timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles'
@@ -151,6 +329,7 @@ async function initDb() {
 
       CREATE TABLE IF NOT EXISTS appointment_types (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER,
         name TEXT NOT NULL,
         duration_minutes INTEGER NOT NULL DEFAULT 45,
         price_cents INTEGER NOT NULL DEFAULT 0,
@@ -162,6 +341,7 @@ async function initDb() {
 
       CREATE TABLE IF NOT EXISTS appointments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_id INTEGER,
         type_id INTEGER,
         title TEXT,
         client_name TEXT NOT NULL,
@@ -177,26 +357,53 @@ async function initDb() {
         FOREIGN KEY(type_id) REFERENCES appointment_types(id)
       );
 
+      CREATE TABLE IF NOT EXISTS business_settings (
+        business_id INTEGER PRIMARY KEY,
+        business_name TEXT NOT NULL,
+        owner_email TEXT,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+        FOREIGN KEY(business_id) REFERENCES businesses(id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
       CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+      CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
+
+    addSqliteColumnIfMissing('settings', 'business_id', 'business_id INTEGER');
+    addSqliteColumnIfMissing('appointment_types', 'business_id', 'business_id INTEGER');
+    addSqliteColumnIfMissing('appointments', 'business_id', 'business_id INTEGER');
+    sqlite.exec('CREATE INDEX IF NOT EXISTS idx_settings_business ON settings(business_id)');
+    sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
+    sqlite.exec('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
+
+    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliSchedule';
+    const defaultSlug = slugifyBusinessName(defaultBusinessName);
+    sqlite
+      .prepare(
+        `INSERT OR IGNORE INTO businesses (id, name, slug, owner_email, timezone)
+         VALUES (1, ?, ?, ?, ?)`
+      )
+      .run(defaultBusinessName, defaultSlug, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles');
 
     sqlite
       .prepare(
-        `INSERT OR IGNORE INTO settings (id, business_name, owner_email, timezone)
+        `INSERT OR IGNORE INTO business_settings (business_id, business_name, owner_email, timezone)
          VALUES (1, ?, ?, ?)`
       )
-      .run(
-        process.env.BUSINESS_NAME || 'IntelliSchedule',
-        process.env.OWNER_EMAIL || null,
-        process.env.TIMEZONE || 'America/Los_Angeles'
-      );
+      .run(defaultBusinessName, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles');
 
-    const count = sqlite.prepare('SELECT COUNT(*) AS c FROM appointment_types').get().c;
+    sqlite.prepare('UPDATE settings SET business_id = 1 WHERE business_id IS NULL').run();
+    sqlite.prepare('UPDATE appointment_types SET business_id = 1 WHERE business_id IS NULL').run();
+    sqlite.prepare('UPDATE appointments SET business_id = 1 WHERE business_id IS NULL').run();
+
+    const count = sqlite.prepare('SELECT COUNT(*) AS c FROM appointment_types WHERE business_id = 1').get().c;
     if (!count) {
       const insert = sqlite.prepare(
-        `INSERT INTO appointment_types (name, duration_minutes, price_cents, location_mode, color)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES (1, ?, ?, ?, ?, ?)`
       );
       [
         ['Consultation', 45, 15000, 'office', COLORS[0]],
@@ -204,6 +411,16 @@ async function initDb() {
         ['Review', 60, 20000, 'virtual', COLORS[2]],
         ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
       ].forEach((row) => insert.run(...row));
+    }
+
+    const existingUser = sqlite.prepare('SELECT id FROM users WHERE email = ?').get(DEFAULT_ADMIN_EMAIL.toLowerCase());
+    if (!existingUser) {
+      sqlite
+        .prepare(
+          `INSERT INTO users (business_id, name, email, password_hash, role)
+           VALUES (1, ?, ?, ?, 'owner')`
+        )
+        .run('Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD));
     }
   }
 }
@@ -252,8 +469,72 @@ function fmtTime(time24) {
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-async function getSettings() {
-  return dbGet('SELECT * FROM settings WHERE id = 1', 'SELECT * FROM settings WHERE id = 1');
+async function getSettings(businessId) {
+  const id = Number(businessId || 1);
+  return dbGet(
+    'SELECT * FROM business_settings WHERE business_id = ? LIMIT 1',
+    'SELECT * FROM business_settings WHERE business_id = $1 LIMIT 1',
+    [id]
+  );
+}
+
+async function getBusinessById(id) {
+  return dbGet('SELECT * FROM businesses WHERE id = ?', 'SELECT * FROM businesses WHERE id = $1', [Number(id)]);
+}
+
+async function getBusinessBySlug(slug) {
+  return dbGet('SELECT * FROM businesses WHERE slug = ?', 'SELECT * FROM businesses WHERE slug = $1', [String(slug || '')]);
+}
+
+async function createSession({ userId, businessId }) {
+  const token = makeSessionToken();
+  const tokenHash = hashSessionToken(token);
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  await dbRun(
+    `INSERT INTO sessions (user_id, business_id, token_hash, expires_at)
+     VALUES (?, ?, ?, ?)`,
+    `INSERT INTO sessions (user_id, business_id, token_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [Number(userId), Number(businessId), tokenHash, expiresAt]
+  );
+  return token;
+}
+
+async function deleteSessionByToken(token) {
+  const tokenHash = hashSessionToken(token);
+  await dbRun(
+    'DELETE FROM sessions WHERE token_hash = ?',
+    'DELETE FROM sessions WHERE token_hash = $1',
+    [tokenHash]
+  );
+}
+
+async function getSessionByToken(token) {
+  const tokenHash = hashSessionToken(token);
+  const row = await dbGet(
+    `SELECT s.*, u.email, u.name, u.role
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = ?`,
+    `SELECT s.*, u.email, u.name, u.role
+     FROM sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token_hash = $1`,
+    [tokenHash]
+  );
+  if (!row) return null;
+  const expiresAt = new Date(row.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    await deleteSessionByToken(token);
+    return null;
+  }
+  return {
+    userId: Number(row.user_id),
+    businessId: Number(row.business_id),
+    email: row.email,
+    name: row.name,
+    role: row.role
+  };
 }
 
 function parseTimeOrThrow(timeValue) {
@@ -262,17 +543,17 @@ function parseTimeOrThrow(timeValue) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-async function assertNoOverlap({ date, startMinutes, durationMinutes, excludeId = null }) {
+async function assertNoOverlap({ businessId, date, startMinutes, durationMinutes, excludeId = null }) {
   const rows = await dbAll(
     `SELECT id, time, duration_minutes
      FROM appointments
-     WHERE date = ? AND status != 'cancelled'
+     WHERE business_id = ? AND date = ? AND status != 'cancelled'
      ORDER BY time ASC`,
     `SELECT id, time, duration_minutes
      FROM appointments
-     WHERE date = $1 AND status != 'cancelled'
+     WHERE business_id = $1 AND date = $2 AND status != 'cancelled'
      ORDER BY time ASC`,
-    [String(date)]
+    [Number(businessId), String(date)]
   );
 
   const endMinutes = startMinutes + durationMinutes;
@@ -476,6 +757,7 @@ async function sendEmail({ to, subject, html, text }) {
 
 async function createAppointment(payload = {}) {
   const {
+    businessId,
     typeId,
     title,
     clientName,
@@ -489,15 +771,17 @@ async function createAppointment(payload = {}) {
   } = payload;
 
   if (!clientName?.trim()) throw new Error('clientName is required');
+  const scopedBusinessId = Number(businessId);
+  if (!Number.isFinite(scopedBusinessId) || scopedBusinessId <= 0) throw new Error('businessId is required');
   if (!date) throw new Error('date is required');
   if (!time) throw new Error('time is required');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) throw new Error('date must be in YYYY-MM-DD format');
 
   const type = typeId
     ? await dbGet(
-        'SELECT * FROM appointment_types WHERE id = ? AND active = 1',
-        'SELECT * FROM appointment_types WHERE id = $1 AND active = TRUE',
-        [Number(typeId)]
+        'SELECT * FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
+        'SELECT * FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
+        [Number(typeId), scopedBusinessId]
       )
     : null;
 
@@ -507,12 +791,14 @@ async function createAppointment(payload = {}) {
   }
   const startMinutes = parseTimeOrThrow(time);
   await assertNoOverlap({
+    businessId: scopedBusinessId,
     date: String(date),
     startMinutes,
     durationMinutes: resolvedDuration
   });
 
   const params = [
+    scopedBusinessId,
     type?.id || null,
     title || type?.name || 'Appointment',
     clientName.trim(),
@@ -529,8 +815,8 @@ async function createAppointment(payload = {}) {
   if (USE_POSTGRES) {
     const insert = await pgPool.query(
       `INSERT INTO appointments
-       (type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'confirmed',$10)
+       (business_id, type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'confirmed',$11)
        RETURNING id`,
       params
     );
@@ -539,8 +825,8 @@ async function createAppointment(payload = {}) {
     const result = sqlite
       .prepare(
         `INSERT INTO appointments
-         (type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`
+         (business_id, type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`
       )
       .run(...params);
     id = result.lastInsertRowid;
@@ -550,16 +836,16 @@ async function createAppointment(payload = {}) {
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = ?`,
+     WHERE a.id = ? AND a.business_id = ?`,
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = $1`,
-    [id]
+     WHERE a.id = $1 AND a.business_id = $2`,
+    [id, scopedBusinessId]
   );
 
   const appointment = rowToAppointment(row);
-  const settings = await getSettings();
+  const settings = await getSettings(scopedBusinessId);
 
   const clientText = `Hi ${appointment.clientName},\n\nYour ${appointment.typeName} is confirmed for ${appointment.date} at ${fmtTime(
     appointment.time
@@ -644,7 +930,8 @@ function humanTime(minutesFromMidnight = 540) {
   return fmtTime(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
 }
 
-async function createInsights(date) {
+async function createInsights(date, businessId) {
+  const scopedBusinessId = Number(businessId);
   const focusDate = new Date(`${date}T00:00:00`);
   if (Number.isNaN(focusDate.getTime())) return [];
 
@@ -661,56 +948,61 @@ async function createInsights(date) {
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date >= ?
+       WHERE a.business_id = ? AND a.date >= ?
        ORDER BY a.date ASC, a.time ASC`,
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date >= $1
+       WHERE a.business_id = $1 AND a.date >= $2
        ORDER BY a.date ASC, a.time ASC`,
-      [from30Str]
+      [scopedBusinessId, from30Str]
     ),
     dbAll(
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date >= ? AND a.status != 'cancelled'
+       WHERE a.business_id = ? AND a.date >= ? AND a.status != 'cancelled'
        ORDER BY a.date ASC, a.time ASC`,
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date >= $1 AND a.status != 'cancelled'
+       WHERE a.business_id = $1 AND a.date >= $2 AND a.status != 'cancelled'
        ORDER BY a.date ASC, a.time ASC`,
-      [from30Str]
+      [scopedBusinessId, from30Str]
     ),
     dbAll(
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date = ? AND a.status != 'cancelled'
+       WHERE a.business_id = ? AND a.date = ? AND a.status != 'cancelled'
        ORDER BY a.time ASC`,
       `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date = $1 AND a.status != 'cancelled'
+       WHERE a.business_id = $1 AND a.date = $2 AND a.status != 'cancelled'
        ORDER BY a.time ASC`,
-      [date]
+      [scopedBusinessId, date]
     ),
     dbAll(
       `SELECT a.date
        FROM appointments a
-       WHERE a.date BETWEEN ? AND ? AND a.status != 'cancelled'`,
+       WHERE a.business_id = ? AND a.date BETWEEN ? AND ? AND a.status != 'cancelled'`,
       `SELECT a.date
        FROM appointments a
-       WHERE a.date BETWEEN $1 AND $2 AND a.status != 'cancelled'`,
-      [date, to7Str]
+       WHERE a.business_id = $1 AND a.date BETWEEN $2 AND $3 AND a.status != 'cancelled'`,
+      [scopedBusinessId, date, to7Str]
     ),
     dbGet(
-      "SELECT COUNT(*) AS c FROM appointments WHERE status = 'pending'",
-      "SELECT COUNT(*)::int AS c FROM appointments WHERE status = 'pending'"
+      "SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'",
+      "SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'",
+      [scopedBusinessId]
     ),
-    getSettings()
+    getSettings(scopedBusinessId)
   ]);
+  const businessSettings = settings || {
+    business_name: 'IntelliSchedule',
+    timezone: 'America/Los_Angeles'
+  };
 
   const insights = [];
 
@@ -724,7 +1016,7 @@ async function createInsights(date) {
     });
     insights.push({
       icon: '🎯',
-      text: `Current timezone is ${settings.timezone}.`,
+      text: `Current timezone is ${businessSettings.timezone}.`,
       action: 'Keep timezone synced for reminder accuracy.',
       confidence: 'High confidence',
       time: 'Now'
@@ -841,7 +1133,7 @@ async function createInsights(date) {
 
   insights.push({
     icon: '🌍',
-    text: `Timezone is set to ${settings.timezone}.`,
+    text: `Timezone is set to ${businessSettings.timezone}.`,
     action: 'Keep timezone aligned with business hours and reminder rules.',
     confidence: 'High confidence',
     time: 'Configuration'
@@ -855,39 +1147,228 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, db: USE_POSTGRES ? 'postgres' : 'sqlite' });
 });
 
-app.get('/api/settings', async (_req, res) => {
-  res.json({ settings: await getSettings() });
+app.post('/api/auth/signup', async (req, res) => {
+  const { businessName, name, email, password, timezone } = req.body || {};
+  if (!businessName?.trim()) return res.status(400).json({ error: 'businessName is required' });
+  if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  if (!email?.trim()) return res.status(400).json({ error: 'email is required' });
+  if (!password || String(password).length < 8) {
+    return res.status(400).json({ error: 'password must be at least 8 characters' });
+  }
+
+  const emailValue = String(email).trim().toLowerCase();
+  const slugBase = slugifyBusinessName(businessName);
+  let slug = slugBase;
+  let suffix = 1;
+  // ensure unique business slug
+  while (await getBusinessBySlug(slug)) {
+    suffix += 1;
+    slug = `${slugBase}-${suffix}`;
+  }
+
+  try {
+    let business;
+    if (USE_POSTGRES) {
+      business = (
+        await pgPool.query(
+          `INSERT INTO businesses (name, slug, owner_email, timezone)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [businessName.trim(), slug, emailValue, timezone || 'America/Los_Angeles']
+        )
+      ).rows[0];
+      await pgPool.query(
+        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+         VALUES ($1, $2, $3, $4)`,
+        [business.id, businessName.trim(), emailValue, timezone || 'America/Los_Angeles']
+      );
+      await pgPool.query(
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES
+           ($1, $2, $3, $4, $5, $6),
+           ($1, $7, $8, $9, $10, $11),
+           ($1, $12, $13, $14, $15, $16),
+           ($1, $17, $18, $19, $20, $21)`,
+        [
+          business.id,
+          'Consultation', 45, 15000, 'office', COLORS[0],
+          'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
+          'Review', 60, 20000, 'virtual', COLORS[2],
+          'Follow-up Call', 15, 0, 'phone', COLORS[3]
+        ]
+      );
+      const user = (
+        await pgPool.query(
+          `INSERT INTO users (business_id, name, email, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'owner')
+           RETURNING *`,
+          [business.id, name.trim(), emailValue, hashPassword(password)]
+        )
+      ).rows[0];
+      const token = await createSession({ userId: user.id, businessId: business.id });
+      setSessionCookie(res, token);
+      return res.status(201).json({
+        user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
+        business: { id: Number(business.id), name: business.name, slug: business.slug }
+      });
+    }
+
+    const businessInsert = sqlite
+      .prepare(
+        `INSERT INTO businesses (name, slug, owner_email, timezone)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(businessName.trim(), slug, emailValue, timezone || 'America/Los_Angeles');
+    const businessId = Number(businessInsert.lastInsertRowid);
+
+    sqlite
+      .prepare(
+        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(businessId, businessName.trim(), emailValue, timezone || 'America/Los_Angeles');
+
+    const insertType = sqlite.prepare(
+      `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    [
+      ['Consultation', 45, 15000, 'office', COLORS[0]],
+      ['Strategy Session', 90, 30000, 'hybrid', COLORS[1]],
+      ['Review', 60, 20000, 'virtual', COLORS[2]],
+      ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
+    ].forEach((r) => insertType.run(businessId, ...r));
+
+    const userInsert = sqlite
+      .prepare(
+        `INSERT INTO users (business_id, name, email, password_hash, role)
+         VALUES (?, ?, ?, ?, 'owner')`
+      )
+      .run(businessId, name.trim(), emailValue, hashPassword(password));
+
+    const token = await createSession({ userId: userInsert.lastInsertRowid, businessId });
+    setSessionCookie(res, token);
+    return res.status(201).json({
+      user: { id: Number(userInsert.lastInsertRowid), name: name.trim(), email: emailValue, role: 'owner' },
+      business: { id: businessId, name: businessName.trim(), slug }
+    });
+  } catch (error) {
+    if (String(error.message || '').toLowerCase().includes('unique')) {
+      return res.status(409).json({ error: 'Email already in use.' });
+    }
+    return res.status(500).json({ error: 'Could not create account.' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  const emailValue = String(email || '').trim().toLowerCase();
+  if (!emailValue || !password) return res.status(400).json({ error: 'email and password are required' });
+
+  const user = await dbGet(
+    'SELECT * FROM users WHERE email = ?',
+    'SELECT * FROM users WHERE email = $1',
+    [emailValue]
+  );
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  const business = await getBusinessById(user.business_id);
+  const token = await createSession({ userId: user.id, businessId: user.business_id });
+  setSessionCookie(res, token);
+  return res.json({
+    user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
+    business: business ? { id: Number(business.id), name: business.name, slug: business.slug } : null
+  });
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE];
+  if (token) await deleteSessionByToken(token);
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/me', async (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE];
+  if (!token) return res.status(401).json({ error: 'Not authenticated.' });
+  const session = await getSessionByToken(token);
+  if (!session) return res.status(401).json({ error: 'Not authenticated.' });
+  const business = await getBusinessById(session.businessId);
+  return res.json({
+    user: { id: session.userId, name: session.name, email: session.email, role: session.role },
+    business: business ? { id: Number(business.id), name: business.name, slug: business.slug } : null
+  });
+});
+
+app.use('/api', async (req, res, next) => {
+  if (
+    req.path === '/health' ||
+    req.path.startsWith('/auth/') ||
+    req.path === '/public/bookings' ||
+    (req.path === '/types' && req.method === 'GET' && req.query.businessSlug)
+  ) {
+    return next();
+  }
+
+  const cookies = parseCookies(req);
+  const token = cookies[SESSION_COOKIE];
+  if (!token) return res.status(401).json({ error: 'Authentication required.' });
+  const session = await getSessionByToken(token);
+  if (!session) {
+    clearSessionCookie(res);
+    return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+  }
+  req.auth = session;
+  next();
+});
+
+app.get('/api/settings', async (req, res) => {
+  res.json({ settings: await getSettings(req.auth.businessId) });
 });
 
 app.put('/api/settings', async (req, res) => {
   const { businessName, ownerEmail, timezone } = req.body || {};
+  const businessId = req.auth.businessId;
 
   await dbRun(
-    `UPDATE settings
+    `UPDATE business_settings
      SET business_name = COALESCE(?, business_name),
          owner_email = COALESCE(?, owner_email),
          timezone = COALESCE(?, timezone)
-     WHERE id = 1`,
-    `UPDATE settings
+     WHERE business_id = ?`,
+    `UPDATE business_settings
      SET business_name = COALESCE($1, business_name),
          owner_email = COALESCE($2, owner_email),
          timezone = COALESCE($3, timezone)
-     WHERE id = 1`,
-    [businessName || null, ownerEmail || null, timezone || null]
+     WHERE business_id = $4`,
+    [businessName || null, ownerEmail || null, timezone || null, businessId]
   );
 
-  res.json({ settings: await getSettings() });
+  res.json({ settings: await getSettings(businessId) });
 });
 
-app.get('/api/types', async (_req, res) => {
+app.get('/api/types', async (req, res) => {
+  let businessId = req.auth?.businessId;
+  if (!businessId && req.query.businessSlug) {
+    const business = await getBusinessBySlug(String(req.query.businessSlug));
+    if (!business) return res.status(404).json({ error: 'Business not found.' });
+    businessId = Number(business.id);
+  }
+  if (!businessId) return res.status(401).json({ error: 'Authentication required.' });
   const rows = await dbAll(
-    'SELECT * FROM appointment_types WHERE active = 1 ORDER BY id ASC',
-    'SELECT * FROM appointment_types WHERE active = TRUE ORDER BY id ASC'
+    'SELECT * FROM appointment_types WHERE business_id = ? AND active = 1 ORDER BY id ASC',
+    'SELECT * FROM appointment_types WHERE business_id = $1 AND active = TRUE ORDER BY id ASC',
+    [businessId]
   );
   res.json({ types: rows.map(rowToType) });
 });
 
 app.post('/api/types', async (req, res) => {
+  const businessId = req.auth.businessId;
   const { name, durationMinutes, priceCents, locationMode, color } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
 
@@ -903,19 +1384,19 @@ app.post('/api/types', async (req, res) => {
   if (USE_POSTGRES) {
     row = (
       await pgPool.query(
-        `INSERT INTO appointment_types (name, duration_minutes, price_cents, location_mode, color)
-         VALUES ($1,$2,$3,$4,$5)
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES ($1,$2,$3,$4,$5,$6)
          RETURNING *`,
-        params
+        [businessId, ...params]
       )
     ).rows[0];
   } else {
     const result = sqlite
       .prepare(
-        `INSERT INTO appointment_types (name, duration_minutes, price_cents, location_mode, color)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES (?, ?, ?, ?, ?, ?)`
       )
-      .run(...params);
+      .run(businessId, ...params);
     row = sqlite.prepare('SELECT * FROM appointment_types WHERE id = ?').get(result.lastInsertRowid);
   }
 
@@ -923,6 +1404,7 @@ app.post('/api/types', async (req, res) => {
 });
 
 app.put('/api/types/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
   const id = Number(req.params.id);
   const { name, durationMinutes, priceCents, locationMode, color, active } = req.body || {};
 
@@ -934,7 +1416,7 @@ app.put('/api/types/:id', async (req, res) => {
          location_mode = COALESCE(?, location_mode),
          color = COALESCE(?, color),
          active = COALESCE(?, active)
-     WHERE id = ?`,
+     WHERE id = ? AND business_id = ?`,
     `UPDATE appointment_types
      SET name = COALESCE($1, name),
          duration_minutes = COALESCE($2, duration_minutes),
@@ -942,7 +1424,7 @@ app.put('/api/types/:id', async (req, res) => {
          location_mode = COALESCE($4, location_mode),
          color = COALESCE($5, color),
          active = COALESCE($6, active)
-     WHERE id = $7`,
+     WHERE id = $7 AND business_id = $8`,
     [
       name || null,
       durationMinutes == null ? null : Number(durationMinutes),
@@ -950,14 +1432,15 @@ app.put('/api/types/:id', async (req, res) => {
       locationMode || null,
       color || null,
       active == null ? null : USE_POSTGRES ? !!active : Number(!!active),
-      id
+      id,
+      businessId
     ]
   );
 
   const row = await dbGet(
-    'SELECT * FROM appointment_types WHERE id = ?',
-    'SELECT * FROM appointment_types WHERE id = $1',
-    [id]
+    'SELECT * FROM appointment_types WHERE id = ? AND business_id = ?',
+    'SELECT * FROM appointment_types WHERE id = $1 AND business_id = $2',
+    [id, businessId]
   );
 
   if (!row) return res.status(404).json({ error: 'type not found' });
@@ -965,15 +1448,17 @@ app.put('/api/types/:id', async (req, res) => {
 });
 
 app.delete('/api/types/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
   await dbRun(
-    'UPDATE appointment_types SET active = 0 WHERE id = ?',
-    'UPDATE appointment_types SET active = FALSE WHERE id = $1',
-    [Number(req.params.id)]
+    'UPDATE appointment_types SET active = 0 WHERE id = ? AND business_id = ?',
+    'UPDATE appointment_types SET active = FALSE WHERE id = $1 AND business_id = $2',
+    [Number(req.params.id), businessId]
   );
   res.json({ ok: true });
 });
 
 app.get('/api/appointments', async (req, res) => {
+  const businessId = req.auth.businessId;
   const { date, q, status } = req.query;
 
   if (!USE_POSTGRES) {
@@ -981,9 +1466,9 @@ app.get('/api/appointments', async (req, res) => {
       SELECT a.*, t.name AS type_name
       FROM appointments a
       LEFT JOIN appointment_types t ON t.id = a.type_id
-      WHERE 1 = 1
+      WHERE a.business_id = ?
     `;
-    const params = [];
+    const params = [businessId];
 
     if (date) {
       sql += ' AND a.date = ?';
@@ -1006,9 +1491,9 @@ app.get('/api/appointments', async (req, res) => {
     SELECT a.*, t.name AS type_name
     FROM appointments a
     LEFT JOIN appointment_types t ON t.id = a.type_id
-    WHERE 1 = 1
+    WHERE a.business_id = $1
   `;
-  const params = [];
+  const params = [businessId];
 
   if (date) {
     params.push(String(date));
@@ -1031,7 +1516,11 @@ app.get('/api/appointments', async (req, res) => {
 
 app.post('/api/appointments', async (req, res) => {
   try {
-    const result = await createAppointment({ ...req.body, source: req.body?.source || 'owner' });
+    const result = await createAppointment({
+      ...req.body,
+      businessId: req.auth.businessId,
+      source: req.body?.source || 'owner'
+    });
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1040,7 +1529,11 @@ app.post('/api/appointments', async (req, res) => {
 
 app.post('/api/public/bookings', async (req, res) => {
   try {
-    const result = await createAppointment({ ...req.body, source: 'public' });
+    const slug = String(req.body?.businessSlug || '').trim();
+    if (!slug) return res.status(400).json({ error: 'businessSlug is required for public bookings.' });
+    const business = await getBusinessBySlug(slug);
+    if (!business) return res.status(404).json({ error: 'Business not found.' });
+    const result = await createAppointment({ ...req.body, businessId: business.id, source: 'public' });
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1048,24 +1541,25 @@ app.post('/api/public/bookings', async (req, res) => {
 });
 
 app.post('/api/appointments/:id/email', async (req, res) => {
+  const businessId = req.auth.businessId;
   const id = Number(req.params.id);
   const row = await dbGet(
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = ?`,
+     WHERE a.id = ? AND a.business_id = ?`,
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = $1`,
-    [id]
+     WHERE a.id = $1 AND a.business_id = $2`,
+    [id, businessId]
   );
 
   if (!row) return res.status(404).json({ error: 'appointment not found' });
   const appointment = rowToAppointment(row);
   if (!appointment.clientEmail) return res.status(400).json({ error: 'This appointment has no client email.' });
 
-  const settings = await getSettings();
+  const settings = await getSettings(businessId);
   const { template, subject, message } = req.body || {};
   const selectedTemplate = String(template || 'summary');
 
@@ -1123,6 +1617,7 @@ app.post('/api/appointments/:id/email', async (req, res) => {
 });
 
 app.put('/api/appointments/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
   const id = Number(req.params.id);
   const { typeId, clientName, clientEmail, date, time, durationMinutes, location, notes } = req.body || {};
 
@@ -1134,9 +1629,9 @@ app.put('/api/appointments/:id', async (req, res) => {
   let selectedType = null;
   if (typeId != null) {
     selectedType = await dbGet(
-      'SELECT * FROM appointment_types WHERE id = ? AND active = 1',
-      'SELECT * FROM appointment_types WHERE id = $1 AND active = TRUE',
-      [Number(typeId)]
+      'SELECT * FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
+      'SELECT * FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
+      [Number(typeId), businessId]
     );
     if (!selectedType) return res.status(400).json({ error: 'Invalid appointment type' });
   }
@@ -1148,6 +1643,7 @@ app.put('/api/appointments/:id', async (req, res) => {
 
   try {
     await assertNoOverlap({
+      businessId,
       date: String(date),
       startMinutes: parseTimeOrThrow(time),
       durationMinutes: resolvedDuration,
@@ -1168,7 +1664,7 @@ app.put('/api/appointments/:id', async (req, res) => {
            duration_minutes = $6,
            location = $7,
            notes = $8
-       WHERE id = $9`,
+       WHERE id = $9 AND business_id = $10`,
       [
         selectedType?.id || null,
         clientName.trim(),
@@ -1178,7 +1674,8 @@ app.put('/api/appointments/:id', async (req, res) => {
         resolvedDuration,
         location || selectedType?.location_mode || 'office',
         notes || null,
-        id
+        id,
+        businessId
       ]
     );
     if (!up.rowCount) return res.status(404).json({ error: 'appointment not found' });
@@ -1194,7 +1691,7 @@ app.put('/api/appointments/:id', async (req, res) => {
              duration_minutes = ?,
              location = ?,
              notes = ?
-         WHERE id = ?`
+         WHERE id = ? AND business_id = ?`
       )
       .run(
         selectedType?.id || null,
@@ -1205,7 +1702,8 @@ app.put('/api/appointments/:id', async (req, res) => {
         resolvedDuration,
         location || selectedType?.location_mode || 'office',
         notes || null,
-        id
+        id,
+        businessId
       );
     if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
   }
@@ -1214,31 +1712,33 @@ app.put('/api/appointments/:id', async (req, res) => {
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = ?`,
+     WHERE a.id = ? AND a.business_id = ?`,
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = $1`,
-    [id]
+     WHERE a.id = $1 AND a.business_id = $2`,
+    [id, businessId]
   );
 
   res.json({ appointment: rowToAppointment(row) });
 });
 
 app.delete('/api/appointments/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
   const id = Number(req.params.id);
   if (USE_POSTGRES) {
-    const result = await pgPool.query('DELETE FROM appointments WHERE id = $1', [id]);
+    const result = await pgPool.query('DELETE FROM appointments WHERE id = $1 AND business_id = $2', [id, businessId]);
     if (!result.rowCount) return res.status(404).json({ error: 'appointment not found' });
     return res.json({ ok: true });
   }
 
-  const info = sqlite.prepare('DELETE FROM appointments WHERE id = ?').run(id);
+  const info = sqlite.prepare('DELETE FROM appointments WHERE id = ? AND business_id = ?').run(id, businessId);
   if (!info.changes) return res.status(404).json({ error: 'appointment not found' });
   return res.json({ ok: true });
 });
 
 app.patch('/api/appointments/:id/status', async (req, res) => {
+  const businessId = req.auth.businessId;
   const id = Number(req.params.id);
   const { status, cancellationReason } = req.body || {};
   const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
@@ -1248,10 +1748,10 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
   }
 
   if (USE_POSTGRES) {
-    const up = await pgPool.query('UPDATE appointments SET status = $1 WHERE id = $2', [status, id]);
+    const up = await pgPool.query('UPDATE appointments SET status = $1 WHERE id = $2 AND business_id = $3', [status, id, businessId]);
     if (!up.rowCount) return res.status(404).json({ error: 'appointment not found' });
   } else {
-    const up = sqlite.prepare('UPDATE appointments SET status = ? WHERE id = ?').run(status, id);
+    const up = sqlite.prepare('UPDATE appointments SET status = ? WHERE id = ? AND business_id = ?').run(status, id, businessId);
     if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
   }
 
@@ -1259,16 +1759,16 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = ?`,
+     WHERE a.id = ? AND a.business_id = ?`,
     `SELECT a.*, t.name AS type_name
      FROM appointments a
      LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.id = $1`,
-    [id]
+     WHERE a.id = $1 AND a.business_id = $2`,
+    [id, businessId]
   );
 
   const appointment = rowToAppointment(row);
-  const settings = await getSettings();
+  const settings = await getSettings(businessId);
   const cleanCancellationReason = String(cancellationReason || '').trim();
 
   if (appointment.clientEmail) {
@@ -1308,18 +1808,19 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
 });
 
 app.get('/api/dashboard', async (req, res) => {
+  const businessId = req.auth.businessId;
   const date = String(req.query.date || new Date().toISOString().slice(0, 10));
 
   let stats;
   if (USE_POSTGRES) {
     const [today, week, pending, total] = await Promise.all([
-      pgPool.query('SELECT COUNT(*)::int AS c FROM appointments WHERE date = $1', [date]),
+      pgPool.query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date = $2', [businessId, date]),
       pgPool.query(
-        "SELECT COUNT(*)::int AS c FROM appointments WHERE date BETWEEN $1::date AND ($1::date + INTERVAL '6 day')",
-        [date]
+        "SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date BETWEEN $2::date AND ($2::date + INTERVAL '6 day')",
+        [businessId, date]
       ),
-      pgPool.query("SELECT COUNT(*)::int AS c FROM appointments WHERE status = 'pending'"),
-      pgPool.query('SELECT COUNT(*)::int AS c FROM appointments')
+      pgPool.query("SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'", [businessId]),
+      pgPool.query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1', [businessId])
     ]);
 
     stats = {
@@ -1330,12 +1831,12 @@ app.get('/api/dashboard', async (req, res) => {
     };
   } else {
     stats = {
-      today: sqlite.prepare('SELECT COUNT(*) AS c FROM appointments WHERE date = ?').get(date).c,
+      today: sqlite.prepare('SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date = ?').get(businessId, date).c,
       week: sqlite
-        .prepare("SELECT COUNT(*) AS c FROM appointments WHERE date BETWEEN date(?) AND date(?, '+6 day')")
-        .get(date, date).c,
-      pending: sqlite.prepare("SELECT COUNT(*) AS c FROM appointments WHERE status = 'pending'").get().c,
-      aiOptimized: sqlite.prepare('SELECT COUNT(*) AS c FROM appointments').get().c
+        .prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date BETWEEN date(?) AND date(?, '+6 day')")
+        .get(businessId, date, date).c,
+      pending: sqlite.prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'").get(businessId).c,
+      aiOptimized: sqlite.prepare('SELECT COUNT(*) AS c FROM appointments WHERE business_id = ?').get(businessId).c
     };
   }
 
@@ -1344,35 +1845,36 @@ app.get('/api/dashboard', async (req, res) => {
       `SELECT a.*, t.name AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date = ?
+       WHERE a.business_id = ? AND a.date = ?
        ORDER BY a.time ASC`,
       `SELECT a.*, t.name AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
-       WHERE a.date = $1
+       WHERE a.business_id = $1 AND a.date = $2
        ORDER BY a.time ASC`,
-      [date]
+      [businessId, date]
     )
   ).map(rowToAppointment);
 
   const typeRows = await dbAll(
     `SELECT t.*, COUNT(a.id) AS booking_count
      FROM appointment_types t
-     LEFT JOIN appointments a ON a.type_id = t.id
-     WHERE t.active = 1
+     LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = ?
+     WHERE t.business_id = ? AND t.active = 1
      GROUP BY t.id
      ORDER BY t.id ASC`,
     `SELECT t.*, COUNT(a.id)::int AS booking_count
      FROM appointment_types t
-     LEFT JOIN appointments a ON a.type_id = t.id
-     WHERE t.active = TRUE
+     LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = $1
+     WHERE t.business_id = $1 AND t.active = TRUE
      GROUP BY t.id
-     ORDER BY t.id ASC`
+     ORDER BY t.id ASC`,
+    [businessId, businessId]
   );
 
   const types = typeRows.map((row) => ({ ...rowToType(row), bookingCount: Number(row.booking_count || 0) }));
 
-  res.json({ stats, appointments, types, insights: await createInsights(date) });
+  res.json({ stats, appointments, types, insights: await createInsights(date, businessId) });
 });
 
 app.get('/book', (_req, res) => {

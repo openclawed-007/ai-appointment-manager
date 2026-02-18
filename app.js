@@ -13,7 +13,9 @@ const state = {
   searchActive: false,
   emailMenuAppointmentId: null,
   cancelMenuAppointmentId: null,
-  cancelMenuDate: ''
+  cancelMenuDate: '',
+  currentUser: null,
+  currentBusiness: null
 };
 
 function getFocusableElements(container) {
@@ -512,9 +514,15 @@ function monthLabel(date) {
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
     ...options
   });
   const body = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    const error = new Error(body.error || 'Authentication required.');
+    error.code = 401;
+    throw error;
+  }
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
 }
@@ -1308,6 +1316,118 @@ async function clearSearchAndRestoreView(searchInput) {
   state.searchOriginView = null;
 }
 
+function updateAccountUi() {
+  const chip = document.getElementById('account-chip');
+  if (chip) {
+    if (state.currentUser && state.currentBusiness) {
+      chip.textContent = `${state.currentBusiness.name} • ${state.currentUser.email}`;
+    } else {
+      chip.textContent = '';
+    }
+  }
+  const publicBookingLink = document.getElementById('btn-public-booking');
+  if (publicBookingLink && state.currentBusiness?.slug) {
+    publicBookingLink.href = `/book?business=${encodeURIComponent(state.currentBusiness.slug)}`;
+  }
+}
+
+function setAuthTab(tab) {
+  const loginForm = document.getElementById('auth-login-form');
+  const signupForm = document.getElementById('auth-signup-form');
+  document.querySelectorAll('.auth-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.authTab === tab);
+  });
+  if (loginForm) loginForm.classList.toggle('hidden', tab !== 'login');
+  if (signupForm) signupForm.classList.toggle('hidden', tab !== 'signup');
+}
+
+function showAuthShell() {
+  document.getElementById('auth-shell')?.classList.remove('hidden');
+}
+
+function hideAuthShell() {
+  document.getElementById('auth-shell')?.classList.add('hidden');
+}
+
+async function ensureAuth() {
+  try {
+    const me = await api('/api/auth/me');
+    state.currentUser = me.user || null;
+    state.currentBusiness = me.business || null;
+    updateAccountUi();
+    hideAuthShell();
+    return true;
+  } catch (_error) {
+    state.currentUser = null;
+    state.currentBusiness = null;
+    updateAccountUi();
+    showAuthShell();
+    return false;
+  }
+}
+
+function bindAuthUi() {
+  document.querySelectorAll('.auth-tab').forEach((btn) => {
+    btn.addEventListener('click', () => setAuthTab(btn.dataset.authTab));
+  });
+
+  document.getElementById('auth-login-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    try {
+      const result = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      state.currentUser = result.user || null;
+      state.currentBusiness = result.business || null;
+      updateAccountUi();
+      hideAuthShell();
+      await loadTypes();
+      await loadDashboard();
+      await loadAppointmentsTable();
+      await loadSettings();
+      showToast('Signed in successfully.', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('auth-signup-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    try {
+      const result = await api('/api/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      state.currentUser = result.user || null;
+      state.currentBusiness = result.business || null;
+      updateAccountUi();
+      hideAuthShell();
+      await loadTypes();
+      await loadDashboard();
+      await loadAppointmentsTable();
+      await loadSettings();
+      showToast('Account created.', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+    } catch (_error) {
+      // ignore logout API errors and continue local sign-out UX
+    }
+    state.currentUser = null;
+    state.currentBusiness = null;
+    updateAccountUi();
+    showAuthShell();
+  });
+}
+
 function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
@@ -1351,6 +1471,7 @@ function bindForms() {
 }
 
 async function init() {
+  bindAuthUi();
   bindNavigation();
   bindHeaderButtons();
   bindModalControls();
@@ -1374,12 +1495,21 @@ async function init() {
   window.addEventListener('scroll', repositionDayMenuIfOpen, true);
 
   try {
+    const authed = await ensureAuth();
+    if (!authed) {
+      state.apiOnline = true;
+      return;
+    }
     await loadTypes();
     await loadDashboard();
     await loadAppointmentsTable();
     await loadSettings();
     state.apiOnline = true;
   } catch (error) {
+    if (error?.code === 401) {
+      showAuthShell();
+      return;
+    }
     state.apiOnline = false;
     showToast('Backend API not running. Start with: npm install && npm run dev', 'error');
     console.error(error);

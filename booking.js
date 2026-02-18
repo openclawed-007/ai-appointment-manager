@@ -4,6 +4,7 @@ const locationSelect = document.getElementById('public-location');
 const form = document.getElementById('public-booking-form');
 
 let types = [];
+const businessSlug = new URLSearchParams(window.location.search).get('business') || '';
 
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
@@ -45,7 +46,8 @@ function syncTypeFields() {
 }
 
 async function loadTypes() {
-  const { types: remoteTypes } = await api('/api/types');
+  const suffix = businessSlug ? `?businessSlug=${encodeURIComponent(businessSlug)}` : '';
+  const { types: remoteTypes } = await api(`/api/types${suffix}`);
   types = remoteTypes;
 
   clearChildren(typeSelect);
@@ -74,7 +76,7 @@ form.addEventListener('submit', async (e) => {
 
     const result = await api('/api/public/bookings', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, businessSlug })
     });
 
     form.reset();
@@ -96,6 +98,10 @@ typeSelect.addEventListener('change', syncTypeFields);
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    if (!businessSlug) {
+      showToast('Missing business link. Use /book?business=your-business-slug', 'error');
+      return;
+    }
     await loadTypes();
     const dateInput = form.querySelector('input[name="date"]');
     dateInput.value = new Date().toISOString().slice(0, 10);

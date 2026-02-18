@@ -3,6 +3,7 @@
 Sleek appointment management software with:
 - Flexible appointment types for **any business**
 - Owner dashboard + public booking page
+- Multi-tenant owner accounts (each business has isolated data)
 - Automatic confirmation/owner notification emails
 - AI-style insights based on real booking data
 - Free persistent DB option via Postgres (Neon) with SQLite fallback
@@ -20,6 +21,7 @@ Sleek appointment management software with:
   - AI insights panel
   - New appointment modal wired to backend
 - Public booking page (`/book`) for customers
+- Owner auth: signup/login/logout, session-based
 
 ### Backend
 - Express API with **Postgres-first** architecture (`pg`) and SQLite fallback
@@ -34,6 +36,7 @@ Sleek appointment management software with:
   - `DELETE /api/types/:id`
   - `POST /api/public/bookings`
   - `GET /api/settings`, `PUT /api/settings`
+  - `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 - Auto-seeds default appointment types
 
 ### Email notifications
@@ -58,7 +61,7 @@ npm run dev
 
 Open:
 - Dashboard: `http://localhost:3000/`
-- Public booking page: `http://localhost:3000/book`
+- Public booking page: `http://localhost:3000/book?business=your-business-slug`
 
 ---
 
@@ -78,6 +81,8 @@ DB_PATH=./data/data.db
 BUSINESS_NAME=IntelliSchedule
 OWNER_EMAIL=owner@example.com
 TIMEZONE=America/Los_Angeles
+ADMIN_EMAIL=owner@example.com
+ADMIN_PASSWORD=ChangeMe123!
 
 # Recommended email provider
 RESEND_API_KEY=
