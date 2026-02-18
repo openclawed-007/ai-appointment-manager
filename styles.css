@@ -875,6 +875,22 @@ body {
     margin-bottom: 4px;
 }
 
+.insight-action {
+    font-size: 0.8rem;
+    color: var(--primary-dark);
+    margin-bottom: 4px;
+}
+
+.insight-confidence {
+    display: inline-block;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    margin-bottom: 4px;
+}
+
 .insight-time {
     font-size: 0.75rem;
     color: var(--text-muted);
@@ -1433,7 +1449,7 @@ body {
     
     .main-content {
         margin-left: 0;
-        padding-bottom: 88px;
+        padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     }
     
     .header {
@@ -1565,7 +1581,7 @@ body {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
         gap: 6px;
-        padding: 10px;
+        padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
         background: rgba(255, 255, 255, 0.92);
         backdrop-filter: blur(10px);
         border-top: 1px solid var(--bg-tertiary);
@@ -1597,8 +1613,34 @@ body {
     .toast {
         right: 12px;
         left: 12px;
-        bottom: 96px;
+        bottom: calc(96px + env(safe-area-inset-bottom, 0px));
         max-width: none;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) and (max-width: 1024px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .mobile-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 6px;
+        padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--bg-tertiary);
+        z-index: 120;
     }
 }
 

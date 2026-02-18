@@ -256,6 +256,40 @@ async function getSettings() {
   return dbGet('SELECT * FROM settings WHERE id = 1', 'SELECT * FROM settings WHERE id = 1');
 }
 
+function parseTimeOrThrow(timeValue) {
+  const match = String(timeValue || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  if (!match) throw new Error('time must be in HH:MM format');
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+async function assertNoOverlap({ date, startMinutes, durationMinutes, excludeId = null }) {
+  const rows = await dbAll(
+    `SELECT id, time, duration_minutes
+     FROM appointments
+     WHERE date = ? AND status != 'cancelled'
+     ORDER BY time ASC`,
+    `SELECT id, time, duration_minutes
+     FROM appointments
+     WHERE date = $1 AND status != 'cancelled'
+     ORDER BY time ASC`,
+    [String(date)]
+  );
+
+  const endMinutes = startMinutes + durationMinutes;
+  const blocker = rows.find((row) => {
+    if (excludeId != null && Number(row.id) === Number(excludeId)) return false;
+    const otherStart = parseTimeToMinutes(row.time);
+    const otherEnd = otherStart + Number(row.duration_minutes || 45);
+    return startMinutes < otherEnd && endMinutes > otherStart;
+  });
+
+  if (blocker) {
+    const otherStart = parseTimeToMinutes(blocker.time);
+    const otherEnd = otherStart + Number(blocker.duration_minutes || 45);
+    throw new Error(`Time overlaps with another appointment (${humanTime(otherStart)}-${humanTime(otherEnd)}).`);
+  }
+}
+
 async function sendEmail({ to, subject, html, text }) {
   if (!to) return { ok: false, reason: 'missing-to' };
   const fromEmail = process.env.FROM_EMAIL;
@@ -321,6 +355,7 @@ async function createAppointment(payload = {}) {
   if (!clientName?.trim()) throw new Error('clientName is required');
   if (!date) throw new Error('date is required');
   if (!time) throw new Error('time is required');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) throw new Error('date must be in YYYY-MM-DD format');
 
   const type = typeId
     ? await dbGet(
@@ -330,6 +365,17 @@ async function createAppointment(payload = {}) {
       )
     : null;
 
+  const resolvedDuration = Number(durationMinutes || type?.duration_minutes || 45);
+  if (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0) {
+    throw new Error('durationMinutes must be greater than 0');
+  }
+  const startMinutes = parseTimeOrThrow(time);
+  await assertNoOverlap({
+    date: String(date),
+    startMinutes,
+    durationMinutes: resolvedDuration
+  });
+
   const params = [
     type?.id || null,
     title || type?.name || 'Appointment',
@@ -337,7 +383,7 @@ async function createAppointment(payload = {}) {
     clientEmail || null,
     date,
     time,
-    Number(durationMinutes || type?.duration_minutes || 45),
+    resolvedDuration,
     location || type?.location_mode || 'office',
     notes || null,
     source || 'owner'
@@ -419,74 +465,228 @@ async function createAppointment(payload = {}) {
   };
 }
 
+function toYmd(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseTimeToMinutes(timeValue = '09:00') {
+  const [h, m] = String(timeValue).split(':').map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : 9 * 60;
+}
+
+function humanTime(minutesFromMidnight = 540) {
+  const h = Math.floor(minutesFromMidnight / 60);
+  const m = minutesFromMidnight % 60;
+  return fmtTime(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+}
+
 async function createInsights(date) {
-  const byType = await dbAll(
-    `SELECT t.name, COUNT(*) AS count
-     FROM appointments a
-     LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.date >= date('now', '-30 day')
-     GROUP BY t.name
-     ORDER BY count DESC`,
-    `SELECT t.name, COUNT(*)::int AS count
-     FROM appointments a
-     LEFT JOIN appointment_types t ON t.id = a.type_id
-     WHERE a.date >= CURRENT_DATE - INTERVAL '30 days'
-     GROUP BY t.name
-     ORDER BY count DESC`
-  );
+  const focusDate = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(focusDate.getTime())) return [];
 
-  const todayCount = Number(
-    (
-      await dbGet(
-        'SELECT COUNT(*) AS c FROM appointments WHERE date = ?',
-        'SELECT COUNT(*)::int AS c FROM appointments WHERE date = $1',
-        [date]
-      )
-    ).c
-  );
+  const from30 = new Date(focusDate);
+  from30.setDate(from30.getDate() - 29);
+  const to7 = new Date(focusDate);
+  to7.setDate(to7.getDate() + 6);
 
-  const pendingCount = Number(
-    (
-      await dbGet(
-        "SELECT COUNT(*) AS c FROM appointments WHERE status = 'pending'",
-        "SELECT COUNT(*)::int AS c FROM appointments WHERE status = 'pending'"
-      )
-    ).c
-  );
+  const from30Str = toYmd(from30);
+  const to7Str = toYmd(to7);
 
-  const settings = await getSettings();
-  const busiest = byType[0];
+  const [recentAllRows, recentActiveRows, selectedDayRows, weekRows, pendingRow, settings] = await Promise.all([
+    dbAll(
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date >= ?
+       ORDER BY a.date ASC, a.time ASC`,
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date >= $1
+       ORDER BY a.date ASC, a.time ASC`,
+      [from30Str]
+    ),
+    dbAll(
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date >= ? AND a.status != 'cancelled'
+       ORDER BY a.date ASC, a.time ASC`,
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date >= $1 AND a.status != 'cancelled'
+       ORDER BY a.date ASC, a.time ASC`,
+      [from30Str]
+    ),
+    dbAll(
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date = ? AND a.status != 'cancelled'
+       ORDER BY a.time ASC`,
+      `SELECT a.date, a.time, a.duration_minutes, a.status, COALESCE(t.name, a.title, 'Appointment') AS type_name
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.date = $1 AND a.status != 'cancelled'
+       ORDER BY a.time ASC`,
+      [date]
+    ),
+    dbAll(
+      `SELECT a.date
+       FROM appointments a
+       WHERE a.date BETWEEN ? AND ? AND a.status != 'cancelled'`,
+      `SELECT a.date
+       FROM appointments a
+       WHERE a.date BETWEEN $1 AND $2 AND a.status != 'cancelled'`,
+      [date, to7Str]
+    ),
+    dbGet(
+      "SELECT COUNT(*) AS c FROM appointments WHERE status = 'pending'",
+      "SELECT COUNT(*)::int AS c FROM appointments WHERE status = 'pending'"
+    ),
+    getSettings()
+  ]);
 
-  return [
-    {
+  const insights = [];
+
+  if (!recentAllRows.length) {
+    insights.push({
       icon: '💡',
-      text: busiest
-        ? `${busiest.name} is your most booked service this month (${busiest.count} bookings).`
-        : 'No trend data yet. Add appointments to unlock stronger AI insights.',
-      time: 'Live'
-    },
-    {
-      icon: '📊',
-      text:
-        todayCount > 0
-          ? `You have ${todayCount} booking${todayCount === 1 ? '' : 's'} today. Recommended: 15-minute buffers between meetings.`
-          : 'No bookings today. Good window to open new slots.',
-      time: 'Live'
-    },
-    {
-      icon: '⚠️',
-      text:
-        pendingCount > 0
-          ? `${pendingCount} booking${pendingCount === 1 ? '' : 's'} are pending confirmation.`
-          : 'No pending confirmations. You are fully up to date.',
-      time: 'Live'
-    },
-    {
+      text: 'No historical bookings yet. Add a few appointments to unlock utilization and trend insights.',
+      action: 'Create your first week of slots, then check insights again.',
+      confidence: 'Low confidence (not enough data)',
+      time: 'Now'
+    });
+    insights.push({
       icon: '🎯',
-      text: `Current timezone: ${settings.timezone}. Keep this synced for reminder accuracy.`,
-      time: 'Live'
+      text: `Current timezone is ${settings.timezone}.`,
+      action: 'Keep timezone synced for reminder accuracy.',
+      confidence: 'High confidence',
+      time: 'Now'
+    });
+    return insights;
+  }
+
+  const typeCounts = new Map();
+  const hourCounts = new Map();
+  recentActiveRows.forEach((row) => {
+    const typeName = String(row.type_name || 'Appointment');
+    typeCounts.set(typeName, (typeCounts.get(typeName) || 0) + 1);
+    const mins = parseTimeToMinutes(row.time);
+    const hour = Math.floor(mins / 60);
+    hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
+  });
+
+  const busiestType = [...typeCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (busiestType) {
+    const pct = Math.round((busiestType[1] / Math.max(recentActiveRows.length, 1)) * 100);
+    insights.push({
+      icon: '📈',
+      text: `${busiestType[0]} is your top service in the last 30 days (${busiestType[1]} bookings, ${pct}% share).`,
+      action: 'Prioritize this service in peak-time slots and booking page order.',
+      confidence: recentActiveRows.length >= 20 ? 'High confidence' : 'Medium confidence',
+      time: '30-day trend'
+    });
+  }
+
+  const peakHourEntry = [...hourCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (peakHourEntry) {
+    const peakStart = peakHourEntry[0] * 60;
+    insights.push({
+      icon: '🕒',
+      text: `Peak demand window is around ${humanTime(peakStart)} (${peakHourEntry[1]} bookings).`,
+      action: 'Protect this window for high-value services and avoid admin tasks here.',
+      confidence: recentActiveRows.length >= 15 ? 'High confidence' : 'Medium confidence',
+      time: 'Pattern'
+    });
+  }
+
+  const dayLoad = new Map();
+  weekRows.forEach((r) => dayLoad.set(String(r.date), (dayLoad.get(String(r.date)) || 0) + 1));
+  const weekValues = Array.from(dayLoad.values());
+  const maxDayLoad = weekValues.length ? Math.max(...weekValues) : 0;
+  if (maxDayLoad >= 7) {
+    const overloadedDay = [...dayLoad.entries()].sort((a, b) => b[1] - a[1])[0];
+    insights.push({
+      icon: '⚠️',
+      text: `Heaviest upcoming day is ${overloadedDay[0]} with ${overloadedDay[1]} bookings.`,
+      action: 'Add buffers or move 1-2 low-priority bookings to a lighter day.',
+      confidence: 'High confidence',
+      time: 'Next 7 days'
+    });
+  } else {
+    insights.push({
+      icon: '✅',
+      text: `Upcoming load looks balanced (max ${maxDayLoad} bookings on any day in next 7 days).`,
+      action: 'Open one extra premium slot on your lightest day to lift revenue.',
+      confidence: 'High confidence',
+      time: 'Next 7 days'
+    });
+  }
+
+  if (selectedDayRows.length >= 2) {
+    const blocks = selectedDayRows.map((r) => {
+      const start = parseTimeToMinutes(r.time);
+      const duration = Number(r.duration_minutes || 45);
+      return { start, end: start + duration };
+    });
+    let bestGap = 0;
+    let bestGapStart = null;
+    for (let i = 0; i < blocks.length - 1; i += 1) {
+      const gap = blocks[i + 1].start - blocks[i].end;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestGapStart = blocks[i].end;
+      }
     }
-  ];
+    if (bestGap >= 45 && bestGapStart != null) {
+      insights.push({
+        icon: '🧩',
+        text: `There is a ${bestGap}-minute gap on ${date} starting around ${humanTime(bestGapStart)}.`,
+        action: 'Good slot for a short consultation or same-day booking.',
+        confidence: 'High confidence',
+        time: 'Schedule optimization'
+      });
+    }
+  }
+
+  const totalRecent = recentAllRows.length;
+  const cancelledRecent = recentAllRows.filter((r) => String(r.status) === 'cancelled').length;
+  const cancelRate = totalRecent ? Math.round((cancelledRecent / totalRecent) * 100) : 0;
+  if (cancelRate >= 15) {
+    insights.push({
+      icon: '📉',
+      text: `Cancellation rate is ${cancelRate}% over the last 30 days.`,
+      action: 'Use confirmation reminders 24 hours before start time to reduce churn.',
+      confidence: totalRecent >= 20 ? 'High confidence' : 'Medium confidence',
+      time: 'Reliability'
+    });
+  }
+
+  const pendingCount = Number(pendingRow?.c || 0);
+  if (pendingCount > 0) {
+    insights.push({
+      icon: '📬',
+      text: `${pendingCount} booking${pendingCount === 1 ? '' : 's'} are pending confirmation.`,
+      action: 'Clear pending items first to stabilize this week’s schedule.',
+      confidence: 'High confidence',
+      time: 'Action now'
+    });
+  }
+
+  insights.push({
+    icon: '🌍',
+    text: `Timezone is set to ${settings.timezone}.`,
+    action: 'Keep timezone aligned with business hours and reminder rules.',
+    confidence: 'High confidence',
+    time: 'Configuration'
+  });
+
+  return insights.slice(0, 6);
 }
 
 // API
@@ -693,6 +893,7 @@ app.put('/api/appointments/:id', async (req, res) => {
   if (!clientName?.trim()) return res.status(400).json({ error: 'clientName is required' });
   if (!date) return res.status(400).json({ error: 'date is required' });
   if (!time) return res.status(400).json({ error: 'time is required' });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
 
   let selectedType = null;
   if (typeId != null) {
@@ -702,6 +903,22 @@ app.put('/api/appointments/:id', async (req, res) => {
       [Number(typeId)]
     );
     if (!selectedType) return res.status(400).json({ error: 'Invalid appointment type' });
+  }
+
+  const resolvedDuration = Number(durationMinutes || selectedType?.duration_minutes || 45);
+  if (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0) {
+    return res.status(400).json({ error: 'durationMinutes must be greater than 0' });
+  }
+
+  try {
+    await assertNoOverlap({
+      date: String(date),
+      startMinutes: parseTimeOrThrow(time),
+      durationMinutes: resolvedDuration,
+      excludeId: id
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 
   if (USE_POSTGRES) {
@@ -722,7 +939,7 @@ app.put('/api/appointments/:id', async (req, res) => {
         clientEmail || null,
         String(date),
         String(time),
-        Number(durationMinutes || selectedType?.duration_minutes || 45),
+        resolvedDuration,
         location || selectedType?.location_mode || 'office',
         notes || null,
         id
@@ -749,7 +966,7 @@ app.put('/api/appointments/:id', async (req, res) => {
         clientEmail || null,
         String(date),
         String(time),
-        Number(durationMinutes || selectedType?.duration_minutes || 45),
+        resolvedDuration,
         location || selectedType?.location_mode || 'office',
         notes || null,
         id

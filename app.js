@@ -8,7 +8,9 @@ const state = {
   lastFocusedElement: null,
   dayMenuDate: null,
   dayMenuAnchorEl: null,
-  editingAppointmentId: null
+  editingAppointmentId: null,
+  searchOriginView: null,
+  searchActive: false
 };
 
 function getFocusableElements(container) {
@@ -250,6 +252,16 @@ function toTime12(time24 = '09:00') {
   return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
+function addMinutesToTime(time24 = '09:00', durationMinutes = 0) {
+  const [h, m] = String(time24).split(':').map(Number);
+  const start = (Number(h) || 0) * 60 + (Number(m) || 0);
+  const total = start + Number(durationMinutes || 0);
+  const normalized = ((total % 1440) + 1440) % 1440;
+  const hh = Math.floor(normalized / 60);
+  const mm = normalized % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
 function escapeHtml(str = '') {
   return String(str)
     .replaceAll('&', '&amp;')
@@ -297,6 +309,10 @@ function setActiveView(view) {
   document.querySelectorAll('.app-view').forEach((section) => {
     section.classList.toggle('active', section.dataset.view === view);
   });
+}
+
+function getActiveView() {
+  return document.querySelector('.app-view.active')?.dataset.view || 'dashboard';
 }
 
 function bindNavigation() {
@@ -720,7 +736,7 @@ function renderTimeline(appointments = []) {
     .map(
       (a) => `
       <div class="timeline-item">
-        <div class="time">${toTime12(a.time)}</div>
+        <div class="time">${toTime12(a.time)} - ${toTime12(addMinutesToTime(a.time, a.durationMinutes))}</div>
         <div class="appointment-card ${escapeHtml(a.typeClass)}">
           <div class="appointment-type">${escapeHtml(a.typeName)}</div>
           <h3>${escapeHtml(a.title || a.typeName)}</h3>
@@ -814,6 +830,8 @@ function renderInsights(insights = []) {
             <div class="insight-icon">${escapeHtml(i.icon || '💡')}</div>
             <div class="insight-content">
               <p>${escapeHtml(i.text)}</p>
+              ${i.action ? `<div class="insight-action">${escapeHtml(i.action)}</div>` : ''}
+              ${i.confidence ? `<div class="insight-confidence">${escapeHtml(i.confidence)}</div>` : ''}
               <span class="insight-time">${escapeHtml(i.time || 'Live')}</span>
             </div>
           </div>`
@@ -995,6 +1013,16 @@ async function runSearch(query) {
   setActiveView('appointments');
 }
 
+async function clearSearchAndRestoreView(searchInput) {
+  if (searchInput) searchInput.value = '';
+  await loadAppointmentsTable();
+  if (state.searchActive && state.searchOriginView) {
+    setActiveView(state.searchOriginView);
+  }
+  state.searchActive = false;
+  state.searchOriginView = null;
+}
+
 function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
@@ -1007,7 +1035,32 @@ function bindForms() {
     let timer;
     search.addEventListener('input', () => {
       clearTimeout(timer);
-      timer = setTimeout(() => runSearch(search.value.trim()), 250);
+      const query = search.value.trim();
+
+      if (query && !state.searchActive) {
+        state.searchOriginView = getActiveView();
+        state.searchActive = true;
+      }
+
+      timer = setTimeout(async () => {
+        if (!query) {
+          await clearSearchAndRestoreView(search);
+          return;
+        }
+        await runSearch(query);
+      }, 250);
+    });
+
+    search.addEventListener('blur', async () => {
+      if (!state.searchActive) return;
+      await clearSearchAndRestoreView(search);
+    });
+
+    search.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      await clearSearchAndRestoreView(search);
+      search.blur();
     });
   }
 }
