@@ -121,15 +121,17 @@ function bindCalendarNav() {
   };
   setMonth();
 
-  document.getElementById('calendar-prev')?.addEventListener('click', () => {
+  document.getElementById('calendar-prev')?.addEventListener('click', async () => {
     state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
     setMonth();
+    await refreshCalendarDots();
     showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
   });
 
-  document.getElementById('calendar-next')?.addEventListener('click', () => {
+  document.getElementById('calendar-next')?.addEventListener('click', async () => {
     state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
     setMonth();
+    await refreshCalendarDots();
     showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
   });
 
@@ -207,6 +209,23 @@ function renderStats(stats = {}) {
   document.getElementById('stat-week').textContent = stats.week ?? 0;
   document.getElementById('stat-pending').textContent = stats.pending ?? 0;
   document.getElementById('stat-ai').textContent = stats.aiOptimized ?? 0;
+}
+
+async function refreshCalendarDots() {
+  const { appointments } = await api('/api/appointments');
+  const yyyy = state.calendarDate.getFullYear();
+  const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
+
+  const daysWithAppointments = new Set(
+    appointments
+      .filter((a) => typeof a.date === 'string' && a.date.startsWith(`${yyyy}-${mm}-`))
+      .map((a) => Number(a.date.slice(8, 10)))
+  );
+
+  document.querySelectorAll('.day-cell:not(.empty)').forEach((cell) => {
+    const day = Number(cell.textContent.trim());
+    cell.classList.toggle('has-event', daysWithAppointments.has(day));
+  });
 }
 
 function renderTimeline(appointments = []) {
@@ -389,6 +408,7 @@ async function loadDashboard() {
   renderTimeline(appointments);
   renderTypes(types);
   renderInsights(insights);
+  await refreshCalendarDots();
 }
 
 async function loadAppointmentsTable() {
