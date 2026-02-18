@@ -10,19 +10,13 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      - key: PORT
-        value: 10000
       - key: DB_PATH
         value: /var/data/intellischedule/data.db
       - key: BUSINESS_NAME
         value: IntelliSchedule
       - key: TIMEZONE
         value: America/Los_Angeles
-      # Set these in Render dashboard (secrets)
-      # - OWNER_EMAIL
-      # - FROM_EMAIL
-      # - RESEND_API_KEY
-    disks:
-      - name: intellischedule-data
-        mountPath: /var/data/intellischedule
-        sizeGB: 1
+    disk:
+      name: intellischedule-data
+      mountPath: /var/data/intellischedule
+      sizeGB: 1
