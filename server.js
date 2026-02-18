@@ -6,7 +6,9 @@ require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const db = new Database(path.join(__dirname, 'data.db'));
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
+require('fs').mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = new Database(DB_PATH);
 
 app.use(express.json());
 app.use(express.static(__dirname));

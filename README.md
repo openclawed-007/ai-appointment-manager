@@ -105,9 +105,30 @@ Done — emails work immediately.
 
 ## Deployment options
 
-### Best easy option
-- Deploy to **Render** or **Railway** as a Node web service
-- Persist `data.db` on a volume (or move to Postgres later)
+### Best easy option: Render (recommended)
+This repo includes `render.yaml` for near one-click deploy.
+
+1. Push repo to GitHub (already done)
+2. In Render: **New + → Blueprint**
+3. Select this repo and deploy
+4. In Render service settings, add secrets:
+   - `OWNER_EMAIL`
+   - `FROM_EMAIL`
+   - `RESEND_API_KEY` (recommended)
+5. Open `/api/health` to confirm service is live
+
+The blueprint already configures:
+- Node runtime
+- health check
+- start/build commands
+- persistent disk mount for SQLite
+- `DB_PATH=/var/data/intellischedule/data.db`
+
+### Railway (alternative)
+1. New project from GitHub repo
+2. Add environment variables from `.env.example`
+3. Add a persistent volume and set `DB_PATH` to that mounted path
+4. Deploy
 
 ### Important
 GitHub Pages can host only static files, not this backend.
