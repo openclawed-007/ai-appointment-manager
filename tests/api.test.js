@@ -7,8 +7,9 @@ const testDbPath = path.join(testDbDir, 'test-data.db');
 
 let app;
 let db;
+let boot;
 
-beforeAll(() => {
+beforeAll(async () => {
   fs.mkdirSync(testDbDir, { recursive: true });
   if (fs.existsSync(testDbPath)) fs.unlinkSync(testDbPath);
   process.env.DB_PATH = testDbPath;
@@ -17,11 +18,13 @@ beforeAll(() => {
   const mod = require('../server');
   app = mod.app;
   db = mod.db;
+  boot = mod.boot;
+  await boot;
 });
 
-afterAll(() => {
+afterAll(async () => {
   try {
-    db?.close();
+    await db?.close();
   } catch {}
 });
 

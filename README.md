@@ -5,7 +5,7 @@ Sleek appointment management software with:
 - Owner dashboard + public booking page
 - Automatic confirmation/owner notification emails
 - AI-style insights based on real booking data
-- Very simple setup (SQLite, no external DB required)
+- Free persistent DB option via Postgres (Neon) with SQLite fallback
 
 ---
 
@@ -22,7 +22,7 @@ Sleek appointment management software with:
 - Public booking page (`/book`) for customers
 
 ### Backend
-- Express API + SQLite (`better-sqlite3`) for reliability and no-fuss setup
+- Express API with **Postgres-first** architecture (`pg`) and SQLite fallback
 - Endpoints:
   - `GET /api/dashboard`
   - `GET /api/appointments`
@@ -68,6 +68,13 @@ Copy `.env.example` to `.env` and set:
 
 ```env
 PORT=3000
+
+# Recommended: free persistent Postgres (Neon)
+DATABASE_URL=
+
+# Optional fallback when DATABASE_URL is empty
+DB_PATH=./data/data.db
+
 BUSINESS_NAME=IntelliSchedule
 OWNER_EMAIL=owner@example.com
 TIMEZONE=America/Los_Angeles
@@ -96,7 +103,8 @@ Done — emails work immediately.
 
 ## Why this stack
 
-- **Express + SQLite**: fastest to deploy, zero DB setup pain
+- **Express + Postgres-first**: persistent data on free-tier DB providers (like Neon)
+- **SQLite fallback**: easy local/dev mode when no DB URL is set
 - **Single process app**: simpler hosting and maintenance
 - **Resend**: high deliverability + easy API
 - **Vanilla frontend**: no build step needed, quick edits
@@ -111,11 +119,13 @@ This repo includes `render.yaml` for one-click **Free instance** deploy.
 1. Push repo to GitHub (already done)
 2. In Render: **New + → Blueprint**
 3. Select this repo and deploy
-4. In Render service settings, add secrets:
+4. Create a free Neon Postgres project and copy its connection string
+5. In Render service settings, add secrets:
+   - `DATABASE_URL` (from Neon)
    - `OWNER_EMAIL`
    - `FROM_EMAIL`
    - `RESEND_API_KEY` (recommended)
-5. Open `/api/health` to confirm service is live
+6. Open `/api/health` to confirm service is live (`db` should say `postgres`)
 
 The blueprint already configures:
 - Node runtime
@@ -123,8 +133,8 @@ The blueprint already configures:
 - start/build commands
 - free instance settings
 
-> Note: On Render Free, filesystem is ephemeral, so SQLite data can reset on redeploy/sleep/restart.
-> For persistent production data, upgrade to a paid instance with disk or move DB to Postgres.
+> Best free reliability: use `DATABASE_URL` (Neon Postgres). This avoids Render free filesystem resets.
+> SQLite remains available as fallback for local development.
 
 ### Railway (alternative)
 1. New project from GitHub repo
