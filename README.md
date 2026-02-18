@@ -106,7 +106,7 @@ Done — emails work immediately.
 ## Deployment options
 
 ### Best easy option: Render (recommended)
-This repo includes `render.yaml` for near one-click deploy.
+This repo includes `render.yaml` for one-click **Free instance** deploy.
 
 1. Push repo to GitHub (already done)
 2. In Render: **New + → Blueprint**
@@ -121,8 +121,10 @@ The blueprint already configures:
 - Node runtime
 - health check
 - start/build commands
-- persistent disk mount for SQLite
-- `DB_PATH=/var/data/intellischedule/data.db`
+- free instance settings
+
+> Note: On Render Free, filesystem is ephemeral, so SQLite data can reset on redeploy/sleep/restart.
+> For persistent production data, upgrade to a paid instance with disk or move DB to Postgres.
 
 ### Railway (alternative)
 1. New project from GitHub repo
