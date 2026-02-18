@@ -18,9 +18,15 @@ beforeAll(async () => {
   adminEmail = 'owner-test@example.com';
   adminPassword = 'TestPass123!';
   process.env.DB_PATH = testDbPath;
+  process.env.DATABASE_URL = '';
   process.env.NODE_ENV = 'test';
   process.env.ADMIN_EMAIL = adminEmail;
   process.env.ADMIN_PASSWORD = adminPassword;
+  process.env.RESEND_API_KEY = '';
+  process.env.FROM_EMAIL = '';
+  process.env.SMTP_HOST = '';
+  process.env.SMTP_USER = '';
+  process.env.SMTP_PASS = '';
 
   const mod = require('../server');
   app = mod.app;
@@ -288,4 +294,81 @@ describe('API smoke', () => {
     expect(apptsAfter.statusCode).toBe(200);
     expect(apptsAfter.body.appointments.length).toBe(exportRes.body.appointments.length);
   });
+
+  it(
+    'reliably restores varied datasets across 10 export/import rounds',
+    async () => {
+      const agent = request.agent(app);
+      const loginRes = await agent.post('/api/auth/login').send({
+        email: adminEmail,
+        password: adminPassword
+      });
+      expect(loginRes.statusCode).toBe(200);
+
+      for (let round = 1; round <= 10; round += 1) {
+        const existing = await agent.get('/api/appointments');
+        expect(existing.statusCode).toBe(200);
+        for (const appt of existing.body.appointments) {
+          const del = await agent.delete(`/api/appointments/${appt.id}`);
+          expect(del.statusCode).toBe(200);
+        }
+
+        const typeRes = await agent.post('/api/types').send({
+          name: `Round ${round} Type ${Date.now()}`,
+          durationMinutes: 20 + round * 5,
+          priceCents: round * 1000,
+          locationMode: round % 2 === 0 ? 'virtual' : 'office'
+        });
+        expect(typeRes.statusCode).toBe(201);
+        const typeId = typeRes.body.type.id;
+
+        const count = (round % 6) + 1; // 2..7 appointments per round
+        const expectedClients = [];
+        for (let i = 0; i < count; i += 1) {
+          const day = String(round + i + 1).padStart(2, '0');
+          const hour = String(8 + i).padStart(2, '0');
+          const minute = i % 2 === 0 ? '00' : '30';
+          const clientName = `Round${round}-Client${i + 1}`;
+          expectedClients.push(clientName);
+
+          const create = await agent.post('/api/appointments').send({
+            typeId,
+            clientName,
+            clientEmail: `r${round}c${i + 1}@example.com`,
+            date: `2026-05-${day}`,
+            time: `${hour}:${minute}`,
+            durationMinutes: 25,
+            location: 'office',
+            notes: `round ${round}`
+          });
+          expect(create.statusCode).toBe(201);
+        }
+
+        const exportRes = await agent.get('/api/data/export');
+        expect(exportRes.statusCode).toBe(200);
+        expect(exportRes.body.appointments.length).toBe(count);
+
+        const toDelete = await agent.get('/api/appointments');
+        expect(toDelete.statusCode).toBe(200);
+        for (const appt of toDelete.body.appointments) {
+          const del = await agent.delete(`/api/appointments/${appt.id}`);
+          expect(del.statusCode).toBe(200);
+        }
+
+        const importRes = await agent.post('/api/data/import').send(exportRes.body);
+        expect(importRes.statusCode).toBe(200);
+        expect(importRes.body.ok).toBe(true);
+        expect(importRes.body.importedAppointments).toBe(count);
+
+        const afterImport = await agent.get('/api/appointments');
+        expect(afterImport.statusCode).toBe(200);
+        expect(afterImport.body.appointments.length).toBe(count);
+        const names = new Set(afterImport.body.appointments.map((a) => a.clientName));
+        for (const expected of expectedClients) {
+          expect(names.has(expected)).toBe(true);
+        }
+      }
+    },
+    120000
+  );
 });

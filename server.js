@@ -33,7 +33,7 @@ if (USE_POSTGRES) {
   sqlite.pragma('journal_mode = WAL');
 }
 
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(express.static(__dirname));
 
 // Express 4 does not automatically forward rejected async handlers to error middleware.
@@ -2344,10 +2344,10 @@ app.get('/api/dashboard', async (req, res) => {
     `SELECT t.*, COUNT(a.id)::int AS booking_count
      FROM appointment_types t
      LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = $1
-     WHERE t.business_id = $1 AND t.active = TRUE
+     WHERE t.business_id = $2 AND t.active = TRUE
      GROUP BY t.id
      ORDER BY t.id ASC`,
-    [businessId]
+    [businessId, businessId]
   );
 
   const types = typeRows.map((row) => ({ ...rowToType(row), bookingCount: Number(row.booking_count || 0) }));
@@ -2392,6 +2392,9 @@ app.get('/verify-email', (req, res) => {
 app.use('/api', (err, _req, res, _next) => {
   console.error('API error:', err);
   if (res.headersSent) return;
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Backup file is too large. Try a smaller JSON export.' });
+  }
   res.status(500).json({ error: 'Internal server error.' });
 });
 
