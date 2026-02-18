@@ -1,0 +1,158 @@
+/* ═══════════════════════════════════════════════════
+   IntelliSchedule — Light Mode: Warm Parchment
+   Aged vellum, cream surfaces, espresso text,
+   sepia shadows, rich amber accents
+   ═══════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+    --gold: #c48a2a;
+    --gold-light: #d4a04a;
+    --gold-dim: rgba(196, 138, 42, 0.10);
+    --gold-glow: rgba(196, 138, 42, 0.18);
+
+    --bg-base: #f6f1ea;
+    --bg-surface: #fffdf8;
+    --bg-raised: #f0ebe3;
+    --bg-hover: #e8e2d8;
+    --bg-input: #fffdf8;
+
+    --border: rgba(120, 90, 50, 0.10);
+    --border-strong: rgba(120, 90, 50, 0.18);
+
+    --text: #2c2418;
+    --text-secondary: #6b5e4f;
+    --text-muted: #9a8e7e;
+    --text-inverse: #fffdf8;
+
+    --success: #3d8b56;
+    --warning: #b87d1e;
+    --error: #b5403a;
+    --info: #3a7bb5;
+
+    --gradient-gold: linear-gradient(135deg, #c48a2a 0%, #a87028 100%);
+    --gradient-surface: linear-gradient(180deg, #fffdf8 0%, #f6f1ea 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(196, 138, 42, 0.05) 0%, transparent 60%);
+
+    --shadow-sm: 0 1px 3px rgba(120, 90, 50, 0.08);
+    --shadow-md: 0 4px 12px rgba(120, 90, 50, 0.10);
+    --shadow-lg: 0 8px 30px rgba(120, 90, 50, 0.12);
+    --shadow-xl: 0 20px 50px rgba(120, 90, 50, 0.14);
+    --shadow-gold: 0 4px 20px rgba(196, 138, 42, 0.15);
+}
+
+/* ── Light mode component overrides ── */
+
+[data-theme="light"] body::before {
+    opacity: 0.012;
+}
+
+[data-theme="light"] .header {
+    background: rgba(255, 253, 248, 0.88);
+}
+
+[data-theme="light"] .toast.info {
+    background: rgba(255, 253, 248, 0.96);
+}
+
+[data-theme="light"] .toast.success {
+    background: rgba(240, 253, 244, 0.96);
+    border-color: rgba(61, 139, 86, 0.25);
+}
+
+[data-theme="light"] .toast.error {
+    background: rgba(253, 242, 240, 0.96);
+    border-color: rgba(181, 64, 58, 0.25);
+}
+
+[data-theme="light"] .modal-overlay {
+    background: rgba(44, 36, 24, 0.35);
+}
+
+[data-theme="light"] .auth-shell {
+    background: rgba(44, 36, 24, 0.30);
+}
+
+[data-theme="light"] .day-menu-delete {
+    border-color: rgba(181, 64, 58, 0.25);
+    background: rgba(181, 64, 58, 0.06);
+}
+
+[data-theme="light"] .day-menu-cancel,
+[data-theme="light"] .btn-cancel {
+    border-color: rgba(184, 125, 30, 0.25);
+    background: rgba(184, 125, 30, 0.06);
+}
+
+[data-theme="light"] .day-menu-email {
+    border-color: rgba(58, 123, 181, 0.25);
+    background: rgba(58, 123, 181, 0.06);
+}
+
+/* ── Theme Toggle ── */
+.theme-toggle {
+    width: 36px;
+    height: 36px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--gold);
+    border-color: var(--gold-dim);
+}
+
+.theme-toggle svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        opacity 200ms ease;
+}
+
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon {
+    position: absolute;
+}
+
+/* Dark mode: show moon, hide sun */
+.theme-toggle .icon-sun {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+}
+
+.theme-toggle .icon-moon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+}
+
+/* Light mode: show sun, hide moon */
+[data-theme="light"] .theme-toggle .icon-sun {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+}
+
+[data-theme="light"] .theme-toggle .icon-moon {
+    opacity: 0;
+    transform: rotate(90deg) scale(0.5);
+}
+
+/* Mobile theme toggle in header */
+.mobile-theme-toggle {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-theme-toggle {
+        display: flex;
+    }
+}

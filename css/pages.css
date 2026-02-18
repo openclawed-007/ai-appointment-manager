@@ -1,0 +1,208 @@
+/* ── Views ── */
+.app-view {
+    display: none;
+}
+
+.app-view.active {
+    display: block;
+    animation: fade-in 200ms ease;
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--spacing-xl);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-raised);
+    font-size: 0.85rem;
+}
+
+/* ── Data Rows ── */
+.data-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-radius: var(--radius-md);
+}
+
+.data-row+.data-row {
+    border-top: 1px solid var(--border);
+}
+
+.data-row .row-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.data-row .pill {
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    background: var(--bg-raised);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+/* ── Booking Page ── */
+.booking-shell {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: var(--spacing-xl);
+    background: var(--bg-base);
+}
+
+.booking-card {
+    width: min(760px, 100%);
+    background: var(--bg-surface);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+}
+
+.booking-header {
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(226, 168, 75, 0.03) 0%, transparent 100%);
+}
+
+.booking-header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--spacing-md);
+}
+
+.booking-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.booking-logo .logo-icon {
+    width: 34px;
+    height: 34px;
+}
+
+.booking-logo .logo-text {
+    font-size: 1.05rem;
+}
+
+.booking-header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.3rem, 4vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.booking-header p {
+    color: var(--text-secondary);
+    font-size: clamp(0.82rem, 2vw, 0.875rem);
+}
+
+.booking-form {
+    max-height: none;
+}
+
+/* ── Auth ── */
+.auth-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+}
+
+.auth-shell.hidden {
+    display: none;
+}
+
+.auth-card {
+    position: relative;
+    width: min(520px, 100%);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-xl);
+}
+
+.auth-close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    border-radius: var(--radius-full);
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.auth-close-btn:hover {
+    color: var(--text);
+    border-color: var(--gold);
+}
+
+.auth-card h2 {
+    font-family: var(--font-display);
+    margin-bottom: 6px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.auth-card p {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+
+.auth-password-hint {
+    margin: -2px 0 10px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.auth-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.auth-tab {
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+}
+
+.auth-tab.active {
+    border-color: var(--gold);
+    background: var(--gold-dim);
+    color: var(--gold);
+}
+
+.auth-form.hidden {
+    display: none;
+}
+
+/* ── Mobile Nav ── */
+.mobile-nav {
+    display: none;
+}

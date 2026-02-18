@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════
+   IntelliSchedule — Dark Editorial Luxury Theme
+   Fonts: Outfit (display) + Crimson Pro (body accents)
+   Palette: Deep charcoal + warm amber/gold
+   ═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
+
+:root {
+    --gold: #e2a84b;
+    --gold-light: #f0c97d;
+    --gold-dim: rgba(226, 168, 75, 0.12);
+    --gold-glow: rgba(226, 168, 75, 0.25);
+
+    --bg-base: #111114;
+    --bg-surface: #1a1a1f;
+    --bg-raised: #222228;
+    --bg-hover: #2a2a32;
+    --bg-input: #18181c;
+
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.1);
+
+    --text: #e8e4df;
+    --text-secondary: #8a8680;
+    --text-muted: #5a5854;
+    --text-inverse: #111114;
+
+    --success: #5cb87a;
+    --warning: #e2a84b;
+    --error: #d4564e;
+    --info: #5b9bd5;
+
+    --gradient-gold: linear-gradient(135deg, #e2a84b 0%, #c4863a 100%);
+    --gradient-surface: linear-gradient(180deg, #1e1e24 0%, #1a1a1f 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(226, 168, 75, 0.06) 0%, transparent 60%);
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.7);
+    --shadow-gold: 0 4px 20px rgba(226, 168, 75, 0.2);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-fast: 150ms var(--ease);
+    --transition-normal: 250ms var(--ease);
+    --transition-slow: 400ms var(--ease);
+
+    --font-display: 'Outfit', system-ui, sans-serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
+    --font-accent: 'Crimson Pro', Georgia, serif;
+}
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg-base);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+
+/* Subtle grain texture */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+}
+
+/* ── App Layout ── */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* ── Focus ── */
+:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+/* ── Selection ── */
+::selection {
+    background: var(--gold-dim);
+    color: var(--gold-light);
+}
+
+/* ── Screen reader only ── */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

@@ -977,7 +977,6 @@ function renderStats(stats = {}) {
   document.getElementById('stat-today').textContent = stats.today ?? 0;
   document.getElementById('stat-week').textContent = stats.week ?? 0;
   document.getElementById('stat-pending').textContent = stats.pending ?? 0;
-  document.getElementById('stat-ai').textContent = stats.aiOptimized ?? 0;
 
   document.querySelectorAll('[data-notification-dot]').forEach((dot) => {
     dot.classList.toggle('hidden', Number(stats.pending || 0) <= 0);

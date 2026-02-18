@@ -2,6 +2,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const Database = require('better-sqlite3');
 const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
@@ -15,8 +17,8 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 30;
 const VERIFY_HOURS = 24;
-const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || 'owner@example.com';
-const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
+const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || '';
+const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 let sqlite = null;
@@ -25,7 +27,7 @@ let pgPool = null;
 if (USE_POSTGRES) {
   pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: true }
   });
 } else {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -34,7 +36,29 @@ if (USE_POSTGRES) {
 }
 
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(__dirname));
+
+// ─── Security ──────────────────────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false   // CSP handled by app's inline scripts/styles
+}));
+
+// Rate-limit auth endpoints (login, signup, verify)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 20,                    // 20 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' }
+});
+app.use('/api/auth', authLimiter);
+
+// Serve ONLY the public-facing files — never the project root
+const STATIC_FILES = ['index.html', 'app.js', 'booking.html', 'booking.js', 'styles.css'];
+STATIC_FILES.forEach(f => {
+  const full = path.join(__dirname, f);
+  if (fs.existsSync(full)) app.use(`/${f}`, express.static(full));
+});
+app.use('/css', express.static(path.join(__dirname, 'css')));
 
 // Express 4 does not automatically forward rejected async handlers to error middleware.
 // Wrap async route/middleware handlers so rejected promises become regular 500 responses
@@ -165,9 +189,10 @@ function parseCookies(req) {
 
 function setSessionCookie(res, token) {
   const maxAge = SESSION_DAYS * 24 * 60 * 60;
+  const securePart = process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${securePart}`
   );
 }
 
@@ -337,13 +362,15 @@ async function initDb() {
       );
     }
 
-    const existingUser = await pgPool.query('SELECT id FROM users WHERE email = $1', [DEFAULT_ADMIN_EMAIL.toLowerCase()]);
-    if (!existingUser.rowCount) {
-      await pgPool.query(
-        `INSERT INTO users (business_id, name, email, password_hash, role)
-         VALUES ($1, $2, $3, $4, 'owner')`,
-        [businessRow.id, 'Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD)]
-      );
+    if (DEFAULT_ADMIN_EMAIL && DEFAULT_ADMIN_PASSWORD) {
+      const existingUser = await pgPool.query('SELECT id FROM users WHERE email = $1', [DEFAULT_ADMIN_EMAIL.toLowerCase()]);
+      if (!existingUser.rowCount) {
+        await pgPool.query(
+          `INSERT INTO users (business_id, name, email, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'owner')`,
+          [businessRow.id, 'Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD)]
+        );
+      }
     }
   } else {
     sqlite.exec(`
@@ -486,14 +513,16 @@ async function initDb() {
       ].forEach((row) => insert.run(...row));
     }
 
-    const existingUser = sqlite.prepare('SELECT id FROM users WHERE email = ?').get(DEFAULT_ADMIN_EMAIL.toLowerCase());
-    if (!existingUser) {
-      sqlite
-        .prepare(
-          `INSERT INTO users (business_id, name, email, password_hash, role)
-           VALUES (1, ?, ?, ?, 'owner')`
-        )
-        .run('Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD));
+    if (DEFAULT_ADMIN_EMAIL && DEFAULT_ADMIN_PASSWORD) {
+      const existingUser = sqlite.prepare('SELECT id FROM users WHERE email = ?').get(DEFAULT_ADMIN_EMAIL.toLowerCase());
+      if (!existingUser) {
+        sqlite
+          .prepare(
+            `INSERT INTO users (business_id, name, email, password_hash, role)
+             VALUES (1, ?, ?, ?, 'owner')`
+          )
+          .run('Owner', DEFAULT_ADMIN_EMAIL.toLowerCase(), hashPassword(DEFAULT_ADMIN_PASSWORD));
+      }
     }
   }
 }
@@ -594,19 +623,19 @@ async function exportBusinessData(businessId) {
     exportedAt: new Date().toISOString(),
     business: business
       ? {
-          id: Number(business.id),
-          name: business.name,
-          slug: business.slug,
-          owner_email: business.owner_email || null,
-          timezone: business.timezone || null
-        }
+        id: Number(business.id),
+        name: business.name,
+        slug: business.slug,
+        owner_email: business.owner_email || null,
+        timezone: business.timezone || null
+      }
       : null,
     settings: settings
       ? {
-          business_name: settings.business_name || '',
-          owner_email: settings.owner_email || null,
-          timezone: settings.timezone || 'America/Los_Angeles'
-        }
+        business_name: settings.business_name || '',
+        owner_email: settings.owner_email || null,
+        timezone: settings.timezone || 'America/Los_Angeles'
+      }
       : null,
     appointmentTypes: types.map((t) => ({
       id: Number(t.id),
@@ -642,9 +671,9 @@ async function importBusinessData(businessId, backup) {
     business_name:
       String(
         payload.settings.business_name ||
-          payload.business.name ||
-          payload.business.business_name ||
-          'IntelliSchedule'
+        payload.business.name ||
+        payload.business.business_name ||
+        'IntelliSchedule'
       ).trim() || 'IntelliSchedule',
     owner_email: payload.settings.owner_email || payload.business.owner_email || null,
     timezone: payload.settings.timezone || payload.business.timezone || 'America/Los_Angeles'
@@ -724,7 +753,7 @@ async function importBusinessData(businessId, backup) {
     } catch (error) {
       try {
         await tx.query('ROLLBACK');
-      } catch {}
+      } catch { }
       throw error;
     } finally {
       tx.release();
@@ -907,7 +936,7 @@ async function createBusinessWithOwner({ businessName, name, email, passwordHash
     } catch (error) {
       try {
         await tx.query('ROLLBACK');
-      } catch {}
+      } catch { }
       throw error;
     } finally {
       tx.release();
@@ -1021,18 +1050,18 @@ function buildBrandedEmailHtml({ businessName, title, subtitle, message, details
   const detailsHtml = details.length
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate;border-spacing:0 8px;">
         ${details
-          .map(
-            (d) => `
+      .map(
+        (d) => `
               <tr>
                 <td style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.4px;">${escapeHtmlEmail(
-                  d.label
-                )}</td>
+          d.label
+        )}</td>
                 <td style="padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#0f172a;">${escapeHtmlEmail(
-                  d.value
-                )}</td>
+          d.value
+        )}</td>
               </tr>`
-          )
-          .join('')}
+      )
+      .join('')}
       </table>`
     : '';
 
@@ -1208,10 +1237,10 @@ async function createAppointment(payload = {}) {
 
   const type = typeId
     ? await dbGet(
-        'SELECT * FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
-        'SELECT * FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
-        [Number(typeId), scopedBusinessId]
-      )
+      'SELECT * FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
+      'SELECT * FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
+      [Number(typeId), scopedBusinessId]
+    )
     : null;
 
   const resolvedDuration = Number(durationMinutes || type?.duration_minutes || 45);
@@ -1312,19 +1341,19 @@ async function createAppointment(payload = {}) {
   const notifyResults = await Promise.allSettled([
     appointment.clientEmail
       ? sendEmail({
-          to: appointment.clientEmail,
-          subject: `${settings.business_name}: Appointment confirmed`,
-          text: clientText,
-          html: clientHtml
-        })
+        to: appointment.clientEmail,
+        subject: `${settings.business_name}: Appointment confirmed`,
+        text: clientText,
+        html: clientHtml
+      })
       : Promise.resolve(),
     settings.owner_email
       ? sendEmail({
-          to: settings.owner_email,
-          subject: `[Owner Alert] New booking - ${settings.business_name}`,
-          text: ownerText,
-          html: ownerHtml
-        })
+        to: settings.owner_email,
+        subject: `[Owner Alert] New booking - ${settings.business_name}`,
+        text: ownerText,
+        html: ownerHtml
+      })
       : Promise.resolve()
   ]);
 
@@ -2296,32 +2325,32 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
     const isCancelled = status === 'cancelled';
     const statusText = isCancelled
       ? `Hi ${appointment.clientName}, your appointment on ${appointment.date} at ${fmtTime(
-          appointment.time
-        )} has been cancelled.${cleanCancellationReason ? `\n\nReason: ${cleanCancellationReason}` : ''}`
+        appointment.time
+      )} has been cancelled.${cleanCancellationReason ? `\n\nReason: ${cleanCancellationReason}` : ''}`
       : `Hi ${appointment.clientName}, your appointment on ${appointment.date} at ${fmtTime(
-          appointment.time
-        )} is now ${status}.`;
+        appointment.time
+      )} is now ${status}.`;
     await sendEmail({
       to: appointment.clientEmail,
       subject: isCancelled ? `${settings.business_name}: Appointment cancelled` : `${settings.business_name}: Appointment ${status}`,
       text: statusText,
       html: isCancelled
         ? buildCancellationEmailHtml({
-            businessName: settings.business_name,
-            appointment,
-            cancellationReason: cleanCancellationReason
-          })
+          businessName: settings.business_name,
+          appointment,
+          cancellationReason: cleanCancellationReason
+        })
         : buildBrandedEmailHtml({
-            businessName: settings.business_name,
-            title: `Appointment ${status}`,
-            subtitle: appointment.typeName,
-            message: statusText,
-            details: [
-              { label: 'Date', value: appointment.date },
-              { label: 'Time', value: fmtTime(appointment.time) },
-              { label: 'Status', value: status }
-            ]
-          })
+          businessName: settings.business_name,
+          title: `Appointment ${status}`,
+          subtitle: appointment.typeName,
+          message: statusText,
+          details: [
+            { label: 'Date', value: appointment.date },
+            { label: 'Time', value: fmtTime(appointment.time) },
+            { label: 'Status', value: status }
+          ]
+        })
     });
   }
 
@@ -2334,21 +2363,19 @@ app.get('/api/dashboard', async (req, res) => {
 
   let stats;
   if (USE_POSTGRES) {
-    const [today, week, pending, total] = await Promise.all([
+    const [today, week, pending] = await Promise.all([
       pgPool.query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date = $2', [businessId, date]),
       pgPool.query(
         "SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date BETWEEN $2::date AND ($2::date + INTERVAL '6 day')",
         [businessId, date]
       ),
-      pgPool.query("SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'", [businessId]),
-      pgPool.query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1', [businessId])
+      pgPool.query("SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'", [businessId])
     ]);
 
     stats = {
       today: today.rows[0].c,
       week: week.rows[0].c,
-      pending: pending.rows[0].c,
-      aiOptimized: total.rows[0].c
+      pending: pending.rows[0].c
     };
   } else {
     stats = {
@@ -2356,8 +2383,7 @@ app.get('/api/dashboard', async (req, res) => {
       week: sqlite
         .prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date BETWEEN date(?) AND date(?, '+6 day')")
         .get(businessId, date, date).c,
-      pending: sqlite.prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'").get(businessId).c,
-      aiOptimized: sqlite.prepare('SELECT COUNT(*) AS c FROM appointments WHERE business_id = ?').get(businessId).c
+      pending: sqlite.prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'").get(businessId).c
     };
   }
 
@@ -2396,6 +2422,10 @@ app.get('/api/dashboard', async (req, res) => {
   const types = typeRows.map((row) => ({ ...rowToType(row), bookingCount: Number(row.booking_count || 0) }));
 
   res.json({ stats, appointments, types, insights: await createInsights(date, businessId) });
+});
+
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.get('/book', (_req, res) => {
