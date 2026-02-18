@@ -2,7 +2,9 @@ const state = {
   types: [],
   selectedTypeId: null,
   selectedDate: new Date().toISOString().slice(0, 10),
-  apiOnline: true
+  apiOnline: true,
+  viewAll: false,
+  calendarDate: new Date()
 };
 
 function openModal(modalId) {
@@ -39,18 +41,17 @@ function escapeHtml(str = '') {
     .replaceAll("'", '&#039;');
 }
 
+function monthLabel(date) {
+  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     ...options
   });
-
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(body.error || 'Request failed');
-  }
+  if (!response.ok) throw new Error(body.error || 'Request failed');
   return body;
 }
 
@@ -59,15 +60,86 @@ function showToast(message, type = 'info') {
   toast.className = `toast ${type}`;
   toast.textContent = message;
   document.body.appendChild(toast);
-
   requestAnimationFrame(() => toast.classList.add('show'));
   setTimeout(() => {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 220);
-  }, 2600);
+  }, 2400);
 }
 
-function bindStaticEvents() {
+function setActiveView(view) {
+  document.querySelectorAll('.nav-item').forEach((n) => {
+    n.classList.toggle('active', n.dataset.view === view);
+  });
+
+  document.querySelectorAll('.app-view').forEach((section) => {
+    section.classList.toggle('active', section.dataset.view === view);
+  });
+}
+
+function bindNavigation() {
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetView = item.dataset.view || 'dashboard';
+      setActiveView(targetView);
+    });
+  });
+
+  document.getElementById('btn-manage-types')?.addEventListener('click', () => setActiveView('types'));
+}
+
+function bindHeaderButtons() {
+  document.getElementById('btn-notifications')?.addEventListener('click', () => {
+    showToast('No new notifications right now.', 'info');
+  });
+
+  document.getElementById('btn-view-all')?.addEventListener('click', async (e) => {
+    state.viewAll = !state.viewAll;
+    e.currentTarget.textContent = state.viewAll ? 'Show Day' : 'View All';
+    await loadAppointmentsTable();
+  });
+
+  document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
+}
+
+function bindCalendarNav() {
+  const labelNode = document.querySelector('.current-month');
+  const setMonth = () => {
+    if (labelNode) labelNode.textContent = monthLabel(state.calendarDate);
+  };
+  setMonth();
+
+  document.getElementById('calendar-prev')?.addEventListener('click', () => {
+    state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
+    setMonth();
+    showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
+  });
+
+  document.getElementById('calendar-next')?.addEventListener('click', () => {
+    state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
+    setMonth();
+    showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
+  });
+
+  document.querySelectorAll('.day-cell:not(.empty)').forEach((dayCell) => {
+    dayCell.addEventListener('click', async () => {
+      document.querySelectorAll('.day-cell.selected').forEach((n) => n.classList.remove('selected'));
+      dayCell.classList.add('selected');
+      const day = Number(dayCell.textContent.trim());
+      const yyyy = state.calendarDate.getFullYear();
+      const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      state.selectedDate = `${yyyy}-${mm}-${dd}`;
+      state.viewAll = false;
+      const btn = document.getElementById('btn-view-all');
+      if (btn) btn.textContent = 'View All';
+      await loadDashboard();
+    });
+  });
+}
+
+function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal.active').forEach((modal) => modal.classList.remove('active'));
@@ -84,40 +156,6 @@ function bindStaticEvents() {
       openModal('new-appointment');
     }
   });
-
-  document.querySelectorAll('.nav-item').forEach((item) => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach((n) => n.classList.remove('active'));
-      item.classList.add('active');
-    });
-  });
-
-  const search = document.getElementById('global-search');
-  if (search) {
-    let timer;
-    search.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => runSearch(search.value.trim()), 260);
-    });
-  }
-
-  document.querySelectorAll('.day-cell:not(.empty)').forEach((dayCell) => {
-    dayCell.addEventListener('click', async () => {
-      document.querySelectorAll('.day-cell.selected').forEach((n) => n.classList.remove('selected'));
-      dayCell.classList.add('selected');
-
-      const day = Number(dayCell.textContent.trim());
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      state.selectedDate = `${yyyy}-${mm}-${dd}`;
-      await loadDashboard();
-    });
-  });
-
-  document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
 }
 
 function renderTypeSelector(types) {
@@ -137,8 +175,7 @@ function renderTypeSelector(types) {
       <div class="type-option ${state.selectedTypeId === t.id ? 'active' : ''}" data-type-id="${t.id}">
         <div class="type-dot" style="background:${escapeHtml(t.color)}"></div>
         <span>${escapeHtml(t.name)}</span>
-      </div>
-    `
+      </div>`
     )
     .join('');
 
@@ -147,21 +184,9 @@ function renderTypeSelector(types) {
       root.querySelectorAll('.type-option').forEach((n) => n.classList.remove('active'));
       node.classList.add('active');
       state.selectedTypeId = Number(node.dataset.typeId);
-
       const selected = state.types.find((t) => t.id === state.selectedTypeId);
       const durationSelect = document.querySelector('select[name="durationMinutes"]');
-      if (selected && durationSelect) {
-        const exists = Array.from(durationSelect.options).some(
-          (o) => Number(o.value) === Number(selected.durationMinutes)
-        );
-        if (!exists) {
-          const option = document.createElement('option');
-          option.value = String(selected.durationMinutes);
-          option.textContent = `${selected.durationMinutes} minutes`;
-          durationSelect.appendChild(option);
-        }
-        durationSelect.value = String(selected.durationMinutes);
-      }
+      if (selected && durationSelect) durationSelect.value = String(selected.durationMinutes);
     });
   });
 }
@@ -176,7 +201,6 @@ function renderStats(stats = {}) {
 function renderTimeline(appointments = []) {
   const root = document.getElementById('timeline-list');
   if (!root) return;
-
   if (!appointments.length) {
     root.innerHTML = '<div class="empty-state">No appointments for this day yet.</div>';
     return;
@@ -197,59 +221,105 @@ function renderTimeline(appointments = []) {
             <span>• ${escapeHtml(a.status)}</span>
           </div>
         </div>
-      </div>
-    `
+      </div>`
     )
     .join('');
 }
 
 function renderTypes(types = []) {
   const root = document.getElementById('type-list');
-  if (!root) return;
+  const adminRoot = document.getElementById('type-admin-list');
 
-  if (!types.length) {
-    root.innerHTML = '<div class="empty-state">No appointment types yet.</div>';
-    return;
-  }
+  const html =
+    types.length === 0
+      ? '<div class="empty-state">No appointment types yet.</div>'
+      : types
+          .map(
+            (t) => `
+            <div class="type-item">
+              <div class="type-color" style="background:${escapeHtml(t.color)}"></div>
+              <div class="type-info">
+                <h4>${escapeHtml(t.name)}</h4>
+                <p>${t.durationMinutes} min • ${toMoney(t.priceCents)} • ${escapeHtml(t.locationMode)}</p>
+              </div>
+              <span class="type-count">${t.bookingCount || 0}</span>
+            </div>`
+          )
+          .join('');
 
-  root.innerHTML = types
-    .map(
-      (t) => `
-      <div class="type-item">
-        <div class="type-color" style="background:${escapeHtml(t.color)}"></div>
-        <div class="type-info">
-          <h4>${escapeHtml(t.name)}</h4>
-          <p>${t.durationMinutes} min • ${toMoney(t.priceCents)} • ${escapeHtml(t.locationMode)}</p>
-        </div>
-        <span class="type-count">${t.bookingCount || 0}</span>
-      </div>
-    `
-    )
-    .join('');
+  if (root) root.innerHTML = html;
+  if (adminRoot) adminRoot.innerHTML = html;
 }
 
 function renderInsights(insights = []) {
-  const root = document.getElementById('insights-list');
-  if (!root) return;
+  const html =
+    insights.length === 0
+      ? '<div class="empty-state">AI insights will appear as bookings are created.</div>'
+      : insights
+          .map(
+            (i) => `
+          <div class="insight-item">
+            <div class="insight-icon">${escapeHtml(i.icon || '💡')}</div>
+            <div class="insight-content">
+              <p>${escapeHtml(i.text)}</p>
+              <span class="insight-time">${escapeHtml(i.time || 'Live')}</span>
+            </div>
+          </div>`
+          )
+          .join('');
 
-  if (!insights.length) {
-    root.innerHTML = '<div class="empty-state">AI insights will appear as bookings are created.</div>';
+  const root = document.getElementById('insights-list');
+  const fullRoot = document.getElementById('ai-full-list');
+  if (root) root.innerHTML = html;
+  if (fullRoot) fullRoot.innerHTML = html;
+}
+
+function renderAppointmentsTable(appointments = []) {
+  const root = document.getElementById('appointments-table');
+  if (!root) return;
+  if (!appointments.length) {
+    root.innerHTML = '<div class="empty-state">No appointments found.</div>';
     return;
   }
 
-  root.innerHTML = insights
+  root.innerHTML = appointments
     .map(
-      (i) => `
-      <div class="insight-item">
-        <div class="insight-icon">${escapeHtml(i.icon || '💡')}</div>
-        <div class="insight-content">
-          <p>${escapeHtml(i.text)}</p>
-          <span class="insight-time">${escapeHtml(i.time || 'Live')}</span>
+      (a) => `
+      <div class="data-row" data-id="${a.id}">
+        <div><strong>${escapeHtml(a.clientName)}</strong><div class="pill">${escapeHtml(a.typeName)}</div></div>
+        <div>${escapeHtml(a.date)}</div>
+        <div>${toTime12(a.time)}</div>
+        <div><span class="pill">${escapeHtml(a.status)}</span></div>
+        <div class="row-actions">
+          <button class="btn-secondary btn-complete" type="button">Complete</button>
+          <button class="btn-secondary btn-delete" type="button">Delete</button>
         </div>
-      </div>
-    `
+      </div>`
     )
     .join('');
+
+  root.querySelectorAll('.btn-complete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('.data-row')?.dataset.id;
+      await api(`/api/appointments/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' })
+      });
+      showToast('Appointment marked completed', 'success');
+      await loadAppointmentsTable();
+      await loadDashboard();
+    });
+  });
+
+  root.querySelectorAll('.btn-delete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('.data-row')?.dataset.id;
+      await api(`/api/appointments/${id}`, { method: 'DELETE' });
+      showToast('Appointment deleted', 'success');
+      await loadAppointmentsTable();
+      await loadDashboard();
+    });
+  });
 }
 
 async function loadTypes() {
@@ -268,13 +338,16 @@ async function loadDashboard() {
   renderInsights(insights);
 }
 
+async function loadAppointmentsTable() {
+  const query = state.viewAll ? '' : `?date=${encodeURIComponent(state.selectedDate)}`;
+  const { appointments } = await api(`/api/appointments${query}`);
+  renderAppointmentsTable(appointments);
+}
+
 async function submitAppointment(e) {
   e.preventDefault();
-
   const form = e.currentTarget;
-  const formData = new FormData(form);
-  const payload = Object.fromEntries(formData.entries());
-
+  const payload = Object.fromEntries(new FormData(form).entries());
   payload.typeId = state.selectedTypeId;
   payload.durationMinutes = Number(payload.durationMinutes || 45);
 
@@ -284,14 +357,11 @@ async function submitAppointment(e) {
   submitButton.textContent = 'Creating...';
 
   try {
-    await api('/api/appointments', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
+    await api('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
     form.reset();
     closeModal('new-appointment');
     await loadDashboard();
+    await loadAppointmentsTable();
     showToast('Appointment created and notifications sent.', 'success');
   } catch (error) {
     showToast(error.message, 'error');
@@ -301,22 +371,80 @@ async function submitAppointment(e) {
   }
 }
 
-async function runSearch(query) {
-  if (!query) {
-    await loadDashboard();
-    return;
-  }
-
+async function submitType(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const data = Object.fromEntries(new FormData(form).entries());
   try {
-    const { appointments } = await api(`/api/appointments?q=${encodeURIComponent(query)}`);
-    renderTimeline(appointments.slice(0, 20));
+    await api('/api/types', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: data.name,
+        durationMinutes: Number(data.durationMinutes || 30),
+        priceCents: Number(data.priceUsd || 0) * 100,
+        locationMode: data.locationMode
+      })
+    });
+    form.reset();
+    showToast('Type created', 'success');
+    await loadTypes();
+    await loadDashboard();
   } catch (error) {
     showToast(error.message, 'error');
   }
 }
 
+async function submitSettings(e) {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+  try {
+    await api('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
+    showToast('Settings saved', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function loadSettings() {
+  const { settings } = await api('/api/settings');
+  const form = document.getElementById('settings-form');
+  if (!form) return;
+  form.businessName.value = settings.business_name || '';
+  form.ownerEmail.value = settings.owner_email || '';
+  form.timezone.value = settings.timezone || 'America/Los_Angeles';
+}
+
+async function runSearch(query) {
+  if (!query) {
+    await loadAppointmentsTable();
+    return;
+  }
+  const { appointments } = await api(`/api/appointments?q=${encodeURIComponent(query)}`);
+  renderAppointmentsTable(appointments);
+  setActiveView('appointments');
+}
+
+function bindForms() {
+  document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
+  document.getElementById('type-form')?.addEventListener('submit', submitType);
+  document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
+
+  const search = document.getElementById('global-search');
+  if (search) {
+    let timer;
+    search.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => runSearch(search.value.trim()), 250);
+    });
+  }
+}
+
 async function init() {
-  bindStaticEvents();
+  bindNavigation();
+  bindHeaderButtons();
+  bindCalendarNav();
+  bindKeyboard();
+  bindForms();
 
   const todayInput = document.querySelector('input[name="date"]');
   if (todayInput) todayInput.value = state.selectedDate;
@@ -324,6 +452,8 @@ async function init() {
   try {
     await loadTypes();
     await loadDashboard();
+    await loadAppointmentsTable();
+    await loadSettings();
     state.apiOnline = true;
   } catch (error) {
     state.apiOnline = false;
@@ -332,7 +462,18 @@ async function init() {
   }
 }
 
-window.openModal = openModal;
-window.closeModal = closeModal;
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+  document.addEventListener('DOMContentLoaded', init);
+}
 
-document.addEventListener('DOMContentLoaded', init);
+if (typeof module !== 'undefined') {
+  module.exports = {
+    toTime12,
+    escapeHtml,
+    monthLabel,
+    setActiveView,
+    state
+  };
+}

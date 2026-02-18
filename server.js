@@ -472,6 +472,13 @@ app.post('/api/public/bookings', async (req, res) => {
   }
 });
 
+app.delete('/api/appointments/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const info = db.prepare('DELETE FROM appointments WHERE id = ?').run(id);
+  if (!info.changes) return res.status(404).json({ error: 'appointment not found' });
+  return res.json({ ok: true });
+});
+
 app.patch('/api/appointments/:id/status', async (req, res) => {
   const id = Number(req.params.id);
   const { status } = req.body || {};
@@ -549,6 +556,10 @@ app.get('/book', (_req, res) => {
   res.sendFile(path.join(__dirname, 'booking.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`🗓️ IntelliSchedule running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🗓️ IntelliSchedule running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = { app, db, getSettings, rowToAppointment, rowToType };

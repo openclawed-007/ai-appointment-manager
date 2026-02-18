@@ -988,6 +988,15 @@ body {
     border-top: 1px solid var(--bg-tertiary);
 }
 
+.app-view {
+    display: none;
+}
+
+.app-view.active {
+    display: block;
+    animation: fade-in 180ms ease;
+}
+
 .empty-state {
     text-align: center;
     color: var(--text-muted);
@@ -995,6 +1004,32 @@ body {
     border: 1px dashed var(--bg-tertiary);
     border-radius: var(--radius-md);
     background: rgba(255, 255, 255, 0.6);
+}
+
+.data-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border-radius: 10px;
+}
+
+.data-row + .data-row {
+    border-top: 1px solid var(--bg-tertiary);
+}
+
+.data-row .row-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.data-row .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 .toast {
@@ -1103,6 +1138,10 @@ body {
 
     .header-actions .btn-secondary {
         display: none;
+    }
+
+    .data-row {
+        grid-template-columns: 1fr;
     }
 }
 

@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "vitest run"
   },
   "keywords": [
     "appointments",
@@ -17,6 +18,11 @@
   ],
   "author": "",
   "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "supertest": "^7.2.2",
+    "vitest": "^3.2.4"
+  },
   "dependencies": {
     "better-sqlite3": "^11.8.1",
     "dotenv": "^16.4.5",
