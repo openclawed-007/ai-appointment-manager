@@ -13,39 +13,37 @@
 <body>
     <div class="app-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="logo">
-                <button class="logo-icon logo-notification-btn desktop-notification-btn" id="btn-notifications-desktop"
-                    data-notification-button type="button" aria-label="Notifications">
+                <div class="logo-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
                     </svg>
-                    <span class="notification-dot hidden" id="notification-dot-desktop" data-notification-dot></span>
-                </button>
+                </div>
                 <span class="logo-text">IntelliSchedule</span>
             </div>
 
-            <nav class="nav-menu">
-                <a href="#" class="nav-item active" data-view="dashboard">
+            <nav class="nav-menu" aria-label="Main Navigation">
+                <a href="#" class="nav-item active" data-view="dashboard" id="nav-dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-view="appointments" id="nav-appointments">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                         <line x1="16" y1="2" x2="16" y2="6" />
                         <line x1="8" y1="2" x2="8" y2="6" />
                         <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
-                    <span>Dashboard</span>
-                </a>
-                <a href="#" class="nav-item" data-view="appointments">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
                     <span>Appointments</span>
                 </a>
-                <a href="#" class="nav-item" data-view="types">
+                <a href="#" class="nav-item" data-view="types" id="nav-types">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L2 7l10 5 10-5-10-5z" />
                         <path d="M2 17l10 5 10-5" />
@@ -53,23 +51,34 @@
                     </svg>
                     <span>Types & Services</span>
                 </a>
-                <a href="#" class="nav-item" data-view="ai">
+                <a href="#" class="nav-item" data-view="ai" id="nav-ai">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                     <span>AI Assistant</span>
                     <span class="badge">Beta</span>
                 </a>
-                <a href="#" class="nav-item" data-view="settings">
+                <a href="#" class="nav-item" data-view="settings" id="nav-settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3" />
                         <path
-                            d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.24 4.24l-4.24-4.24M6.34 6.34L2.1 2.1" />
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
                     <span>Settings</span>
                 </a>
             </nav>
 
+            <div class="sidebar-footer">
+                <button class="logo-notification-btn desktop-notification-btn" id="btn-notifications-desktop"
+                    data-notification-button type="button" aria-label="Notifications">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="width:18px;height:18px;">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <span class="notification-dot hidden" id="notification-dot-desktop" data-notification-dot></span>
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -92,7 +101,7 @@
                             <circle cx="11" cy="11" r="8" />
                             <path d="m21 21-4.35-4.35" />
                         </svg>
-                        <input id="global-search" type="text" placeholder="Search appointments, clients, or types...">
+                        <input id="global-search" type="text" placeholder="Search appointments, clients, or types…">
                     </div>
                 </div>
                 <div class="header-right">
@@ -132,12 +141,16 @@
                 </div>
             </header>
 
-            <!-- Dashboard Content -->
+            <!-- Content Views -->
             <div class="content-wrapper">
+
+                <!-- ═══ Dashboard ═══ -->
                 <section class="app-view active" data-view="dashboard">
-                    <!-- Stats Cards -->
+                    <h1 class="sr-only">Dashboard</h1>
+
+                    <!-- Stats Row -->
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div class="stat-card" id="stat-card-today">
                             <div class="stat-icon today">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10" />
@@ -149,7 +162,7 @@
                                 <span class="stat-label">Today</span>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" id="stat-card-week">
                             <div class="stat-icon week">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -163,11 +176,12 @@
                                 <span class="stat-label">This Week</span>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" id="stat-card-pending">
                             <div class="stat-icon pending">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path
-                                        d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
                                 </svg>
                             </div>
                             <div class="stat-content">
@@ -175,7 +189,7 @@
                                 <span class="stat-label">Pending</span>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div class="stat-card" id="stat-card-ai">
                             <div class="stat-icon ai">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -190,20 +204,21 @@
                         </div>
                     </div>
 
-                    <!-- Main Grid -->
+                    <!-- Calendar + Schedule -->
                     <div class="dashboard-grid">
-                        <!-- Calendar Section -->
                         <div class="card calendar-card">
                             <div class="card-header">
                                 <h2>Calendar</h2>
                                 <div class="calendar-nav">
-                                    <button class="icon-btn small" type="button" id="calendar-prev">
+                                    <button class="icon-btn small" type="button" id="calendar-prev"
+                                        aria-label="Previous month">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="15 18 9 12 15 6" />
                                         </svg>
                                     </button>
                                     <span class="current-month">February 2026</span>
-                                    <button class="icon-btn small" type="button" id="calendar-next">
+                                    <button class="icon-btn small" type="button" id="calendar-next"
+                                        aria-label="Next month">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="9 18 15 12 9 6" />
                                         </svg>
@@ -213,7 +228,6 @@
                             <div class="calendar-grid" id="calendar-grid"></div>
                         </div>
 
-                        <!-- Today's Schedule -->
                         <div class="card schedule-card">
                             <div class="card-header">
                                 <h2>Today's Schedule</h2>
@@ -225,7 +239,7 @@
                         </div>
                     </div>
 
-                    <!-- Appointment Types & AI Insights -->
+                    <!-- Types + AI Insights -->
                     <div class="dashboard-grid two-col">
                         <div class="card">
                             <div class="card-header">
@@ -233,13 +247,13 @@
                                 <button class="btn-text" id="btn-manage-types" type="button">Manage</button>
                             </div>
                             <div class="appointment-types-list" id="type-list">
-                                <div class="empty-state">Loading appointment types...</div>
+                                <div class="empty-state">Loading appointment types…</div>
                             </div>
                         </div>
 
                         <div class="card ai-insights">
                             <div class="card-header">
-                                <h2>🤖 AI Insights</h2>
+                                <h2>AI Insights</h2>
                                 <span class="badge pulse">Live</span>
                             </div>
                             <div class="insights-list" id="insights-list">
@@ -249,7 +263,9 @@
                     </div>
                 </section>
 
+                <!-- ═══ Appointments ═══ -->
                 <section class="app-view" data-view="appointments">
+                    <h1 class="sr-only">Appointments</h1>
                     <div class="card">
                         <div class="card-header">
                             <h2>All Appointments</h2>
@@ -259,31 +275,42 @@
                     </div>
                 </section>
 
+                <!-- ═══ Types & Services ═══ -->
                 <section class="app-view" data-view="types">
+                    <h1 class="sr-only">Types & Services</h1>
                     <div class="dashboard-grid two-col">
                         <div class="card">
                             <div class="card-header">
                                 <h2>Create Appointment Type</h2>
                             </div>
                             <form class="modal-form" id="type-form">
-                                <div class="form-group"><label>Name</label><input name="name" required
-                                        placeholder="e.g. Haircut" /></div>
+                                <div class="form-group">
+                                    <label for="type-name">Name</label>
+                                    <input id="type-name" name="name" required placeholder="e.g. Haircut" />
+                                </div>
                                 <div class="form-row">
-                                    <div class="form-group"><label>Duration (min)</label><input name="durationMinutes"
-                                            type="number" value="30" min="5" /></div>
-                                    <div class="form-group"><label>Price (£)</label><input name="priceGbp" type="number"
-                                            value="0" min="0" step="1" /></div>
+                                    <div class="form-group">
+                                        <label for="type-duration">Duration (min)</label>
+                                        <input id="type-duration" name="durationMinutes" type="number" value="30"
+                                            min="5" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="type-price">Price (£)</label>
+                                        <input id="type-price" name="priceGbp" type="number" value="0" min="0"
+                                            step="1" />
+                                    </div>
                                 </div>
                                 <div class="form-group">
-                                    <label>Location Mode</label>
-                                    <select name="locationMode">
+                                    <label for="type-location">Location Mode</label>
+                                    <select id="type-location" name="locationMode">
                                         <option value="office">Office</option>
                                         <option value="virtual">Virtual</option>
                                         <option value="phone">Phone</option>
                                         <option value="hybrid" selected>Hybrid</option>
                                     </select>
                                 </div>
-                                <div class="form-actions"><button type="submit" class="btn-primary">Create Type</button>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Create Type</button>
                                 </div>
                             </form>
                         </div>
@@ -296,29 +323,38 @@
                     </div>
                 </section>
 
+                <!-- ═══ AI Assistant ═══ -->
                 <section class="app-view" data-view="ai">
+                    <h1 class="sr-only">AI Assistant</h1>
                     <div class="card ai-insights">
                         <div class="card-header">
                             <h2>AI Assistant Feed</h2>
+                            <span class="badge pulse">Live</span>
                         </div>
                         <div class="insights-list" id="ai-full-list"></div>
                     </div>
                 </section>
 
+                <!-- ═══ Settings ═══ -->
                 <section class="app-view" data-view="settings">
+                    <h1 class="sr-only">Settings</h1>
                     <div class="card">
                         <div class="card-header">
                             <h2>Business Settings</h2>
                         </div>
                         <form class="modal-form" id="settings-form">
                             <div class="form-row">
-                                <div class="form-group"><label>Business Name</label><input name="businessName"
-                                        required /></div>
-                                <div class="form-group"><label>Owner Email</label><input name="ownerEmail"
-                                        type="email" /></div>
+                                <div class="form-group">
+                                    <label for="settings-business-name">Business Name</label>
+                                    <input id="settings-business-name" name="businessName" required />
+                                </div>
+                                <div class="form-group">
+                                    <label for="settings-owner-email">Owner Email</label>
+                                    <input id="settings-owner-email" name="ownerEmail" type="email" />
+                                </div>
                             </div>
                             <div class="form-group timezone-group">
-                                <label>Timezone</label>
+                                <label for="timezone-input">Timezone</label>
                                 <input name="timezone" id="timezone-input" autocomplete="off"
                                     value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
                                 <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox"
@@ -333,11 +369,12 @@
                         </form>
                     </div>
                 </section>
+
             </div>
         </main>
     </div>
 
-    <!-- Modal: New Appointment -->
+    <!-- Modal: New/Edit Appointment -->
     <div class="modal" id="new-appointment">
         <div class="modal-overlay" id="new-appointment-overlay"></div>
         <div class="modal-content appointment-modal" role="dialog" aria-modal="true"
@@ -363,8 +400,7 @@
                             <label>Appointment Type</label>
                             <div class="type-selector type-selector-compact" id="type-selector">
                                 <div class="type-option active" data-type="consultation">
-                                    <div class="type-dot"
-                                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                    <div class="type-dot" style="background: var(--gradient-gold);"></div>
                                     <div class="type-copy">
                                         <span>Consultation</span>
                                         <small>45 min</small>
@@ -375,12 +411,14 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Client Name</label>
-                                <input type="text" name="clientName" required placeholder="e.g. Jane Smith">
+                                <label for="appt-client-name">Client Name</label>
+                                <input id="appt-client-name" type="text" name="clientName" required
+                                    placeholder="e.g. Jane Smith">
                             </div>
                             <div class="form-group">
-                                <label>Email</label>
-                                <input type="email" name="clientEmail" placeholder="jane@example.com">
+                                <label for="appt-client-email">Email</label>
+                                <input id="appt-client-email" type="email" name="clientEmail"
+                                    placeholder="jane@example.com">
                             </div>
                         </div>
 
@@ -403,9 +441,9 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Notes</label>
-                            <textarea rows="3" name="notes"
-                                placeholder="Any special requirements or context..."></textarea>
+                            <label for="appt-notes">Notes</label>
+                            <textarea id="appt-notes" rows="3" name="notes"
+                                placeholder="Any special requirements or context…"></textarea>
                         </div>
                     </div>
 
@@ -413,16 +451,16 @@
                         <div class="side-card">
                             <h3>Schedule</h3>
                             <div class="form-group">
-                                <label>Date</label>
-                                <input type="date" name="date" required>
+                                <label for="appt-date">Date</label>
+                                <input id="appt-date" type="date" name="date" required>
                             </div>
                             <div class="form-group">
-                                <label>Time</label>
-                                <input type="time" name="time" required>
+                                <label for="appt-time">Time</label>
+                                <input id="appt-time" type="time" name="time" required>
                             </div>
                             <div class="form-group">
-                                <label>Duration</label>
-                                <select name="durationMinutes">
+                                <label for="appt-duration">Duration</label>
+                                <select id="appt-duration" name="durationMinutes">
                                     <option value="15">15 minutes</option>
                                     <option value="30">30 minutes</option>
                                     <option value="45" selected>45 minutes</option>
@@ -453,6 +491,7 @@
         </div>
     </div>
 
+    <!-- Mobile Navigation -->
     <nav class="mobile-nav" aria-label="Mobile Navigation">
         <button class="mobile-nav-item active" data-view="dashboard" type="button">Home</button>
         <button class="mobile-nav-item" data-view="appointments" type="button">Bookings</button>
@@ -461,6 +500,7 @@
         <button class="mobile-nav-item" data-view="settings" type="button">Settings</button>
     </nav>
 
+    <!-- Auth Modal -->
     <div class="auth-shell hidden" id="auth-shell">
         <div class="auth-card">
             <button type="button" class="auth-close-btn" id="btn-close-auth-shell"
@@ -473,8 +513,14 @@
             </div>
 
             <form id="auth-login-form" class="auth-form">
-                <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
-                <div class="form-group"><label>Password</label><input name="password" type="password" required /></div>
+                <div class="form-group">
+                    <label for="auth-email">Email</label>
+                    <input id="auth-email" name="email" type="email" required />
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Password</label>
+                    <input id="auth-password" name="password" type="password" required />
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="btn-dev-login">Dev Login</button>
                     <button type="submit" class="btn-primary">Sign In</button>
@@ -483,18 +529,33 @@
 
             <form id="auth-signup-form" class="auth-form hidden">
                 <div class="form-row">
-                    <div class="form-group"><label>Business Name</label><input name="businessName" required /></div>
-                    <div class="form-group"><label>Your Name</label><input name="name" required /></div>
+                    <div class="form-group">
+                        <label for="signup-business">Business Name</label>
+                        <input id="signup-business" name="businessName" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-name">Your Name</label>
+                        <input id="signup-name" name="name" required />
+                    </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
-                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="12"
-                            required /></div>
+                    <div class="form-group">
+                        <label for="signup-email">Email</label>
+                        <input id="signup-email" name="email" type="email" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="signup-password">Password</label>
+                        <input id="signup-password" name="password" type="password" minlength="12" required />
+                    </div>
                 </div>
                 <p class="auth-password-hint">Use 12+ chars with uppercase, lowercase, number, and symbol.</p>
-                <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" />
+                <div class="form-group">
+                    <label for="signup-timezone">Timezone</label>
+                    <input id="signup-timezone" name="timezone" value="America/Los_Angeles" />
                 </div>
-                <div class="form-actions"><button type="submit" class="btn-primary">Create Account</button></div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Create Account</button>
+                </div>
             </form>
         </div>
     </div>
