@@ -15,7 +15,8 @@ const state = {
   cancelMenuAppointmentId: null,
   cancelMenuDate: '',
   currentUser: null,
-  currentBusiness: null
+  currentBusiness: null,
+  authShellDismissed: false
 };
 
 function getFocusableElements(container) {
@@ -1316,6 +1317,23 @@ async function clearSearchAndRestoreView(searchInput) {
   state.searchOriginView = null;
 }
 
+function validatePasswordStrength(password = '') {
+  const value = String(password || '');
+  const checks = [
+    { ok: value.length >= 12, text: '12+ chars' },
+    { ok: /[a-z]/.test(value), text: 'lowercase' },
+    { ok: /[A-Z]/.test(value), text: 'uppercase' },
+    { ok: /\d/.test(value), text: 'number' },
+    { ok: /[^A-Za-z0-9]/.test(value), text: 'symbol' },
+    { ok: !/\s/.test(value), text: 'no spaces' }
+  ];
+  const failed = checks.filter((c) => !c.ok).map((c) => c.text);
+  return {
+    ok: failed.length === 0,
+    message: failed.length === 0 ? '' : `Password is too weak. Missing: ${failed.join(', ')}.`
+  };
+}
+
 function updateAccountUi() {
   const chip = document.getElementById('account-chip');
   if (chip) {
@@ -1329,6 +1347,10 @@ function updateAccountUi() {
   if (publicBookingLink && state.currentBusiness?.slug) {
     publicBookingLink.href = `/book?business=${encodeURIComponent(state.currentBusiness.slug)}`;
   }
+  const authButton = document.getElementById('btn-logout');
+  if (authButton) {
+    authButton.textContent = state.currentUser ? 'Logout' : 'Sign In';
+  }
 }
 
 function setAuthTab(tab) {
@@ -1341,11 +1363,13 @@ function setAuthTab(tab) {
   if (signupForm) signupForm.classList.toggle('hidden', tab !== 'signup');
 }
 
-function showAuthShell() {
+function showAuthShell(force = false) {
+  if (!force && state.authShellDismissed) return;
   document.getElementById('auth-shell')?.classList.remove('hidden');
 }
 
-function hideAuthShell() {
+function hideAuthShell(dismissed = false) {
+  if (dismissed) state.authShellDismissed = true;
   document.getElementById('auth-shell')?.classList.add('hidden');
 }
 
@@ -1354,6 +1378,7 @@ async function ensureAuth() {
     const me = await api('/api/auth/me');
     state.currentUser = me.user || null;
     state.currentBusiness = me.business || null;
+    state.authShellDismissed = false;
     updateAccountUi();
     hideAuthShell();
     return true;
@@ -1381,6 +1406,7 @@ function bindAuthUi() {
       });
       state.currentUser = result.user || null;
       state.currentBusiness = result.business || null;
+      state.authShellDismissed = false;
       updateAccountUi();
       hideAuthShell();
       await loadTypes();
@@ -1396,26 +1422,31 @@ function bindAuthUi() {
   document.getElementById('auth-signup-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const passwordCheck = validatePasswordStrength(data.password);
+    if (!passwordCheck.ok) {
+      showToast(passwordCheck.message, 'error');
+      return;
+    }
     try {
       const result = await api('/api/auth/signup', {
         method: 'POST',
         body: JSON.stringify(data)
       });
-      state.currentUser = result.user || null;
-      state.currentBusiness = result.business || null;
-      updateAccountUi();
-      hideAuthShell();
-      await loadTypes();
-      await loadDashboard();
-      await loadAppointmentsTable();
-      await loadSettings();
-      showToast('Account created.', 'success');
+      const debugToken = result.verificationToken ? ` (dev token: ${result.verificationToken})` : '';
+      showToast(`Verification email sent. Open your inbox to activate account.${debugToken}`, 'success');
+      setAuthTab('login');
     } catch (error) {
       showToast(error.message, 'error');
     }
   });
 
   document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    if (!state.currentUser) {
+      state.authShellDismissed = false;
+      setAuthTab('login');
+      showAuthShell(true);
+      return;
+    }
     try {
       await api('/api/auth/logout', { method: 'POST' });
     } catch (_error) {
@@ -1425,6 +1456,10 @@ function bindAuthUi() {
     state.currentBusiness = null;
     updateAccountUi();
     showAuthShell();
+  });
+
+  document.getElementById('btn-close-auth-shell')?.addEventListener('click', () => {
+    hideAuthShell(true);
   });
 }
 

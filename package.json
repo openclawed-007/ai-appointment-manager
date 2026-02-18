@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "accounts:manage": "node scripts/manage-accounts.js"
   },
   "keywords": [
     "appointments",

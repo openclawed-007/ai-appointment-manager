@@ -14,8 +14,10 @@ const USE_POSTGRES = Boolean(process.env.DATABASE_URL);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 30;
+const VERIFY_HOURS = 24;
 const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || 'owner@example.com';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 let sqlite = null;
 let pgPool = null;
@@ -90,6 +92,28 @@ function hashPassword(password = '') {
   return `${salt}:${hash}`;
 }
 
+function validatePasswordStrength(password = '') {
+  const value = String(password || '');
+  const rules = [
+    { ok: value.length >= 12, message: 'at least 12 characters' },
+    { ok: /[a-z]/.test(value), message: 'one lowercase letter' },
+    { ok: /[A-Z]/.test(value), message: 'one uppercase letter' },
+    { ok: /\d/.test(value), message: 'one number' },
+    { ok: /[^A-Za-z0-9]/.test(value), message: 'one symbol' },
+    { ok: !/\s/.test(value), message: 'no spaces' }
+  ];
+
+  const failed = rules.filter((r) => !r.ok).map((r) => r.message);
+  return {
+    ok: failed.length === 0,
+    failed,
+    error:
+      failed.length === 0
+        ? ''
+        : `Password is too weak. Must include ${failed.join(', ')}.`
+  };
+}
+
 function verifyPassword(password = '', stored = '') {
   const [salt, hash] = String(stored || '').split(':');
   if (!salt || !hash) return false;
@@ -102,6 +126,10 @@ function makeSessionToken() {
 }
 
 function hashSessionToken(token = '') {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function hashToken(token = '') {
   return crypto.createHash('sha256').update(String(token)).digest('hex');
 }
 
@@ -168,6 +196,19 @@ async function initDb() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS signup_verifications (
+        id SERIAL PRIMARY KEY,
+        business_name TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+        slug TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY,
         business_id INTEGER,
@@ -216,6 +257,7 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
       CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_signup_verifications_email ON signup_verifications(email);
       CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
 
@@ -319,6 +361,19 @@ async function initDb() {
         FOREIGN KEY(business_id) REFERENCES businesses(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS signup_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        business_name TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles',
+        slug TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         business_id INTEGER,
@@ -369,6 +424,7 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
       CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_signup_verifications_email ON signup_verifications(email);
       CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
 
@@ -535,6 +591,114 @@ async function getSessionByToken(token) {
     name: row.name,
     role: row.role
   };
+}
+
+async function createBusinessWithOwner({ businessName, name, email, passwordHash, timezone, slug }) {
+  if (USE_POSTGRES) {
+    const tx = await pgPool.connect();
+    try {
+      await tx.query('BEGIN');
+      const business = (
+        await tx.query(
+          `INSERT INTO businesses (name, slug, owner_email, timezone)
+           VALUES ($1, $2, $3, $4)
+           RETURNING *`,
+          [businessName, slug, email, timezone || 'America/Los_Angeles']
+        )
+      ).rows[0];
+      await tx.query(
+        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+         VALUES ($1, $2, $3, $4)`,
+        [business.id, businessName, email, timezone || 'America/Los_Angeles']
+      );
+      await tx.query(
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES
+           ($1, $2, $3, $4, $5, $6),
+           ($1, $7, $8, $9, $10, $11),
+           ($1, $12, $13, $14, $15, $16),
+           ($1, $17, $18, $19, $20, $21)`,
+        [
+          business.id,
+          'Consultation', 45, 15000, 'office', COLORS[0],
+          'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
+          'Review', 60, 20000, 'virtual', COLORS[2],
+          'Follow-up Call', 15, 0, 'phone', COLORS[3]
+        ]
+      );
+      const user = (
+        await tx.query(
+          `INSERT INTO users (business_id, name, email, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'owner')
+           RETURNING *`,
+          [business.id, name, email, passwordHash]
+        )
+      ).rows[0];
+      await tx.query('COMMIT');
+      return {
+        user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
+        business: { id: Number(business.id), name: business.name, slug: business.slug }
+      };
+    } catch (error) {
+      try {
+        await tx.query('ROLLBACK');
+      } catch {}
+      throw error;
+    } finally {
+      tx.release();
+    }
+  }
+
+  const tx = sqlite.transaction((payload) => {
+    const businessInsert = sqlite
+      .prepare(
+        `INSERT INTO businesses (name, slug, owner_email, timezone)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(payload.businessName, payload.slug, payload.email, payload.timezone || 'America/Los_Angeles');
+    const businessId = Number(businessInsert.lastInsertRowid);
+
+    sqlite
+      .prepare(
+        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(businessId, payload.businessName, payload.email, payload.timezone || 'America/Los_Angeles');
+
+    const insertType = sqlite.prepare(
+      `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    [
+      ['Consultation', 45, 15000, 'office', COLORS[0]],
+      ['Strategy Session', 90, 30000, 'hybrid', COLORS[1]],
+      ['Review', 60, 20000, 'virtual', COLORS[2]],
+      ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
+    ].forEach((r) => insertType.run(businessId, ...r));
+
+    const userInsert = sqlite
+      .prepare(
+        `INSERT INTO users (business_id, name, email, password_hash, role)
+         VALUES (?, ?, ?, ?, 'owner')`
+      )
+      .run(businessId, payload.name, payload.email, payload.passwordHash);
+
+    return {
+      user: { id: Number(userInsert.lastInsertRowid), name: payload.name, email: payload.email, role: 'owner' },
+      business: { id: businessId, name: payload.businessName, slug: payload.slug }
+    };
+  });
+
+  return tx({ businessName, name, email, passwordHash, timezone, slug });
+}
+
+async function getPendingSignupByToken(token) {
+  const tokenHash = hashToken(token);
+  return dbGet(
+    'SELECT * FROM signup_verifications WHERE token_hash = ?',
+    'SELECT * FROM signup_verifications WHERE token_hash = $1',
+    [tokenHash]
+  );
 }
 
 function parseTimeOrThrow(timeValue) {
@@ -1152,11 +1316,19 @@ app.post('/api/auth/signup', async (req, res) => {
   if (!businessName?.trim()) return res.status(400).json({ error: 'businessName is required' });
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
   if (!email?.trim()) return res.status(400).json({ error: 'email is required' });
-  if (!password || String(password).length < 8) {
-    return res.status(400).json({ error: 'password must be at least 8 characters' });
-  }
+  const passwordCheck = validatePasswordStrength(password);
+  if (!passwordCheck.ok) return res.status(400).json({ error: passwordCheck.error });
 
   const emailValue = String(email).trim().toLowerCase();
+  const existingUser = await dbGet(
+    'SELECT id FROM users WHERE email = ?',
+    'SELECT id FROM users WHERE email = $1',
+    [emailValue]
+  );
+  if (existingUser) {
+    return res.status(409).json({ error: 'Email already in use.' });
+  }
+
   const slugBase = slugifyBusinessName(businessName);
   let slug = slugBase;
   let suffix = 1;
@@ -1167,96 +1339,119 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 
   try {
-    let business;
-    if (USE_POSTGRES) {
-      business = (
-        await pgPool.query(
-          `INSERT INTO businesses (name, slug, owner_email, timezone)
-           VALUES ($1, $2, $3, $4)
-           RETURNING *`,
-          [businessName.trim(), slug, emailValue, timezone || 'America/Los_Angeles']
-        )
-      ).rows[0];
-      await pgPool.query(
-        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
-         VALUES ($1, $2, $3, $4)`,
-        [business.id, businessName.trim(), emailValue, timezone || 'America/Los_Angeles']
-      );
-      await pgPool.query(
-        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
-         VALUES
-           ($1, $2, $3, $4, $5, $6),
-           ($1, $7, $8, $9, $10, $11),
-           ($1, $12, $13, $14, $15, $16),
-           ($1, $17, $18, $19, $20, $21)`,
-        [
-          business.id,
-          'Consultation', 45, 15000, 'office', COLORS[0],
-          'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
-          'Review', 60, 20000, 'virtual', COLORS[2],
-          'Follow-up Call', 15, 0, 'phone', COLORS[3]
-        ]
-      );
-      const user = (
-        await pgPool.query(
-          `INSERT INTO users (business_id, name, email, password_hash, role)
-           VALUES ($1, $2, $3, $4, 'owner')
-           RETURNING *`,
-          [business.id, name.trim(), emailValue, hashPassword(password)]
-        )
-      ).rows[0];
-      const token = await createSession({ userId: user.id, businessId: business.id });
-      setSessionCookie(res, token);
-      return res.status(201).json({
-        user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
-        business: { id: Number(business.id), name: business.name, slug: business.slug }
-      });
+    const pendingExists = await dbGet(
+      'SELECT id FROM signup_verifications WHERE email = ?',
+      'SELECT id FROM signup_verifications WHERE email = $1',
+      [emailValue]
+    );
+    if (pendingExists) {
+      return res.status(409).json({ error: 'Email already in use.' });
     }
 
-    const businessInsert = sqlite
-      .prepare(
-        `INSERT INTO businesses (name, slug, owner_email, timezone)
-         VALUES (?, ?, ?, ?)`
-      )
-      .run(businessName.trim(), slug, emailValue, timezone || 'America/Los_Angeles');
-    const businessId = Number(businessInsert.lastInsertRowid);
-
-    sqlite
-      .prepare(
-        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
-         VALUES (?, ?, ?, ?)`
-      )
-      .run(businessId, businessName.trim(), emailValue, timezone || 'America/Los_Angeles');
-
-    const insertType = sqlite.prepare(
-      `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
-       VALUES (?, ?, ?, ?, ?, ?)`
+    const verifyToken = makeSessionToken();
+    const tokenHash = hashToken(verifyToken);
+    const expiresAt = new Date(Date.now() + VERIFY_HOURS * 60 * 60 * 1000).toISOString();
+    const passwordHash = hashPassword(password);
+    await dbRun(
+      `INSERT INTO signup_verifications
+       (business_name, name, email, password_hash, timezone, slug, token_hash, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO signup_verifications
+       (business_name, name, email, password_hash, timezone, slug, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [businessName.trim(), name.trim(), emailValue, passwordHash, timezone || 'America/Los_Angeles', slug, tokenHash, expiresAt]
     );
-    [
-      ['Consultation', 45, 15000, 'office', COLORS[0]],
-      ['Strategy Session', 90, 30000, 'hybrid', COLORS[1]],
-      ['Review', 60, 20000, 'virtual', COLORS[2]],
-      ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
-    ].forEach((r) => insertType.run(businessId, ...r));
 
-    const userInsert = sqlite
-      .prepare(
-        `INSERT INTO users (business_id, name, email, password_hash, role)
-         VALUES (?, ?, ?, ?, 'owner')`
-      )
-      .run(businessId, name.trim(), emailValue, hashPassword(password));
-
-    const token = await createSession({ userId: userInsert.lastInsertRowid, businessId });
-    setSessionCookie(res, token);
-    return res.status(201).json({
-      user: { id: Number(userInsert.lastInsertRowid), name: name.trim(), email: emailValue, role: 'owner' },
-      business: { id: businessId, name: businessName.trim(), slug }
+    const verifyLink = `${BASE_URL}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+    const verifyText = `Hi ${name.trim()},\n\nConfirm your IntelliSchedule account by clicking this link:\n${verifyLink}\n\nThis link expires in ${VERIFY_HOURS} hours.`;
+    const verifyResult = await sendEmail({
+      to: emailValue,
+      subject: 'Verify your IntelliSchedule account',
+      text: verifyText,
+      html: buildBrandedEmailHtml({
+        businessName: businessName.trim(),
+        title: 'Verify Your Email',
+        subtitle: 'Account setup',
+        message: `Hi ${name.trim()},\n\nClick below to verify your email and activate your account.\n${verifyLink}`,
+        details: [{ label: 'Expires', value: `${VERIFY_HOURS} hours` }]
+      })
     });
+
+    const payload = {
+      ok: true,
+      pendingVerification: true,
+      provider: verifyResult.provider || 'unknown',
+      message: 'Verification email sent. Please confirm your inbox before logging in.'
+    };
+    if (process.env.NODE_ENV !== 'production') payload.verificationToken = verifyToken;
+    return res.status(202).json(payload);
   } catch (error) {
     if (String(error.message || '').toLowerCase().includes('unique')) {
       return res.status(409).json({ error: 'Email already in use.' });
     }
     return res.status(500).json({ error: 'Could not create account.' });
+  }
+});
+
+app.post('/api/auth/verify-email', async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  const pending = await getPendingSignupByToken(token);
+  if (!pending) return res.status(400).json({ error: 'Invalid verification link.' });
+  if (new Date(pending.expires_at).getTime() <= Date.now()) {
+    await dbRun(
+      'DELETE FROM signup_verifications WHERE id = ?',
+      'DELETE FROM signup_verifications WHERE id = $1',
+      [Number(pending.id)]
+    );
+    return res.status(400).json({ error: 'Verification link expired. Sign up again.' });
+  }
+
+  const existingUser = await dbGet(
+    'SELECT id FROM users WHERE email = ?',
+    'SELECT id FROM users WHERE email = $1',
+    [pending.email]
+  );
+  if (existingUser) {
+    await dbRun(
+      'DELETE FROM signup_verifications WHERE id = ?',
+      'DELETE FROM signup_verifications WHERE id = $1',
+      [Number(pending.id)]
+    );
+    return res.status(409).json({ error: 'Email already in use.' });
+  }
+
+  try {
+    let resolvedSlug = String(pending.slug || slugifyBusinessName(pending.business_name));
+    let counter = 1;
+    while (await getBusinessBySlug(resolvedSlug)) {
+      counter += 1;
+      resolvedSlug = `${slugifyBusinessName(pending.business_name)}-${counter}`;
+    }
+
+    const created = await createBusinessWithOwner({
+      businessName: pending.business_name,
+      name: pending.name,
+      email: pending.email,
+      passwordHash: pending.password_hash,
+      timezone: pending.timezone,
+      slug: resolvedSlug
+    });
+    await dbRun(
+      'DELETE FROM signup_verifications WHERE id = ?',
+      'DELETE FROM signup_verifications WHERE id = $1',
+      [Number(pending.id)]
+    );
+
+    const sessionToken = await createSession({
+      userId: created.user.id,
+      businessId: created.business.id
+    });
+    setSessionCookie(res, sessionToken);
+    return res.json(created);
+  } catch (error) {
+    return res.status(500).json({ error: 'Could not verify account.' });
   }
 });
 
@@ -1879,6 +2074,36 @@ app.get('/api/dashboard', async (req, res) => {
 
 app.get('/book', (_req, res) => {
   res.sendFile(path.join(__dirname, 'booking.html'));
+});
+
+app.get('/verify-email', (req, res) => {
+  const token = String(req.query.token || '').trim();
+  if (!token) return res.status(400).send('Missing verification token.');
+  res.type('html').send(`<!doctype html>
+<html>
+  <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+  <body style="font-family:Inter,Segoe UI,Arial,sans-serif;background:#f8fafc;padding:24px;">
+    <div style="max-width:560px;margin:40px auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px;">
+      <h2 style="margin:0 0 10px;">Verifying your email...</h2>
+      <p id="msg" style="color:#475569;">Please wait.</p>
+      <a href="/" style="display:inline-block;margin-top:10px;">Go to dashboard</a>
+    </div>
+    <script>
+      fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ token: ${JSON.stringify(token)} })
+      })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || 'Verification failed');
+        document.getElementById('msg').textContent = 'Email verified. Redirecting...';
+        setTimeout(() => { window.location.href = '/'; }, 700);
+      })
+      .catch((e) => { document.getElementById('msg').textContent = e.message; });
+    </script>
+  </body>
+</html>`);
 });
 
 const db = {

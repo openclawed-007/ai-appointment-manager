@@ -408,8 +408,9 @@
 
     <div class="auth-shell hidden" id="auth-shell">
         <div class="auth-card">
+            <button type="button" class="auth-close-btn" id="btn-close-auth-shell" aria-label="Close sign in panel">Close</button>
             <h2>Sign in to IntelliSchedule</h2>
-            <p>Use your business owner account to access your workspace.</p>
+            <p>Use your business owner account to access your workspace. New accounts require email verification.</p>
             <div class="auth-tabs">
                 <button type="button" class="auth-tab active" data-auth-tab="login">Login</button>
                 <button type="button" class="auth-tab" data-auth-tab="signup">Create Account</button>
@@ -428,8 +429,9 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
-                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="8" required /></div>
+                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="12" required /></div>
                 </div>
+                <p class="auth-password-hint">Use 12+ chars with uppercase, lowercase, number, and symbol.</p>
                 <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" /></div>
                 <div class="form-actions"><button type="submit" class="btn-primary">Create Account</button></div>
             </form>

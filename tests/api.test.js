@@ -35,6 +35,19 @@ afterAll(async () => {
   } catch {}
 });
 
+async function signupAndVerify(agent, payload) {
+  const signup = await agent.post('/api/auth/signup').send(payload);
+  expect(signup.statusCode).toBe(202);
+  expect(signup.body.pendingVerification).toBe(true);
+  expect(signup.body.verificationToken).toBeTruthy();
+
+  const verify = await agent.post('/api/auth/verify-email').send({
+    token: signup.body.verificationToken
+  });
+  expect(verify.statusCode).toBe(200);
+  return verify.body;
+}
+
 describe('API smoke', () => {
   it('health should be ok', async () => {
     const res = await request(app).get('/api/health');
@@ -115,15 +128,14 @@ describe('API smoke', () => {
     const agentA = request.agent(app);
     const agentB = request.agent(app);
 
-    const signupA = await agentA.post('/api/auth/signup').send({
+    const verifiedA = await signupAndVerify(agentA, {
       businessName: `Alpha ${unique}`,
       name: 'Alpha Owner',
       email: `alpha-${unique}@example.com`,
       password: 'AlphaPass123!',
       timezone: 'America/Los_Angeles'
     });
-    expect(signupA.statusCode).toBe(201);
-    const businessASlug = signupA.body.business.slug;
+    const businessASlug = verifiedA.business.slug;
 
     const typeARes = await agentA.post('/api/types').send({
       name: `Alpha Exclusive ${unique}`,
@@ -145,14 +157,13 @@ describe('API smoke', () => {
     });
     expect(apptARes.statusCode).toBe(201);
 
-    const signupB = await agentB.post('/api/auth/signup').send({
+    await signupAndVerify(agentB, {
       businessName: `Beta ${unique}`,
       name: 'Beta Owner',
       email: `beta-${unique}@example.com`,
       password: 'BetaPass123!',
       timezone: 'America/New_York'
     });
-    expect(signupB.statusCode).toBe(201);
 
     const bAppointments = await agentB.get('/api/appointments');
     expect(bAppointments.statusCode).toBe(200);
@@ -161,6 +172,40 @@ describe('API smoke', () => {
     const publicTypesA = await request(app).get(`/api/types?businessSlug=${encodeURIComponent(businessASlug)}`);
     expect(publicTypesA.statusCode).toBe(200);
     expect(publicTypesA.body.types.some((t) => t.name === `Alpha Exclusive ${unique}`)).toBe(true);
+  });
+
+  it('rejects weak signup passwords', async () => {
+    const weakRes = await request(app).post('/api/auth/signup').send({
+      businessName: `Weak Biz ${Date.now()}`,
+      name: 'Weak Owner',
+      email: `weak-${Date.now()}@example.com`,
+      password: 'weakpass',
+      timezone: 'America/Los_Angeles'
+    });
+    expect(weakRes.statusCode).toBe(400);
+    expect(String(weakRes.body.error || '')).toContain('Password is too weak');
+  });
+
+  it('rejects duplicate signup email before creating account', async () => {
+    const ts = Date.now();
+    const email = `dup-${ts}@example.com`;
+    const payload = {
+      businessName: `Dup Biz ${ts}`,
+      name: 'Dup Owner',
+      email,
+      password: 'StrongPass123!',
+      timezone: 'America/Los_Angeles'
+    };
+
+    const first = await request(app).post('/api/auth/signup').send(payload);
+    expect(first.statusCode).toBe(202);
+
+    const second = await request(app).post('/api/auth/signup').send({
+      ...payload,
+      businessName: `Dup Biz Second ${ts}`
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.body.error).toBe('Email already in use.');
   });
 
   it('dashboard and appointments endpoints return structured data for authenticated owner', async () => {

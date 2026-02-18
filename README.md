@@ -63,6 +63,19 @@ Open:
 - Dashboard: `http://localhost:3000/`
 - Public booking page: `http://localhost:3000/book?business=your-business-slug`
 
+## Manage test accounts locally
+
+Run:
+
+```bash
+npm run accounts:manage
+```
+
+Menu options:
+- Show all accounts
+- Delete a user by user id
+- Delete a business by business id (removes all its data)
+
 ---
 
 ## Environment config
