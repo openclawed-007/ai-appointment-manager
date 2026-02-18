@@ -258,8 +258,50 @@ function renderTypes(types = []) {
           )
           .join('');
 
+  const adminHtml =
+    types.length === 0
+      ? '<div class="empty-state">No appointment types yet.</div>'
+      : types
+          .map(
+            (t) => `
+            <div class="data-row" data-type-id="${t.id}">
+              <div>
+                <strong>${escapeHtml(t.name)}</strong>
+                <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
+              </div>
+              <div>${escapeHtml(t.locationMode)}</div>
+              <div>${t.bookingCount || 0} bookings</div>
+              <div><span class="pill">Active</span></div>
+              <div class="row-actions">
+                <button class="btn-secondary btn-delete-type" type="button">Delete</button>
+              </div>
+            </div>`
+          )
+          .join('');
+
   if (root) root.innerHTML = html;
-  if (adminRoot) adminRoot.innerHTML = html;
+  if (adminRoot) {
+    adminRoot.innerHTML = adminHtml;
+
+    adminRoot.querySelectorAll('.btn-delete-type').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const typeId = btn.closest('.data-row')?.dataset.typeId;
+        if (!typeId) return;
+
+        const ok = window.confirm('Delete this appointment type? Existing bookings remain, but this type will no longer be selectable.');
+        if (!ok) return;
+
+        try {
+          await api(`/api/types/${typeId}`, { method: 'DELETE' });
+          showToast('Appointment type deleted', 'success');
+          await loadTypes();
+          await loadDashboard();
+        } catch (error) {
+          showToast(error.message, 'error');
+        }
+      });
+    });
+  }
 }
 
 function renderInsights(insights = []) {
