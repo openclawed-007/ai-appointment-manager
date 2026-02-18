@@ -12,6 +12,10 @@ require('dotenv').config();
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
+// Render/Neon deployments run behind a reverse proxy. Trust the first proxy hop
+// so express-rate-limit can read client IP from X-Forwarded-For safely.
+app.set('trust proxy', 1);
+
 const USE_POSTGRES = Boolean(process.env.DATABASE_URL);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
 const SESSION_COOKIE = 'sid';
