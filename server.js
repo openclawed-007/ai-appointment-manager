@@ -290,6 +290,142 @@ async function assertNoOverlap({ date, startMinutes, durationMinutes, excludeId 
   }
 }
 
+function escapeHtmlEmail(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function textToHtmlParagraphs(text = '') {
+  return escapeHtmlEmail(text).replaceAll('\n', '<br/>');
+}
+
+function buildBrandedEmailHtml({ businessName, title, subtitle, message, details = [] }) {
+  const brand = escapeHtmlEmail(businessName || 'IntelliSchedule');
+  const safeTitle = escapeHtmlEmail(title || 'Appointment Update');
+  const safeSubtitle = subtitle ? `<p style="margin:6px 0 0;color:#64748b;font-size:14px;">${escapeHtmlEmail(subtitle)}</p>` : '';
+  const safeMessage = textToHtmlParagraphs(message || '');
+  const detailsHtml = details.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate;border-spacing:0 8px;">
+        ${details
+          .map(
+            (d) => `
+              <tr>
+                <td style="padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.4px;">${escapeHtmlEmail(
+                  d.label
+                )}</td>
+                <td style="padding:8px 10px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;color:#0f172a;">${escapeHtmlEmail(
+                  d.value
+                )}</td>
+              </tr>`
+          )
+          .join('')}
+      </table>`
+    : '';
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,Segoe UI,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+            <tr>
+              <td style="padding:18px 20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#ffffff;">
+                <div style="font-size:13px;opacity:.9;">${brand}</div>
+                <div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:4px;">${safeTitle}</div>
+                ${safeSubtitle}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px;">
+                <div style="font-size:14px;line-height:1.65;color:#0f172a;">${safeMessage}</div>
+                ${detailsHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 20px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+                Sent by ${brand}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function buildCancellationEmailHtml({ businessName, appointment, cancellationReason = '' }) {
+  const brand = escapeHtmlEmail(businessName || 'IntelliSchedule');
+  const clientName = escapeHtmlEmail(appointment?.clientName || 'there');
+  const typeName = escapeHtmlEmail(appointment?.typeName || 'Appointment');
+  const dateValue = escapeHtmlEmail(appointment?.date || '');
+  const timeValue = escapeHtmlEmail(fmtTime(appointment?.time));
+  const location = escapeHtmlEmail(appointment?.location || 'office');
+  const reasonValue = String(cancellationReason || '').trim();
+  const reasonBlock = reasonValue
+    ? `
+                <p style="margin:12px 0 0;font-size:14px;line-height:1.65;color:#7c2d12;">
+                  <strong>Reason:</strong> ${escapeHtmlEmail(reasonValue)}
+                </p>`
+    : '';
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#fff7ed;font-family:Inter,Segoe UI,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border:1px solid #fed7aa;border-radius:18px;overflow:hidden;">
+            <tr>
+              <td style="padding:18px 20px;background:linear-gradient(135deg,#dc2626 0%,#f97316 100%);color:#ffffff;">
+                <div style="font-size:13px;opacity:.95;">${brand}</div>
+                <div style="font-size:22px;font-weight:800;line-height:1.2;margin-top:4px;">Appointment Cancelled</div>
+                <p style="margin:6px 0 0;font-size:14px;opacity:.95;">${typeName}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px;">
+                <p style="margin:0 0 10px;font-size:14px;line-height:1.65;color:#0f172a;">Hi ${clientName},</p>
+                <p style="margin:0 0 12px;font-size:14px;line-height:1.65;color:#0f172a;">Your booking has been cancelled. If this was a mistake, reply to this email and we can help rebook quickly.</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 8px;">
+                  <tr>
+                    <td style="padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.4px;">Service</td>
+                    <td style="padding:8px 10px;border:1px solid #fdba74;border-radius:10px;font-size:14px;color:#7c2d12;background:#fffbeb;">${typeName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.4px;">Date</td>
+                    <td style="padding:8px 10px;border:1px solid #fdba74;border-radius:10px;font-size:14px;color:#7c2d12;background:#fffbeb;">${dateValue}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.4px;">Time</td>
+                    <td style="padding:8px 10px;border:1px solid #fdba74;border-radius:10px;font-size:14px;color:#7c2d12;background:#fffbeb;">${timeValue}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;width:140px;font-size:12px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.4px;">Location</td>
+                    <td style="padding:8px 10px;border:1px solid #fdba74;border-radius:10px;font-size:14px;color:#7c2d12;background:#fffbeb;">${location}</td>
+                  </tr>
+                </table>
+                ${reasonBlock}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 20px;border-top:1px solid #fed7aa;font-size:12px;color:#9a3412;">
+                Sent by ${brand}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
 async function sendEmail({ to, subject, html, text }) {
   if (!to) return { ok: false, reason: 'missing-to' };
   const fromEmail = process.env.FROM_EMAIL;
@@ -428,10 +564,35 @@ async function createAppointment(payload = {}) {
   const clientText = `Hi ${appointment.clientName},\n\nYour ${appointment.typeName} is confirmed for ${appointment.date} at ${fmtTime(
     appointment.time
   )}.\n\nLocation: ${appointment.location}\nDuration: ${appointment.durationMinutes} minutes\n\nThanks,\n${settings.business_name}`;
+  const clientHtml = buildBrandedEmailHtml({
+    businessName: settings.business_name,
+    title: 'Appointment Confirmed',
+    subtitle: appointment.typeName,
+    message: `Hi ${appointment.clientName},\n\nYour appointment is confirmed.`,
+    details: [
+      { label: 'Service', value: appointment.typeName },
+      { label: 'Date', value: appointment.date },
+      { label: 'Time', value: fmtTime(appointment.time) },
+      { label: 'Duration', value: `${appointment.durationMinutes} minutes` },
+      { label: 'Location', value: appointment.location }
+    ]
+  });
 
   const ownerText = `New booking received in ${settings.business_name}\n\nType: ${appointment.typeName}\nClient: ${appointment.clientName}\nWhen: ${appointment.date} ${fmtTime(
     appointment.time
   )}\nSource: ${appointment.source}`;
+  const ownerHtml = buildBrandedEmailHtml({
+    businessName: settings.business_name,
+    title: 'New Booking Alert',
+    subtitle: 'Owner Notification',
+    message: 'A new booking has been created.',
+    details: [
+      { label: 'Service', value: appointment.typeName },
+      { label: 'Client', value: appointment.clientName },
+      { label: 'When', value: `${appointment.date} ${fmtTime(appointment.time)}` },
+      { label: 'Source', value: appointment.source }
+    ]
+  });
 
   const notifyResults = await Promise.allSettled([
     appointment.clientEmail
@@ -439,7 +600,7 @@ async function createAppointment(payload = {}) {
           to: appointment.clientEmail,
           subject: `${settings.business_name}: Appointment confirmed`,
           text: clientText,
-          html: `<p>${clientText.replace(/\n/g, '<br/>')}</p>`
+          html: clientHtml
         })
       : Promise.resolve(),
     settings.owner_email
@@ -447,7 +608,7 @@ async function createAppointment(payload = {}) {
           to: settings.owner_email,
           subject: `[Owner Alert] New booking - ${settings.business_name}`,
           text: ownerText,
-          html: `<p>${ownerText.replace(/\n/g, '<br/>')}</p>`
+          html: ownerHtml
         })
       : Promise.resolve()
   ]);
@@ -886,6 +1047,81 @@ app.post('/api/public/bookings', async (req, res) => {
   }
 });
 
+app.post('/api/appointments/:id/email', async (req, res) => {
+  const id = Number(req.params.id);
+  const row = await dbGet(
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = ?`,
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = $1`,
+    [id]
+  );
+
+  if (!row) return res.status(404).json({ error: 'appointment not found' });
+  const appointment = rowToAppointment(row);
+  if (!appointment.clientEmail) return res.status(400).json({ error: 'This appointment has no client email.' });
+
+  const settings = await getSettings();
+  const { template, subject, message } = req.body || {};
+  const selectedTemplate = String(template || 'summary');
+
+  let emailSubject = `${settings.business_name}: Appointment details`;
+  let text;
+
+  if (selectedTemplate === 'custom') {
+    if (!String(message || '').trim()) {
+      return res.status(400).json({ error: 'Custom message is required.' });
+    }
+    emailSubject = String(subject || `${settings.business_name}: Message about your appointment`).trim();
+    text = `Hi ${appointment.clientName},\n\n${String(message).trim()}\n\n---\nAppointment reference:\nService: ${appointment.typeName}\nDate: ${appointment.date}\nTime: ${fmtTime(
+      appointment.time
+    )}\nDuration: ${appointment.durationMinutes} minutes\nLocation: ${appointment.location}\nStatus: ${appointment.status}\n\nThanks,\n${settings.business_name}`;
+  } else if (selectedTemplate === 'reminder') {
+    emailSubject = `${settings.business_name}: Appointment reminder`;
+    text = `Hi ${appointment.clientName},\n\nQuick reminder for your upcoming appointment:\n\nService: ${appointment.typeName}\nDate: ${appointment.date}\nTime: ${fmtTime(
+      appointment.time
+    )}\nDuration: ${appointment.durationMinutes} minutes\nLocation: ${appointment.location}\n\nReply if you need to reschedule.\n\nThanks,\n${settings.business_name}`;
+  } else {
+    text = `Hi ${appointment.clientName},\n\nThis is your appointment summary:\n\nService: ${appointment.typeName}\nDate: ${appointment.date}\nTime: ${fmtTime(
+      appointment.time
+    )}\nDuration: ${appointment.durationMinutes} minutes\nLocation: ${appointment.location}\nStatus: ${appointment.status}\n\nThanks,\n${settings.business_name}`;
+  }
+
+  const result = await sendEmail({
+    to: appointment.clientEmail,
+    subject: emailSubject,
+    text,
+    html: buildBrandedEmailHtml({
+      businessName: settings.business_name,
+      title: emailSubject,
+      subtitle: appointment.typeName,
+      message: text,
+      details: [
+        { label: 'Service', value: appointment.typeName },
+        { label: 'Date', value: appointment.date },
+        { label: 'Time', value: fmtTime(appointment.time) },
+        { label: 'Duration', value: `${appointment.durationMinutes} minutes` },
+        { label: 'Location', value: appointment.location },
+        { label: 'Status', value: appointment.status }
+      ]
+    })
+  });
+
+  if (!result.ok) {
+    return res.status(502).json({ error: 'Could not send email right now.', provider: result.provider || 'unknown' });
+  }
+
+  return res.json({
+    ok: true,
+    provider: result.provider || 'unknown',
+    appointmentId: appointment.id
+  });
+});
+
 app.put('/api/appointments/:id', async (req, res) => {
   const id = Number(req.params.id);
   const { typeId, clientName, clientEmail, date, time, durationMinutes, location, notes } = req.body || {};
@@ -1004,7 +1240,7 @@ app.delete('/api/appointments/:id', async (req, res) => {
 
 app.patch('/api/appointments/:id/status', async (req, res) => {
   const id = Number(req.params.id);
-  const { status } = req.body || {};
+  const { status, cancellationReason } = req.body || {};
   const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
 
   if (!allowed.includes(status)) {
@@ -1033,14 +1269,38 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
 
   const appointment = rowToAppointment(row);
   const settings = await getSettings();
+  const cleanCancellationReason = String(cancellationReason || '').trim();
 
   if (appointment.clientEmail) {
+    const isCancelled = status === 'cancelled';
+    const statusText = isCancelled
+      ? `Hi ${appointment.clientName}, your appointment on ${appointment.date} at ${fmtTime(
+          appointment.time
+        )} has been cancelled.${cleanCancellationReason ? `\n\nReason: ${cleanCancellationReason}` : ''}`
+      : `Hi ${appointment.clientName}, your appointment on ${appointment.date} at ${fmtTime(
+          appointment.time
+        )} is now ${status}.`;
     await sendEmail({
       to: appointment.clientEmail,
-      subject: `${settings.business_name}: Appointment ${status}`,
-      text: `Hi ${appointment.clientName}, your appointment on ${appointment.date} at ${fmtTime(
-        appointment.time
-      )} is now ${status}.`
+      subject: isCancelled ? `${settings.business_name}: Appointment cancelled` : `${settings.business_name}: Appointment ${status}`,
+      text: statusText,
+      html: isCancelled
+        ? buildCancellationEmailHtml({
+            businessName: settings.business_name,
+            appointment,
+            cancellationReason: cleanCancellationReason
+          })
+        : buildBrandedEmailHtml({
+            businessName: settings.business_name,
+            title: `Appointment ${status}`,
+            subtitle: appointment.typeName,
+            message: statusText,
+            details: [
+              { label: 'Date', value: appointment.date },
+              { label: 'Time', value: fmtTime(appointment.time) },
+              { label: 'Status', value: status }
+            ]
+          })
     });
   }
 

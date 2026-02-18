@@ -441,6 +441,11 @@ body {
     color: var(--text-primary);
 }
 
+.btn-secondary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .btn-text {
     background: none;
     border: none;
@@ -1321,20 +1326,39 @@ body {
 }
 
 .day-menu-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    display: grid;
+    gap: 8px;
     border: 1px solid var(--bg-tertiary);
     border-radius: 10px;
     padding: 9px 10px;
     background: var(--bg-primary);
 }
 
+.day-menu-item-actions-wrap {
+    display: grid;
+    gap: 8px;
+}
+
+.day-menu-show-actions {
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 9px;
+    padding: 7px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    justify-self: start;
+}
+
 .day-menu-item-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    flex-shrink: 0;
+}
+
+.day-menu-item-actions.hidden {
+    display: none;
 }
 
 .day-menu-item-copy {
@@ -1369,6 +1393,22 @@ body {
     flex-shrink: 0;
 }
 
+.day-menu-cancel {
+    border: 1px solid #fdba74;
+    background: #fff7ed;
+    color: #c2410c;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.day-menu-cancel:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
 .day-menu-edit {
     border: 1px solid #cbd5e1;
     background: #f8fafc;
@@ -1380,6 +1420,50 @@ body {
     cursor: pointer;
 }
 
+.day-menu-email {
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-cancel {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fdba74;
+}
+
+.cancel-menu {
+    width: min(460px, calc(100vw - 20px));
+}
+
+.cancel-menu-body {
+    padding: 2px 2px 0;
+}
+
+.cancel-menu-help {
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.cancel-menu-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
+.cancel-menu-toggle input {
+    accent-color: var(--primary);
+}
+
 .day-menu-empty,
 .day-menu-loading {
     padding: 10px;
@@ -1388,6 +1472,103 @@ body {
     color: var(--text-secondary);
     font-size: 0.82rem;
     text-align: center;
+}
+
+.email-menu {
+    position: fixed;
+    z-index: 1450;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(420px, calc(100vw - 20px));
+    max-height: min(74vh, 560px);
+    overflow: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 14px;
+    box-shadow: var(--shadow-xl);
+    padding: 10px;
+    animation: fade-in 140ms ease;
+}
+
+.email-menu.hidden {
+    display: none;
+}
+
+.email-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.email-menu-header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.email-menu-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 9px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.email-template-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.email-template-btn {
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.email-template-btn.active {
+    border-color: var(--primary-light);
+    background: rgba(99, 102, 241, 0.08);
+    color: var(--primary-dark);
+}
+
+.email-custom-fields {
+    margin-bottom: 10px;
+}
+
+.email-custom-fields.hidden {
+    display: none;
+}
+
+.email-custom-fields .form-group {
+    margin-bottom: 10px;
+}
+
+.email-custom-fields .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.email-menu-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.email-menu-actions .btn-primary,
+.email-menu-actions .btn-secondary {
+    padding: 8px 12px;
+    border-radius: 10px;
 }
 
 .booking-shell {
@@ -1591,6 +1772,12 @@ body {
     .day-menu {
         width: calc(100vw - 16px);
         max-height: 62vh;
+        padding: 8px;
+    }
+
+    .email-menu {
+        width: calc(100vw - 16px);
+        max-height: 68vh;
         padding: 8px;
     }
 

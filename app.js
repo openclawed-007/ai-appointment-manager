@@ -10,7 +10,10 @@ const state = {
   dayMenuAnchorEl: null,
   editingAppointmentId: null,
   searchOriginView: null,
-  searchActive: false
+  searchActive: false,
+  emailMenuAppointmentId: null,
+  cancelMenuAppointmentId: null,
+  cancelMenuDate: ''
 };
 
 function getFocusableElements(container) {
@@ -111,6 +114,191 @@ function closeDayMenu() {
   state.dayMenuAnchorEl = null;
 }
 
+function ensureEmailComposerMenu() {
+  let menu = document.getElementById('email-composer-menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'email-composer-menu';
+  menu.className = 'email-menu hidden';
+  menu.setAttribute('role', 'dialog');
+  menu.setAttribute('aria-modal', 'false');
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function closeEmailComposerMenu() {
+  const menu = document.getElementById('email-composer-menu');
+  if (!menu) return;
+  menu.classList.add('hidden');
+  menu.innerHTML = '';
+  state.emailMenuAppointmentId = null;
+}
+
+function ensureCancelReasonMenu() {
+  let menu = document.getElementById('cancel-reason-menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'cancel-reason-menu';
+  menu.className = 'email-menu cancel-menu hidden';
+  menu.setAttribute('role', 'dialog');
+  menu.setAttribute('aria-modal', 'false');
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function closeCancelReasonMenu() {
+  const menu = document.getElementById('cancel-reason-menu');
+  if (!menu) return;
+  menu.classList.add('hidden');
+  menu.innerHTML = '';
+  state.cancelMenuAppointmentId = null;
+  state.cancelMenuDate = '';
+}
+
+async function openCancelReasonMenu(appointmentId, date = '') {
+  const menu = ensureCancelReasonMenu();
+  state.cancelMenuAppointmentId = Number(appointmentId);
+  state.cancelMenuDate = String(date || '');
+
+  menu.innerHTML = `
+    <div class="email-menu-header">
+      <h3>Cancel Appointment</h3>
+      <button type="button" class="email-menu-close cancel-menu-close" aria-label="Close cancel menu">×</button>
+    </div>
+    <div class="cancel-menu-body">
+      <p class="cancel-menu-help">Optionally add a reason to include in the cancellation email.</p>
+      <label class="cancel-menu-toggle">
+        <input type="checkbox" name="skipReason" />
+        Cancel without reason
+      </label>
+      <div class="form-group">
+        <label>Reason (optional)</label>
+        <textarea name="cancelReason" rows="4" placeholder="Example: We're fully booked at this hour, please pick a new slot."></textarea>
+      </div>
+    </div>
+    <div class="email-menu-actions">
+      <button type="button" class="btn-secondary cancel-menu-back">Back</button>
+      <button type="button" class="btn-primary cancel-menu-confirm">Confirm Cancellation</button>
+    </div>
+  `;
+
+  menu.classList.remove('hidden');
+
+  const skipReasonInput = menu.querySelector('input[name="skipReason"]');
+  const reasonInput = menu.querySelector('textarea[name="cancelReason"]');
+  const applySkipState = () => {
+    if (!reasonInput || !skipReasonInput) return;
+    reasonInput.disabled = skipReasonInput.checked;
+    if (skipReasonInput.checked) reasonInput.value = '';
+  };
+  skipReasonInput?.addEventListener('change', applySkipState);
+  applySkipState();
+
+  menu.querySelector('.cancel-menu-close')?.addEventListener('click', closeCancelReasonMenu);
+  menu.querySelector('.cancel-menu-back')?.addEventListener('click', closeCancelReasonMenu);
+  menu.querySelector('.cancel-menu-confirm')?.addEventListener('click', async () => {
+    const confirmBtn = menu.querySelector('.cancel-menu-confirm');
+    if (!confirmBtn || !state.cancelMenuAppointmentId) return;
+    const oldText = confirmBtn.textContent;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Cancelling...';
+    const reason = skipReasonInput?.checked ? '' : String(reasonInput?.value || '').trim();
+    await cancelAppointmentById(state.cancelMenuAppointmentId, state.cancelMenuDate, reason);
+    closeCancelReasonMenu();
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = oldText;
+  });
+}
+
+function getEmailPayloadFromMenu(menu) {
+  const selected = menu.querySelector('.email-template-btn.active')?.dataset.template || 'summary';
+  if (selected !== 'custom') return { template: selected };
+
+  const subjectInput = menu.querySelector('input[name="emailSubject"]');
+  const messageInput = menu.querySelector('textarea[name="emailMessage"]');
+  const subject = String(subjectInput?.value || '').trim();
+  const message = String(messageInput?.value || '').trim();
+  if (!message) throw new Error('Please enter a message.');
+  return { template: 'custom', subject, message };
+}
+
+function toggleCustomEmailFields(menu) {
+  const selected = menu.querySelector('.email-template-btn.active')?.dataset.template || 'summary';
+  const customFields = menu.querySelector('.email-custom-fields');
+  if (!customFields) return;
+  customFields.classList.toggle('hidden', selected !== 'custom');
+}
+
+function bindEmailTemplateButtons(menu) {
+  menu.querySelectorAll('.email-template-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      menu.querySelectorAll('.email-template-btn').forEach((n) => n.classList.remove('active'));
+      btn.classList.add('active');
+      toggleCustomEmailFields(menu);
+    });
+  });
+}
+
+async function openEmailComposerMenu(appointmentId) {
+  const menu = ensureEmailComposerMenu();
+  state.emailMenuAppointmentId = Number(appointmentId);
+
+  menu.innerHTML = `
+    <div class="email-menu-header">
+      <h3>Send Email</h3>
+      <button type="button" class="email-menu-close" aria-label="Close email menu">×</button>
+    </div>
+    <div class="email-template-group">
+      <button type="button" class="email-template-btn active" data-template="summary">Summary</button>
+      <button type="button" class="email-template-btn" data-template="reminder">Reminder</button>
+      <button type="button" class="email-template-btn" data-template="custom">Custom</button>
+    </div>
+    <div class="email-custom-fields hidden">
+      <div class="form-group">
+        <label>Subject</label>
+        <input name="emailSubject" type="text" placeholder="Message about your appointment" />
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea name="emailMessage" rows="4" placeholder="Type your message..."></textarea>
+      </div>
+    </div>
+    <div class="email-menu-actions">
+      <button type="button" class="btn-secondary email-cancel-btn">Cancel</button>
+      <button type="button" class="btn-primary email-send-btn">Send Email</button>
+    </div>
+  `;
+
+  menu.classList.remove('hidden');
+  bindEmailTemplateButtons(menu);
+
+  menu.querySelector('.email-menu-close')?.addEventListener('click', closeEmailComposerMenu);
+  menu.querySelector('.email-cancel-btn')?.addEventListener('click', closeEmailComposerMenu);
+  menu.querySelector('.email-send-btn')?.addEventListener('click', async () => {
+    const sendBtn = menu.querySelector('.email-send-btn');
+    if (!sendBtn || !state.emailMenuAppointmentId) return;
+    const oldText = sendBtn.textContent;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    try {
+      const payload = getEmailPayloadFromMenu(menu);
+      const result = await api(`/api/appointments/${state.emailMenuAppointmentId}/email`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showToast(
+        result.provider === 'simulation' ? 'Email simulated (provider not configured).' : 'Appointment email sent.',
+        'success'
+      );
+      closeEmailComposerMenu();
+    } catch (error) {
+      showToast(error.message, 'error');
+      sendBtn.disabled = false;
+      sendBtn.textContent = oldText;
+    }
+  });
+}
+
 function positionDayMenu(anchorEl, menu) {
   const rect = anchorEl.getBoundingClientRect();
   const margin = 10;
@@ -150,12 +338,21 @@ async function openDayMenu(anchorEl, date) {
         (a) => `
           <div class="day-menu-item">
             <div class="day-menu-item-copy">
-              <strong>${escapeHtml(toTime12(a.time))}</strong>
-              <span>${escapeHtml(a.clientName)} • ${escapeHtml(a.typeName)}</span>
+              <strong>${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</strong>
+              <span>${escapeHtml(a.clientName)} • ${escapeHtml(a.typeName)} • ${escapeHtml(a.status)}</span>
             </div>
-            <div class="day-menu-item-actions">
-              <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
-              <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
+            <div class="day-menu-item-actions-wrap">
+              <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
+              <div class="day-menu-item-actions hidden" data-actions-for="${a.id}">
+                ${
+                  a.clientEmail
+                    ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email appointment details">Email</button>`
+                    : ''
+                }
+                <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
+                <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel appointment">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
+                <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
+              </div>
             </div>
           </div>`
       )
@@ -188,12 +385,41 @@ async function openDayMenu(anchorEl, date) {
       updateAppointmentPreview();
     });
 
+    menu.querySelectorAll('.day-menu-show-actions').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.appointmentId;
+        if (!id) return;
+        const target = menu.querySelector(`.day-menu-item-actions[data-actions-for="${id}"]`);
+        if (!target) return;
+        const opening = target.classList.contains('hidden');
+        menu.querySelectorAll('.day-menu-item-actions').forEach((n) => n.classList.add('hidden'));
+        menu.querySelectorAll('.day-menu-show-actions').forEach((n) => {
+          n.setAttribute('aria-expanded', 'false');
+          n.textContent = 'Show actions';
+        });
+        if (opening) {
+          target.classList.remove('hidden');
+          btn.setAttribute('aria-expanded', 'true');
+          btn.textContent = 'Hide actions';
+        }
+      });
+    });
+
     menu.querySelectorAll('.day-menu-edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = Number(btn.dataset.appointmentId);
         const appointment = appointments.find((a) => Number(a.id) === id);
         closeDayMenu();
         startEditAppointment(appointment);
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-email').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.appointmentId;
+        if (!id) return;
+        closeDayMenu();
+        await openEmailComposerMenu(id);
       });
     });
 
@@ -216,6 +442,14 @@ async function openDayMenu(anchorEl, date) {
         } catch (error) {
           showToast(error.message, 'error');
         }
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-cancel').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.appointmentId;
+        if (!id || btn.disabled) return;
+        await openCancelReasonMenu(id, date);
       });
     });
   } catch (error) {
@@ -295,6 +529,29 @@ function showToast(message, type = 'info') {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 220);
   }, 2400);
+}
+
+async function cancelAppointmentById(appointmentId, date = '', cancellationReason = '') {
+  if (!appointmentId) return;
+  try {
+    const payload = { status: 'cancelled' };
+    const cleanReason = String(cancellationReason || '').trim();
+    if (cleanReason) payload.cancellationReason = cleanReason;
+    await api(`/api/appointments/${appointmentId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+    showToast('Appointment cancelled.', 'success');
+    await loadDashboard();
+    await loadAppointmentsTable();
+    await refreshCalendarDots();
+    if (date && state.dayMenuDate === date) {
+      const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
+      if (selectedCell) await openDayMenu(selectedCell, date);
+    }
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 }
 
 function setActiveView(view) {
@@ -465,7 +722,11 @@ function bindKeyboard() {
 
     if (e.key === 'Escape') {
       if (activeModal?.id) closeModal(activeModal.id);
-      else closeDayMenu();
+      else {
+        closeDayMenu();
+        closeEmailComposerMenu();
+        closeCancelReasonMenu();
+      }
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -861,15 +1122,31 @@ function renderAppointmentsTable(appointments = []) {
         <div>${toTime12(a.time)}</div>
         <div><span class="pill">${escapeHtml(a.status)}</span></div>
         <div class="row-actions">
-          <button class="btn-secondary btn-complete" type="button">Complete</button>
+          ${
+            a.clientEmail
+              ? '<button class="btn-secondary btn-email" type="button">Email</button>'
+              : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
+          }
+          <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>Complete</button>
+          <button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
           <button class="btn-secondary btn-delete" type="button">Delete</button>
         </div>
       </div>`
     )
     .join('');
 
+  root.querySelectorAll('.btn-email').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const id = btn.closest('.data-row')?.dataset.id;
+      if (!id) return;
+      await openEmailComposerMenu(id);
+    });
+  });
+
   root.querySelectorAll('.btn-complete').forEach((btn) => {
     btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
       const id = btn.closest('.data-row')?.dataset.id;
       await api(`/api/appointments/${id}/status`, {
         method: 'PATCH',
@@ -878,6 +1155,14 @@ function renderAppointmentsTable(appointments = []) {
       showToast('Appointment marked completed', 'success');
       await loadAppointmentsTable();
       await loadDashboard();
+    });
+  });
+
+  root.querySelectorAll('.btn-cancel').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const id = btn.closest('.data-row')?.dataset.id;
+      await openCancelReasonMenu(id);
     });
   });
 
