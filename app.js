@@ -599,7 +599,9 @@ function setActiveView(view) {
     section.classList.toggle('active', section.dataset.view === view);
   });
 
-  if (view === 'appointments') void loadAppointmentsTable();
+  const canAutoLoadAppointments =
+    typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
+  if (view === 'appointments' && canAutoLoadAppointments) void loadAppointmentsTable();
 }
 
 function getActiveView() {
