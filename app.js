@@ -606,8 +606,36 @@ function bindHeaderButtons() {
     updateAppointmentEditorUi(false);
     openModal('new-appointment');
   });
-  document.getElementById('btn-notifications')?.addEventListener('click', () => {
-    showToast('No new notifications right now.', 'info');
+  document.querySelectorAll('[data-notification-button]').forEach((button) => {
+    button.addEventListener('click', () => {
+      showToast('No new notifications right now.', 'info');
+    });
+  });
+
+  document.getElementById('btn-mobile-menu')?.addEventListener('click', () => {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      sidebar.classList.toggle('mobile-open');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    const sidebar = document.querySelector('.sidebar');
+    const menuBtn = document.getElementById('btn-mobile-menu');
+    if (sidebar?.classList.contains('mobile-open')) {
+      if (!sidebar.contains(e.target) && !menuBtn?.contains(e.target)) {
+        sidebar.classList.remove('mobile-open');
+      }
+    }
+  });
+
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar?.classList.contains('mobile-open')) {
+        sidebar.classList.remove('mobile-open');
+      }
+    });
   });
 
   document.getElementById('btn-view-all')?.addEventListener('click', async (e) => {
@@ -951,8 +979,9 @@ function renderStats(stats = {}) {
   document.getElementById('stat-pending').textContent = stats.pending ?? 0;
   document.getElementById('stat-ai').textContent = stats.aiOptimized ?? 0;
 
-  const dot = document.getElementById('notification-dot');
-  if (dot) dot.classList.toggle('hidden', Number(stats.pending || 0) <= 0);
+  document.querySelectorAll('[data-notification-dot]').forEach((dot) => {
+    dot.classList.toggle('hidden', Number(stats.pending || 0) <= 0);
+  });
 }
 
 async function refreshCalendarDots() {
