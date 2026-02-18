@@ -36,6 +36,23 @@ if (USE_POSTGRES) {
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// Express 4 does not automatically forward rejected async handlers to error middleware.
+// Wrap async route/middleware handlers so rejected promises become regular 500 responses
+// instead of process-level unhandled rejections (which can trigger restarts/502s).
+for (const method of ['use', 'get', 'post', 'put', 'patch', 'delete']) {
+  const original = app[method].bind(app);
+  app[method] = (...args) => {
+    const wrapped = args.map((arg) => {
+      if (typeof arg !== 'function') return arg;
+      if (arg.length >= 4) return arg; // keep error handlers unchanged
+      const isAsync = arg.constructor && arg.constructor.name === 'AsyncFunction';
+      if (!isAsync) return arg;
+      return (req, res, next) => Promise.resolve(arg(req, res, next)).catch(next);
+    });
+    return original(...wrapped);
+  };
+}
+
 const COLORS = [
   'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
@@ -2064,7 +2081,7 @@ app.get('/api/dashboard', async (req, res) => {
      WHERE t.business_id = $1 AND t.active = TRUE
      GROUP BY t.id
      ORDER BY t.id ASC`,
-    [businessId, businessId]
+    [businessId]
   );
 
   const types = typeRows.map((row) => ({ ...rowToType(row), bookingCount: Number(row.booking_count || 0) }));
@@ -2104,6 +2121,20 @@ app.get('/verify-email', (req, res) => {
     </script>
   </body>
 </html>`);
+});
+
+app.use('/api', (err, _req, res, _next) => {
+  console.error('API error:', err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Internal server error.' });
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
 });
 
 const db = {
