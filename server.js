@@ -387,7 +387,7 @@ async function createAppointment(payload = {}) {
     appointment.time
   )}\nSource: ${appointment.source}`;
 
-  await Promise.allSettled([
+  const notifyResults = await Promise.allSettled([
     appointment.clientEmail
       ? sendEmail({
           to: appointment.clientEmail,
@@ -406,7 +406,17 @@ async function createAppointment(payload = {}) {
       : Promise.resolve()
   ]);
 
-  return appointment;
+  const provider = notifyResults
+    .filter((r) => r.status === 'fulfilled' && r.value?.provider)
+    .map((r) => r.value.provider)[0] || 'none';
+
+  return {
+    appointment,
+    notifications: {
+      mode: provider,
+      sent: notifyResults.filter((r) => r.status === 'fulfilled' && r.value?.ok).length
+    }
+  };
 }
 
 async function createInsights(date) {
@@ -660,8 +670,8 @@ app.get('/api/appointments', async (req, res) => {
 
 app.post('/api/appointments', async (req, res) => {
   try {
-    const appointment = await createAppointment({ ...req.body, source: req.body?.source || 'owner' });
-    res.status(201).json({ appointment });
+    const result = await createAppointment({ ...req.body, source: req.body?.source || 'owner' });
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -669,11 +679,97 @@ app.post('/api/appointments', async (req, res) => {
 
 app.post('/api/public/bookings', async (req, res) => {
   try {
-    const appointment = await createAppointment({ ...req.body, source: 'public' });
-    res.status(201).json({ appointment });
+    const result = await createAppointment({ ...req.body, source: 'public' });
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
+});
+
+app.put('/api/appointments/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const { typeId, clientName, clientEmail, date, time, durationMinutes, location, notes } = req.body || {};
+
+  if (!clientName?.trim()) return res.status(400).json({ error: 'clientName is required' });
+  if (!date) return res.status(400).json({ error: 'date is required' });
+  if (!time) return res.status(400).json({ error: 'time is required' });
+
+  let selectedType = null;
+  if (typeId != null) {
+    selectedType = await dbGet(
+      'SELECT * FROM appointment_types WHERE id = ? AND active = 1',
+      'SELECT * FROM appointment_types WHERE id = $1 AND active = TRUE',
+      [Number(typeId)]
+    );
+    if (!selectedType) return res.status(400).json({ error: 'Invalid appointment type' });
+  }
+
+  if (USE_POSTGRES) {
+    const up = await pgPool.query(
+      `UPDATE appointments
+       SET type_id = $1,
+           client_name = $2,
+           client_email = $3,
+           date = $4,
+           time = $5,
+           duration_minutes = $6,
+           location = $7,
+           notes = $8
+       WHERE id = $9`,
+      [
+        selectedType?.id || null,
+        clientName.trim(),
+        clientEmail || null,
+        String(date),
+        String(time),
+        Number(durationMinutes || selectedType?.duration_minutes || 45),
+        location || selectedType?.location_mode || 'office',
+        notes || null,
+        id
+      ]
+    );
+    if (!up.rowCount) return res.status(404).json({ error: 'appointment not found' });
+  } else {
+    const up = sqlite
+      .prepare(
+        `UPDATE appointments
+         SET type_id = ?,
+             client_name = ?,
+             client_email = ?,
+             date = ?,
+             time = ?,
+             duration_minutes = ?,
+             location = ?,
+             notes = ?
+         WHERE id = ?`
+      )
+      .run(
+        selectedType?.id || null,
+        clientName.trim(),
+        clientEmail || null,
+        String(date),
+        String(time),
+        Number(durationMinutes || selectedType?.duration_minutes || 45),
+        location || selectedType?.location_mode || 'office',
+        notes || null,
+        id
+      );
+    if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
+  }
+
+  const row = await dbGet(
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = ?`,
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = $1`,
+    [id]
+  );
+
+  res.json({ appointment: rowToAppointment(row) });
 });
 
 app.delete('/api/appointments/:id', async (req, res) => {

@@ -64,12 +64,6 @@
                 </a>
             </nav>
             
-            <div class="sidebar-footer">
-                <div class="ai-status">
-                    <div class="ai-indicator"></div>
-                    <span>AI Organizing</span>
-                </div>
-            </div>
         </aside>
 
         <!-- Main Content -->
@@ -92,7 +86,7 @@
                         </svg>
                         <span class="notification-dot hidden" id="notification-dot"></span>
                     </button>
-                    <button class="btn-primary" onclick="openModal('new-appointment')">
+                    <button class="btn-primary" id="btn-new-appointment" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"/>
                             <line x1="5" y1="12" x2="19" y2="12"/>
@@ -287,14 +281,20 @@
 
     <!-- Modal: New Appointment -->
     <div class="modal" id="new-appointment">
-        <div class="modal-overlay" onclick="closeModal('new-appointment')"></div>
-        <div class="modal-content appointment-modal">
+        <div class="modal-overlay" id="new-appointment-overlay"></div>
+        <div
+            class="modal-content appointment-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-appointment-title"
+            aria-describedby="new-appointment-subtitle"
+        >
             <div class="modal-header">
                 <div>
-                    <h2>Create Appointment</h2>
-                    <p class="modal-subtitle">Add client details, lock a slot, and send confirmation.</p>
+                    <h2 id="new-appointment-title">Create Appointment</h2>
+                    <p class="modal-subtitle" id="new-appointment-subtitle">Add client details, lock a slot, and send confirmation.</p>
                 </div>
-                <button class="icon-btn" onclick="closeModal('new-appointment')">
+                <button class="icon-btn" id="btn-close-new-appointment" type="button" aria-label="Close appointment modal">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
@@ -389,7 +389,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="closeModal('new-appointment')">Cancel</button>
+                    <button type="button" class="btn-secondary" id="btn-cancel-new-appointment">Cancel</button>
                     <button type="submit" class="btn-primary">Create Appointment</button>
                 </div>
             </form>

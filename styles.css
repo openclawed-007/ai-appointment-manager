@@ -624,6 +624,7 @@ body {
     cursor: pointer;
     transition: all var(--transition-fast);
     position: relative;
+    isolation: isolate;
 }
 
 .day-cell:hover {
@@ -644,14 +645,48 @@ body {
     font-weight: 700;
 }
 
-.day-cell.has-event::after {
-    content: '';
+.day-cell.has-event::before {
+    content: "";
     position: absolute;
-    bottom: 6px;
-    width: 4px;
-    height: 4px;
-    background: var(--accent);
+    inset: 3px;
+    border-radius: calc(var(--radius-md) - 3px);
+    background: rgba(99, 102, 241, 0.08);
+    z-index: -1;
+}
+
+.day-number {
+    line-height: 1;
+}
+
+.day-booking-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
     border-radius: var(--radius-full);
+    background: var(--primary-dark);
+    color: #fff;
+    font-size: 0.625rem;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.1px;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.day-cell.has-event .day-booking-badge {
+    display: inline-flex;
+}
+
+.day-cell.event-med .day-booking-badge {
+    background: var(--primary);
+}
+
+.day-cell.event-high .day-booking-badge {
+    background: var(--accent);
 }
 
 .day-cell.empty {
@@ -1210,6 +1245,135 @@ body {
 .toast.success { background: #059669; }
 .toast.error { background: #dc2626; }
 
+.day-menu {
+    position: fixed;
+    z-index: 1400;
+    width: min(340px, calc(100vw - 20px));
+    max-height: min(68vh, 500px);
+    overflow: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 14px;
+    box-shadow: var(--shadow-xl);
+    padding: 10px;
+    animation: fade-in 140ms ease;
+}
+
+.day-menu.hidden {
+    display: none;
+}
+
+.day-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.day-menu-header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.day-menu-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 9px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.day-menu-actions {
+    margin-bottom: 10px;
+}
+
+.day-menu-actions .btn-primary {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+}
+
+.day-menu-list {
+    display: grid;
+    gap: 8px;
+}
+
+.day-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid var(--bg-tertiary);
+    border-radius: 10px;
+    padding: 9px 10px;
+    background: var(--bg-primary);
+}
+
+.day-menu-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.day-menu-item-copy {
+    min-width: 0;
+}
+
+.day-menu-item-copy strong {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.day-menu-item-copy span {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.day-menu-delete {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #b91c1c;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.day-menu-edit {
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.day-menu-empty,
+.day-menu-loading {
+    padding: 10px;
+    border: 1px dashed var(--bg-tertiary);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
 .booking-shell {
     min-height: 100vh;
     display: grid;
@@ -1309,6 +1473,7 @@ body {
 
     .calendar-grid {
         padding: var(--spacing-md);
+        gap: 6px;
     }
 
     .timeline,
@@ -1319,6 +1484,15 @@ body {
     
     .type-selector {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .day-booking-badge {
+        min-width: 16px;
+        height: 16px;
+        font-size: 0.58rem;
+        top: 3px;
+        right: 3px;
+        padding: 0 4px;
     }
 
     .appointment-layout {
@@ -1396,6 +1570,12 @@ body {
         backdrop-filter: blur(10px);
         border-top: 1px solid var(--bg-tertiary);
         z-index: 120;
+    }
+
+    .day-menu {
+        width: calc(100vw - 16px);
+        max-height: 62vh;
+        padding: 8px;
     }
 
     .mobile-nav-item {

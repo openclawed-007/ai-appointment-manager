@@ -27,12 +27,20 @@ async function api(path, options = {}) {
   return data;
 }
 
+function clearChildren(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
 function syncTypeFields() {
   const typeId = Number(typeSelect.value);
   const selected = types.find((t) => t.id === typeId);
   if (!selected) return;
 
-  durationSelect.innerHTML = `<option value="${selected.durationMinutes}">${selected.durationMinutes} minutes</option>`;
+  clearChildren(durationSelect);
+  const option = document.createElement('option');
+  option.value = String(selected.durationMinutes);
+  option.textContent = `${selected.durationMinutes} minutes`;
+  durationSelect.appendChild(option);
   locationSelect.value = selected.locationMode;
 }
 
@@ -40,9 +48,13 @@ async function loadTypes() {
   const { types: remoteTypes } = await api('/api/types');
   types = remoteTypes;
 
-  typeSelect.innerHTML = types
-    .map((t) => `<option value="${t.id}">${t.name}</option>`)
-    .join('');
+  clearChildren(typeSelect);
+  types.forEach((t) => {
+    const option = document.createElement('option');
+    option.value = String(t.id);
+    option.textContent = t.name;
+    typeSelect.appendChild(option);
+  });
 
   syncTypeFields();
 }
@@ -60,13 +72,18 @@ form.addEventListener('submit', async (e) => {
     payload.typeId = Number(payload.typeId);
     payload.durationMinutes = Number(payload.durationMinutes);
 
-    await api('/api/public/bookings', {
+    const result = await api('/api/public/bookings', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
 
     form.reset();
-    showToast('Booked! Confirmation email sent.', 'success');
+    showToast(
+      result?.notifications?.mode === 'simulation'
+        ? 'Booked! Email simulation mode is active.'
+        : 'Booked! Confirmation email sent.',
+      'success'
+    );
   } catch (error) {
     showToast(error.message, 'error');
   } finally {

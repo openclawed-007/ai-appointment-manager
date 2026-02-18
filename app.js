@@ -4,15 +4,31 @@ const state = {
   selectedDate: new Date().toISOString().slice(0, 10),
   apiOnline: true,
   viewAll: false,
-  calendarDate: new Date()
+  calendarDate: new Date(),
+  lastFocusedElement: null,
+  dayMenuDate: null,
+  dayMenuAnchorEl: null,
+  editingAppointmentId: null
 };
+
+function getFocusableElements(container) {
+  if (!container) return [];
+  return Array.from(
+    container.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((el) => !el.hasAttribute('hidden'));
+}
 
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
+  state.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
   if (modalId === 'new-appointment') setAppointmentDefaults();
+  const focusables = getFocusableElements(modal);
+  focusables[0]?.focus();
 }
 
 function closeModal(modalId) {
@@ -20,6 +36,207 @@ function closeModal(modalId) {
   if (!modal) return;
   modal.classList.remove('active');
   document.body.style.overflow = '';
+  state.lastFocusedElement?.focus?.();
+  if (modalId === 'new-appointment') {
+    state.editingAppointmentId = null;
+    updateAppointmentEditorUi(false);
+  }
+}
+
+function updateAppointmentEditorUi(isEditing) {
+  const title = document.getElementById('new-appointment-title');
+  const subtitle = document.getElementById('new-appointment-subtitle');
+  const submit = document.querySelector('#appointment-form button[type="submit"]');
+  if (title) title.textContent = isEditing ? 'Edit Appointment' : 'Create Appointment';
+  if (subtitle) {
+    subtitle.textContent = isEditing
+      ? 'Update details for this booking.'
+      : 'Add client details, lock a slot, and send confirmation.';
+  }
+  if (submit) submit.textContent = isEditing ? 'Save Changes' : 'Create Appointment';
+}
+
+function fillAppointmentForm(appointment) {
+  const form = document.getElementById('appointment-form');
+  if (!form || !appointment) return;
+
+  if (appointment.typeId) state.selectedTypeId = Number(appointment.typeId);
+  renderTypeSelector(state.types);
+
+  form.clientName.value = appointment.clientName || '';
+  form.clientEmail.value = appointment.clientEmail || '';
+  form.date.value = appointment.date || '';
+  form.time.value = appointment.time || '';
+  form.durationMinutes.value = String(appointment.durationMinutes || 45);
+  if (appointment.notes != null) form.notes.value = appointment.notes;
+  const locationRadio = form.querySelector(`input[name="location"][value="${appointment.location || 'office'}"]`);
+  if (locationRadio) locationRadio.checked = true;
+  updateAppointmentPreview();
+}
+
+function startEditAppointment(appointment) {
+  if (!appointment) return;
+  state.editingAppointmentId = Number(appointment.id);
+  updateAppointmentEditorUi(true);
+  openModal('new-appointment');
+  fillAppointmentForm(appointment);
+}
+
+function formatMenuDate(dateStr) {
+  const dt = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return dateStr;
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function ensureDayMenu() {
+  let menu = document.getElementById('calendar-day-menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'calendar-day-menu';
+  menu.className = 'day-menu hidden';
+  menu.setAttribute('role', 'dialog');
+  menu.setAttribute('aria-modal', 'false');
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function closeDayMenu() {
+  const menu = document.getElementById('calendar-day-menu');
+  if (!menu) return;
+  menu.classList.add('hidden');
+  menu.innerHTML = '';
+  state.dayMenuDate = null;
+  state.dayMenuAnchorEl = null;
+}
+
+function positionDayMenu(anchorEl, menu) {
+  const rect = anchorEl.getBoundingClientRect();
+  const margin = 10;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  menu.classList.remove('hidden');
+
+  const menuRect = menu.getBoundingClientRect();
+  let left = rect.left;
+  let top = rect.bottom + 8;
+
+  if (left + menuRect.width > vw - margin) left = vw - menuRect.width - margin;
+  if (left < margin) left = margin;
+
+  if (top + menuRect.height > vh - margin) top = rect.top - menuRect.height - 8;
+  if (top < margin) top = margin;
+
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+}
+
+async function openDayMenu(anchorEl, date) {
+  const menu = ensureDayMenu();
+  state.dayMenuDate = date;
+  state.dayMenuAnchorEl = anchorEl;
+  menu.innerHTML = '<div class="day-menu-loading">Loading...</div>';
+  positionDayMenu(anchorEl, menu);
+
+  try {
+    const { appointments } = await api(`/api/appointments?date=${encodeURIComponent(date)}`);
+    if (state.dayMenuDate !== date) return;
+    const items = appointments
+      .map(
+        (a) => `
+          <div class="day-menu-item">
+            <div class="day-menu-item-copy">
+              <strong>${escapeHtml(toTime12(a.time))}</strong>
+              <span>${escapeHtml(a.clientName)} • ${escapeHtml(a.typeName)}</span>
+            </div>
+            <div class="day-menu-item-actions">
+              <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
+              <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
+            </div>
+          </div>`
+      )
+      .join('');
+
+    menu.innerHTML = `
+      <div class="day-menu-header">
+        <h3>${escapeHtml(formatMenuDate(date))}</h3>
+        <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
+      </div>
+      <div class="day-menu-actions">
+        <button type="button" class="btn-primary day-menu-add">Add Appointment</button>
+      </div>
+      <div class="day-menu-list">
+        ${items || '<div class="day-menu-empty">No appointments for this day.</div>'}
+      </div>
+    `;
+
+    positionDayMenu(anchorEl, menu);
+
+    menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
+    menu.querySelector('.day-menu-add')?.addEventListener('click', () => {
+      state.editingAppointmentId = null;
+      updateAppointmentEditorUi(false);
+      closeDayMenu();
+      openModal('new-appointment');
+      const form = document.getElementById('appointment-form');
+      const dateInput = form?.querySelector('input[name="date"]');
+      if (dateInput) dateInput.value = date;
+      updateAppointmentPreview();
+    });
+
+    menu.querySelectorAll('.day-menu-edit').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.appointmentId);
+        const appointment = appointments.find((a) => Number(a.id) === id);
+        closeDayMenu();
+        startEditAppointment(appointment);
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-delete').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.appointmentId;
+        if (!id) return;
+        try {
+          await api(`/api/appointments/${id}`, { method: 'DELETE' });
+          await loadDashboard();
+          await loadAppointmentsTable();
+          await refreshCalendarDots();
+          const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
+          if (selectedCell && state.dayMenuDate === date) {
+            await openDayMenu(selectedCell, date);
+          } else {
+            closeDayMenu();
+          }
+          showToast('Appointment removed.', 'success');
+        } catch (error) {
+          showToast(error.message, 'error');
+        }
+      });
+    });
+  } catch (error) {
+    menu.innerHTML = `
+      <div class="day-menu-header">
+        <h3>${escapeHtml(formatMenuDate(date))}</h3>
+        <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
+      </div>
+      <div class="day-menu-empty">Could not load this day. Try again.</div>
+    `;
+    menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
+  }
+}
+
+function repositionDayMenuIfOpen() {
+  const menu = document.getElementById('calendar-day-menu');
+  if (!menu || menu.classList.contains('hidden')) return;
+  const anchorEl = state.dayMenuAnchorEl;
+  if (!anchorEl || !document.contains(anchorEl)) {
+    closeDayMenu();
+    return;
+  }
+  positionDayMenu(anchorEl, menu);
 }
 
 function toMoney(cents = 0) {
@@ -52,7 +269,7 @@ async function api(path, options = {}) {
     ...options
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Request failed');
+  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
 }
 
@@ -102,6 +319,11 @@ function bindNavigation() {
 }
 
 function bindHeaderButtons() {
+  document.getElementById('btn-new-appointment')?.addEventListener('click', () => {
+    state.editingAppointmentId = null;
+    updateAppointmentEditorUi(false);
+    openModal('new-appointment');
+  });
   document.getElementById('btn-notifications')?.addEventListener('click', () => {
     showToast('No new notifications right now.', 'info');
   });
@@ -113,6 +335,16 @@ function bindHeaderButtons() {
   });
 
   document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
+}
+
+function bindModalControls() {
+  document.getElementById('new-appointment-overlay')?.addEventListener('click', () => closeModal('new-appointment'));
+  document
+    .getElementById('btn-close-new-appointment')
+    ?.addEventListener('click', () => closeModal('new-appointment'));
+  document
+    .getElementById('btn-cancel-new-appointment')
+    ?.addEventListener('click', () => closeModal('new-appointment'));
 }
 
 function renderCalendarGrid() {
@@ -142,7 +374,11 @@ function renderCalendarGrid() {
     if (isTodayMonth && day === today.getDate()) classes.push('today');
     if (isSelectedMonth && day === selected.getDate()) classes.push('selected');
 
-    return `<div class="${classes.join(' ')}" data-day="${day}">${day}</div>`;
+    return `
+      <div class="${classes.join(' ')}" data-day="${day}" aria-label="${day}">
+        <span class="day-number">${day}</span>
+        <span class="day-booking-badge" aria-hidden="true"></span>
+      </div>`;
   }).join('');
 
   grid.innerHTML = `${headers}${empties}${days}`;
@@ -157,17 +393,17 @@ function bindCalendarNav() {
   setMonth();
 
   document.getElementById('calendar-prev')?.addEventListener('click', async () => {
+    closeDayMenu();
     state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
     setMonth();
     await refreshCalendarDots();
-    showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
   });
 
   document.getElementById('calendar-next')?.addEventListener('click', async () => {
+    closeDayMenu();
     state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
     setMonth();
     await refreshCalendarDots();
-    showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
   });
 
   document.getElementById('calendar-grid')?.addEventListener('click', async (event) => {
@@ -186,14 +422,34 @@ function bindCalendarNav() {
 
     renderCalendarGrid();
     await loadDashboard();
+    const selectedCell = document.querySelector(`.day-cell[data-day="${day}"]`);
+    if (selectedCell) await openDayMenu(selectedCell, state.selectedDate);
   });
 }
 
 function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
+    const activeModal = document.querySelector('.modal.active');
+
+    if (activeModal && e.key === 'Tab') {
+      const focusables = getFocusableElements(activeModal);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const current = document.activeElement;
+
+      if (e.shiftKey && current === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && current === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
     if (e.key === 'Escape') {
-      document.querySelectorAll('.modal.active').forEach((modal) => modal.classList.remove('active'));
-      document.body.style.overflow = '';
+      if (activeModal?.id) closeModal(activeModal.id);
+      else closeDayMenu();
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -418,15 +674,37 @@ async function refreshCalendarDots() {
   const yyyy = state.calendarDate.getFullYear();
   const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
 
-  const daysWithAppointments = new Set(
-    appointments
-      .filter((a) => typeof a.date === 'string' && a.date.startsWith(`${yyyy}-${mm}-`))
-      .map((a) => Number(a.date.slice(8, 10)))
+  const monthAppointments = appointments.filter(
+    (a) => typeof a.date === 'string' && a.date.startsWith(`${yyyy}-${mm}-`)
   );
+  const dayCounts = new Map();
+  const dayTypes = new Map();
+
+  monthAppointments.forEach((a) => {
+    const day = Number(a.date.slice(8, 10));
+    dayCounts.set(day, (dayCounts.get(day) || 0) + 1);
+    if (!dayTypes.has(day)) dayTypes.set(day, []);
+    if (dayTypes.get(day).length < 2 && a.typeName) dayTypes.get(day).push(a.typeName);
+  });
 
   document.querySelectorAll('.day-cell:not(.empty)').forEach((cell) => {
-    const day = Number(cell.textContent.trim());
-    cell.classList.toggle('has-event', daysWithAppointments.has(day));
+    const day = Number(cell.dataset.day);
+    const count = dayCounts.get(day) || 0;
+    const badge = cell.querySelector('.day-booking-badge');
+    const typeList = dayTypes.get(day) || [];
+    const labelParts = [`${count} booking${count === 1 ? '' : 's'}`];
+    if (typeList.length) labelParts.push(typeList.join(', '));
+
+    cell.classList.toggle('has-event', count > 0);
+    cell.classList.toggle('event-low', count > 0 && count <= 2);
+    cell.classList.toggle('event-med', count >= 3 && count <= 4);
+    cell.classList.toggle('event-high', count >= 5);
+    cell.setAttribute('aria-label', count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`);
+    cell.title = count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`;
+
+    if (badge) {
+      badge.textContent = count > 0 ? String(count) : '';
+    }
   });
 }
 
@@ -623,22 +901,39 @@ async function submitAppointment(e) {
   e.preventDefault();
   const form = e.currentTarget;
   const payload = Object.fromEntries(new FormData(form).entries());
+  const wasEditing = Boolean(state.editingAppointmentId);
   payload.typeId = state.selectedTypeId;
   payload.durationMinutes = Number(payload.durationMinutes || 45);
 
   const submitButton = form.querySelector('button[type="submit"]');
   const oldText = submitButton.textContent;
   submitButton.disabled = true;
-  submitButton.textContent = 'Creating...';
+  submitButton.textContent = wasEditing ? 'Saving...' : 'Creating...';
 
   try {
-    await api('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
+    if (wasEditing) {
+      await api(`/api/appointments/${state.editingAppointmentId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+    } else {
+      const result = await api('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
+      const provider = result?.notifications?.mode;
+      showToast(
+        provider === 'simulation'
+          ? 'Appointment created. Email simulation mode is active.'
+          : 'Appointment created and notifications sent.',
+        'success'
+      );
+    }
+
     form.reset();
     setAppointmentDefaults();
     closeModal('new-appointment');
     await loadDashboard();
     await loadAppointmentsTable();
-    showToast('Appointment created and notifications sent.', 'success');
+    await refreshCalendarDots();
+    if (wasEditing) showToast('Appointment updated.', 'success');
   } catch (error) {
     showToast(error.message, 'error');
   } finally {
@@ -705,6 +1000,7 @@ function bindForms() {
   document.getElementById('type-form')?.addEventListener('submit', submitType);
   document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
   bindAppointmentFormEnhancements();
+  updateAppointmentEditorUi(false);
 
   const search = document.getElementById('global-search');
   if (search) {
@@ -719,6 +1015,7 @@ function bindForms() {
 async function init() {
   bindNavigation();
   bindHeaderButtons();
+  bindModalControls();
   bindCalendarNav();
   bindKeyboard();
   bindForms();
@@ -726,6 +1023,17 @@ async function init() {
 
   const todayInput = document.querySelector('input[name="date"]');
   if (todayInput) todayInput.value = state.selectedDate;
+
+  document.addEventListener('click', (event) => {
+    const menu = document.getElementById('calendar-day-menu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    const clickedInMenu = event.target.closest('#calendar-day-menu');
+    const clickedOnDay = event.target.closest('.day-cell[data-day]');
+    if (!clickedInMenu && !clickedOnDay) closeDayMenu();
+  });
+
+  window.addEventListener('resize', repositionDayMenuIfOpen);
+  window.addEventListener('scroll', repositionDayMenuIfOpen, true);
 
   try {
     await loadTypes();
