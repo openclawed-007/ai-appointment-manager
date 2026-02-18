@@ -96,6 +96,30 @@ function formatMenuDate(dateStr) {
   return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function localYmd(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function dayOrdinal(day) {
+  const v = Number(day);
+  if (v % 100 >= 11 && v % 100 <= 13) return `${v}th`;
+  if (v % 10 === 1) return `${v}st`;
+  if (v % 10 === 2) return `${v}nd`;
+  if (v % 10 === 3) return `${v}rd`;
+  return `${v}th`;
+}
+
+function formatScheduleDate(dateStr) {
+  const dt = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return dateStr;
+  const weekday = dt.toLocaleDateString('en-US', { weekday: 'long' });
+  const month = dt.toLocaleDateString('en-US', { month: 'short' });
+  return `${weekday} ${month} ${dayOrdinal(dt.getDate())}`;
+}
+
 function ensureDayMenu() {
   let menu = document.getElementById('calendar-day-menu');
   if (menu) return menu;
@@ -988,9 +1012,14 @@ async function refreshCalendarDots() {
   const yyyy = state.calendarDate.getFullYear();
   const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
 
-  const monthAppointments = appointments.filter(
-    (a) => typeof a.date === 'string' && a.date.startsWith(`${yyyy}-${mm}-`)
-  );
+  const monthAppointments = appointments.filter((a) => {
+    const status = String(a.status || '').toLowerCase();
+    return (
+      typeof a.date === 'string' &&
+      a.date.startsWith(`${yyyy}-${mm}-`) &&
+      status !== 'completed'
+    );
+  });
   const dayCounts = new Map();
   const dayTypes = new Map();
 
@@ -1044,6 +1073,31 @@ function renderTimeline(appointments = []) {
             <span>⏱ ${a.durationMinutes} min</span>
             <span>• ${escapeHtml(a.status)}</span>
           </div>
+        </div>
+      </div>`
+    )
+    .join('');
+}
+
+function renderCompletedAppointments(appointments = []) {
+  const root = document.getElementById('completed-list');
+  if (!root) return;
+  if (!appointments.length) {
+    root.innerHTML = '<div class="empty-state">No completed appointments yet.</div>';
+    return;
+  }
+
+  root.innerHTML = appointments
+    .map(
+      (a) => `
+      <div class="completed-item">
+        <div class="completed-item-main">
+          <strong>${escapeHtml(a.typeName || a.title || 'Appointment')}</strong>
+          <span>${escapeHtml(a.clientName || 'Client')}</span>
+        </div>
+        <div class="completed-item-meta">
+          <span>${escapeHtml(a.date || '')}</span>
+          <span>${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</span>
         </div>
       </div>`
     )
@@ -1221,12 +1275,49 @@ async function loadTypes() {
 
 async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   const { refreshDots = true } = options;
-  const { stats, appointments, types, insights } = await api(
-    `/api/dashboard?date=${encodeURIComponent(targetDate)}`
-  );
+  const [dashboardResult, completedResult, allAppointmentsResult] = await Promise.all([
+    api(`/api/dashboard?date=${encodeURIComponent(targetDate)}`),
+    api('/api/appointments?status=completed'),
+    api('/api/appointments')
+  ]);
+  const { stats, types, insights } = dashboardResult;
   if (targetDate !== state.selectedDate) return;
+  const scheduleTitle = document.getElementById('schedule-title');
+  const today = localYmd();
+  const scheduleCandidates = (allAppointmentsResult?.appointments || [])
+    .filter((a) => {
+      const status = String(a.status || '').toLowerCase();
+      return status !== 'completed' && status !== 'cancelled';
+    })
+    .slice()
+    .sort((a, b) => {
+      const aKey = `${a.date || ''} ${a.time || ''}`;
+      const bKey = `${b.date || ''} ${b.time || ''}`;
+      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+    });
+  const todayAppointments = scheduleCandidates.filter((a) => a.date === today);
+  let activeAppointments = todayAppointments;
+  if (todayAppointments.length) {
+    if (scheduleTitle) scheduleTitle.textContent = 'Today\'s Schedule';
+  } else {
+    const next = scheduleCandidates.find((a) => typeof a.date === 'string' && a.date >= today);
+    if (next?.date) {
+      activeAppointments = scheduleCandidates.filter((a) => a.date === next.date);
+      if (scheduleTitle) scheduleTitle.textContent = `Next: ${formatScheduleDate(next.date)}`;
+    } else if (scheduleTitle) {
+      scheduleTitle.textContent = 'Today\'s Schedule';
+    }
+  }
+  const completedAppointments = (completedResult?.appointments || [])
+    .slice()
+    .sort((a, b) => {
+      const aKey = `${a.date || ''} ${a.time || ''}`;
+      const bKey = `${b.date || ''} ${b.time || ''}`;
+      return aKey < bKey ? 1 : -1;
+    });
   renderStats(stats);
-  renderTimeline(appointments);
+  renderTimeline(activeAppointments);
+  renderCompletedAppointments(completedAppointments);
   renderTypes(types);
   renderInsights(insights);
   if (refreshDots) await refreshCalendarDots();

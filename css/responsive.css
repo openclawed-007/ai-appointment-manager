@@ -228,6 +228,19 @@
         padding: var(--spacing-sm);
     }
 
+    .completed-item {
+        gap: 4px;
+        padding: 8px 9px;
+    }
+
+    .completed-item-meta {
+        align-items: flex-start;
+    }
+
+    .completed-card .timeline {
+        grid-template-columns: 1fr;
+    }
+
     .type-selector {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }

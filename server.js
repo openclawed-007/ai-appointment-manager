@@ -20,6 +20,7 @@ const VERIFY_HOURS = 24;
 const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || '';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const SEED_DEFAULT_TYPES = process.env.SEED_DEFAULT_TYPES === 'true';
 
 let sqlite = null;
 let pgPool = null;
@@ -344,7 +345,7 @@ async function initDb() {
     const existingTypeCount = Number(
       (await pgPool.query('SELECT COUNT(*)::int AS c FROM appointment_types WHERE business_id = $1', [businessRow.id])).rows[0].c
     );
-    if (!existingTypeCount) {
+    if (SEED_DEFAULT_TYPES && !existingTypeCount) {
       await pgPool.query(
         `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
          VALUES
@@ -500,7 +501,7 @@ async function initDb() {
     sqlite.prepare('UPDATE appointments SET business_id = 1 WHERE business_id IS NULL').run();
 
     const count = sqlite.prepare('SELECT COUNT(*) AS c FROM appointment_types WHERE business_id = 1').get().c;
-    if (!count) {
+    if (SEED_DEFAULT_TYPES && !count) {
       const insert = sqlite.prepare(
         `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
          VALUES (1, ?, ?, ?, ?, ?)`
@@ -905,21 +906,23 @@ async function createBusinessWithOwner({ businessName, name, email, passwordHash
          VALUES ($1, $2, $3, $4)`,
         [business.id, businessName, email, timezone || 'America/Los_Angeles']
       );
-      await tx.query(
-        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
-         VALUES
-           ($1, $2, $3, $4, $5, $6),
-           ($1, $7, $8, $9, $10, $11),
-           ($1, $12, $13, $14, $15, $16),
-           ($1, $17, $18, $19, $20, $21)`,
-        [
-          business.id,
-          'Consultation', 45, 15000, 'office', COLORS[0],
-          'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
-          'Review', 60, 20000, 'virtual', COLORS[2],
-          'Follow-up Call', 15, 0, 'phone', COLORS[3]
-        ]
-      );
+      if (SEED_DEFAULT_TYPES) {
+        await tx.query(
+          `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+           VALUES
+             ($1, $2, $3, $4, $5, $6),
+             ($1, $7, $8, $9, $10, $11),
+             ($1, $12, $13, $14, $15, $16),
+             ($1, $17, $18, $19, $20, $21)`,
+          [
+            business.id,
+            'Consultation', 45, 15000, 'office', COLORS[0],
+            'Strategy Session', 90, 30000, 'hybrid', COLORS[1],
+            'Review', 60, 20000, 'virtual', COLORS[2],
+            'Follow-up Call', 15, 0, 'phone', COLORS[3]
+          ]
+        );
+      }
       const user = (
         await tx.query(
           `INSERT INTO users (business_id, name, email, password_hash, role)
@@ -959,16 +962,18 @@ async function createBusinessWithOwner({ businessName, name, email, passwordHash
       )
       .run(businessId, payload.businessName, payload.email, payload.timezone || 'America/Los_Angeles');
 
-    const insertType = sqlite.prepare(
-      `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    );
-    [
-      ['Consultation', 45, 15000, 'office', COLORS[0]],
-      ['Strategy Session', 90, 30000, 'hybrid', COLORS[1]],
-      ['Review', 60, 20000, 'virtual', COLORS[2]],
-      ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
-    ].forEach((r) => insertType.run(businessId, ...r));
+    if (SEED_DEFAULT_TYPES) {
+      const insertType = sqlite.prepare(
+        `INSERT INTO appointment_types (business_id, name, duration_minutes, price_cents, location_mode, color)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      );
+      [
+        ['Consultation', 45, 15000, 'office', COLORS[0]],
+        ['Strategy Session', 90, 30000, 'hybrid', COLORS[1]],
+        ['Review', 60, 20000, 'virtual', COLORS[2]],
+        ['Follow-up Call', 15, 0, 'phone', COLORS[3]]
+      ].forEach((r) => insertType.run(businessId, ...r));
+    }
 
     const userInsert = sqlite
       .prepare(

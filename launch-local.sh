@@ -84,6 +84,8 @@ fi
 mkdir -p data
 
 echo "[launch-local] Starting app..."
+export DATABASE_URL=""
+export SEED_DEFAULT_TYPES="false"
 npm run dev &
 SERVER_PID=$!
 
