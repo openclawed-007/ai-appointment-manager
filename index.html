@@ -90,7 +90,7 @@
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                             <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                         </svg>
-                        <span class="notification-dot"></span>
+                        <span class="notification-dot hidden" id="notification-dot"></span>
                     </button>
                     <button class="btn-primary" onclick="openModal('new-appointment')">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -179,50 +179,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="calendar-grid">
-                            <div class="day-header">Sun</div>
-                            <div class="day-header">Mon</div>
-                            <div class="day-header">Tue</div>
-                            <div class="day-header">Wed</div>
-                            <div class="day-header">Thu</div>
-                            <div class="day-header">Fri</div>
-                            <div class="day-header">Sat</div>
-                            
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell empty"></div>
-                            <div class="day-cell">1</div>
-                            <div class="day-cell">2</div>
-                            <div class="day-cell">3</div>
-                            <div class="day-cell">4</div>
-                            <div class="day-cell">5</div>
-                            <div class="day-cell">6</div>
-                            <div class="day-cell">7</div>
-                            <div class="day-cell">8</div>
-                            <div class="day-cell">9</div>
-                            <div class="day-cell">10</div>
-                            <div class="day-cell">11</div>
-                            <div class="day-cell">12</div>
-                            <div class="day-cell">13</div>
-                            <div class="day-cell">14</div>
-                            <div class="day-cell">15</div>
-                            <div class="day-cell">16</div>
-                            <div class="day-cell">17</div>
-                            <div class="day-cell today">18</div>
-                            <div class="day-cell">19</div>
-                            <div class="day-cell">20</div>
-                            <div class="day-cell">21</div>
-                            <div class="day-cell">22</div>
-                            <div class="day-cell">23</div>
-                            <div class="day-cell">24</div>
-                            <div class="day-cell">25</div>
-                            <div class="day-cell">26</div>
-                            <div class="day-cell">27</div>
-                            <div class="day-cell">28</div>
-                        </div>
+                        <div class="calendar-grid" id="calendar-grid"></div>
                     </div>
 
                     <!-- Today's Schedule -->
@@ -315,7 +272,11 @@
                                 <div class="form-group"><label>Business Name</label><input name="businessName" required /></div>
                                 <div class="form-group"><label>Owner Email</label><input name="ownerEmail" type="email" /></div>
                             </div>
-                            <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" /></div>
+                            <div class="form-group">
+                                <label>Timezone</label>
+                                <input name="timezone" id="timezone-input" list="timezone-options" value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
+                                <datalist id="timezone-options"></datalist>
+                            </div>
                             <div class="form-actions"><button type="submit" class="btn-primary">Save Settings</button></div>
                         </form>
                     </div>

@@ -346,6 +346,10 @@ body {
     border: 2px solid var(--bg-secondary);
 }
 
+.notification-dot.hidden {
+    display: none;
+}
+
 .btn-primary {
     display: flex;
     align-items: center;

@@ -114,10 +114,44 @@ function bindHeaderButtons() {
   document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
 }
 
+function renderCalendarGrid() {
+  const grid = document.getElementById('calendar-grid');
+  if (!grid) return;
+
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const year = state.calendarDate.getFullYear();
+  const month = state.calendarDate.getMonth();
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const today = new Date();
+  const isTodayMonth = today.getFullYear() === year && today.getMonth() === month;
+
+  const selected = state.selectedDate ? new Date(`${state.selectedDate}T00:00:00`) : null;
+  const isSelectedMonth = selected && selected.getFullYear() === year && selected.getMonth() === month;
+
+  const headers = weekdays.map((d) => `<div class="day-header">${d}</div>`).join('');
+  const empties = Array.from({ length: firstWeekday }, () => '<div class="day-cell empty"></div>').join('');
+
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    const classes = ['day-cell'];
+
+    if (isTodayMonth && day === today.getDate()) classes.push('today');
+    if (isSelectedMonth && day === selected.getDate()) classes.push('selected');
+
+    return `<div class="${classes.join(' ')}" data-day="${day}">${day}</div>`;
+  }).join('');
+
+  grid.innerHTML = `${headers}${empties}${days}`;
+}
+
 function bindCalendarNav() {
   const labelNode = document.querySelector('.current-month');
   const setMonth = () => {
     if (labelNode) labelNode.textContent = monthLabel(state.calendarDate);
+    renderCalendarGrid();
   };
   setMonth();
 
@@ -135,20 +169,22 @@ function bindCalendarNav() {
     showToast(`Showing ${monthLabel(state.calendarDate)}`, 'info');
   });
 
-  document.querySelectorAll('.day-cell:not(.empty)').forEach((dayCell) => {
-    dayCell.addEventListener('click', async () => {
-      document.querySelectorAll('.day-cell.selected').forEach((n) => n.classList.remove('selected'));
-      dayCell.classList.add('selected');
-      const day = Number(dayCell.textContent.trim());
-      const yyyy = state.calendarDate.getFullYear();
-      const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      state.selectedDate = `${yyyy}-${mm}-${dd}`;
-      state.viewAll = false;
-      const btn = document.getElementById('btn-view-all');
-      if (btn) btn.textContent = 'View All';
-      await loadDashboard();
-    });
+  document.getElementById('calendar-grid')?.addEventListener('click', async (event) => {
+    const dayCell = event.target.closest('.day-cell[data-day]');
+    if (!dayCell) return;
+
+    const day = Number(dayCell.dataset.day);
+    const yyyy = state.calendarDate.getFullYear();
+    const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    state.selectedDate = `${yyyy}-${mm}-${dd}`;
+
+    state.viewAll = false;
+    const btn = document.getElementById('btn-view-all');
+    if (btn) btn.textContent = 'View All';
+
+    renderCalendarGrid();
+    await loadDashboard();
   });
 }
 
@@ -169,6 +205,28 @@ function bindKeyboard() {
       openModal('new-appointment');
     }
   });
+}
+
+function populateTimezoneOptions() {
+  const datalist = document.getElementById('timezone-options');
+  if (!datalist) return;
+
+  const fallback = [
+    'Europe/London',
+    'America/New_York',
+    'America/Los_Angeles',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Asia/Dubai',
+    'Asia/Singapore',
+    'Australia/Sydney'
+  ];
+
+  const values = typeof Intl.supportedValuesOf === 'function'
+    ? Intl.supportedValuesOf('timeZone')
+    : fallback;
+
+  datalist.innerHTML = values.map((tz) => `<option value="${tz}"></option>`).join('');
 }
 
 function renderTypeSelector(types) {
@@ -209,6 +267,9 @@ function renderStats(stats = {}) {
   document.getElementById('stat-week').textContent = stats.week ?? 0;
   document.getElementById('stat-pending').textContent = stats.pending ?? 0;
   document.getElementById('stat-ai').textContent = stats.aiOptimized ?? 0;
+
+  const dot = document.getElementById('notification-dot');
+  if (dot) dot.classList.toggle('hidden', Number(stats.pending || 0) <= 0);
 }
 
 async function refreshCalendarDots() {
@@ -518,6 +579,7 @@ async function init() {
   bindCalendarNav();
   bindKeyboard();
   bindForms();
+  populateTimezoneOptions();
 
   const todayInput = document.querySelector('input[name="date"]');
   if (todayInput) todayInput.value = state.selectedDate;
