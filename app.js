@@ -715,7 +715,7 @@ function bindCalendarNav() {
     await refreshCalendarDots();
   });
 
-  document.getElementById('calendar-grid')?.addEventListener('click', async (event) => {
+  document.getElementById('calendar-grid')?.addEventListener('click', (event) => {
     const dayCell = event.target.closest('.day-cell[data-day]');
     if (!dayCell) return;
 
@@ -730,9 +730,10 @@ function bindCalendarNav() {
     if (btn) btn.textContent = 'View All';
 
     renderCalendarGrid();
-    await loadDashboard();
     const selectedCell = document.querySelector(`.day-cell[data-day="${day}"]`);
-    if (selectedCell) await openDayMenu(selectedCell, state.selectedDate);
+    const selectedDate = state.selectedDate;
+    if (selectedCell) void openDayMenu(selectedCell, selectedDate);
+    void loadDashboard(selectedDate, { refreshDots: false });
   });
 }
 
@@ -794,9 +795,9 @@ function getTimezoneValues() {
     : fallback;
 }
 
-function setupTimezoneSearch() {
-  const input = document.getElementById('timezone-input');
-  const suggestions = document.getElementById('timezone-suggestions');
+function setupTimezoneSearch(inputId = 'timezone-input', suggestionsId = 'timezone-suggestions') {
+  const input = document.getElementById(inputId);
+  const suggestions = document.getElementById(suggestionsId);
   if (!input || !suggestions) return;
 
   const allZones = getTimezoneValues();
@@ -1219,15 +1220,17 @@ async function loadTypes() {
   renderTypeSelector(types);
 }
 
-async function loadDashboard() {
+async function loadDashboard(targetDate = state.selectedDate, options = {}) {
+  const { refreshDots = true } = options;
   const { stats, appointments, types, insights } = await api(
-    `/api/dashboard?date=${encodeURIComponent(state.selectedDate)}`
+    `/api/dashboard?date=${encodeURIComponent(targetDate)}`
   );
+  if (targetDate !== state.selectedDate) return;
   renderStats(stats);
   renderTimeline(appointments);
   renderTypes(types);
   renderInsights(insights);
-  await refreshCalendarDots();
+  if (refreshDots) await refreshCalendarDots();
 }
 
 async function loadAppointmentsTable() {
@@ -1557,6 +1560,20 @@ function bindAuthUi() {
   });
 }
 
+async function configureDevLoginVisibility() {
+  const devBtn = document.getElementById('btn-dev-login');
+  if (!devBtn) return;
+  devBtn.classList.add('hidden');
+  try {
+    const response = await fetch('/api/health', { credentials: 'same-origin' });
+    if (!response.ok) return;
+    const body = await response.json().catch(() => ({}));
+    devBtn.classList.toggle('hidden', !body.devLoginEnabled);
+  } catch (_error) {
+    devBtn.classList.add('hidden');
+  }
+}
+
 function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
@@ -1609,15 +1626,35 @@ function bindForms() {
   }
 }
 
+function bindThemeToggle() {
+  const saved = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const initial = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', initial);
+
+  const toggle = () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  };
+
+  document.getElementById('theme-toggle-desktop')?.addEventListener('click', toggle);
+  document.getElementById('theme-toggle-mobile')?.addEventListener('click', toggle);
+}
+
 async function init() {
   bindAuthUi();
+  await configureDevLoginVisibility();
   bindNavigation();
   bindHeaderButtons();
   bindModalControls();
   bindCalendarNav();
   bindKeyboard();
   bindForms();
+  bindThemeToggle();
   setupTimezoneSearch();
+  setupTimezoneSearch('signup-timezone', 'signup-timezone-suggestions');
 
   const todayInput = document.querySelector('input[name="date"]');
   if (todayInput) todayInput.value = state.selectedDate;

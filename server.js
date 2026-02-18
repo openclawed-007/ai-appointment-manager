@@ -1573,7 +1573,11 @@ async function createInsights(date, businessId) {
 
 // API
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, db: USE_POSTGRES ? 'postgres' : 'sqlite' });
+  res.json({
+    ok: true,
+    db: USE_POSTGRES ? 'postgres' : 'sqlite',
+    devLoginEnabled: process.env.NODE_ENV !== 'production'
+  });
 });
 
 // Dev-only: auto-login as a test user (skips email verification)
