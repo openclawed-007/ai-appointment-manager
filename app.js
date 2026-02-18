@@ -347,11 +347,10 @@ async function openDayMenu(anchorEl, date) {
             <div class="day-menu-item-actions-wrap">
               <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
               <div class="day-menu-item-actions hidden" data-actions-for="${a.id}">
-                ${
-                  a.clientEmail
-                    ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email appointment details">Email</button>`
-                    : ''
-                }
+                ${a.clientEmail
+            ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email appointment details">Email</button>`
+            : ''
+          }
                 <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
                 <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel appointment">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
                 <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
@@ -1059,8 +1058,8 @@ function renderTypes(types = []) {
     types.length === 0
       ? '<div class="empty-state">No appointment types yet.</div>'
       : types
-          .map(
-            (t) => `
+        .map(
+          (t) => `
             <div class="type-item">
               <div class="type-color" style="background:${escapeHtml(t.color)}"></div>
               <div class="type-info">
@@ -1069,15 +1068,15 @@ function renderTypes(types = []) {
               </div>
               <span class="type-count">${t.bookingCount || 0}</span>
             </div>`
-          )
-          .join('');
+        )
+        .join('');
 
   const adminHtml =
     types.length === 0
       ? '<div class="empty-state">No appointment types yet.</div>'
       : types
-          .map(
-            (t) => `
+        .map(
+          (t) => `
             <div class="data-row" data-type-id="${t.id}">
               <div>
                 <strong>${escapeHtml(t.name)}</strong>
@@ -1090,8 +1089,8 @@ function renderTypes(types = []) {
                 <button class="btn-secondary btn-delete-type" type="button">Delete</button>
               </div>
             </div>`
-          )
-          .join('');
+        )
+        .join('');
 
   if (root) root.innerHTML = html;
   if (adminRoot) {
@@ -1123,8 +1122,8 @@ function renderInsights(insights = []) {
     insights.length === 0
       ? '<div class="empty-state">AI insights will appear as bookings are created.</div>'
       : insights
-          .map(
-            (i) => `
+        .map(
+          (i) => `
           <div class="insight-item">
             <div class="insight-icon">${escapeHtml(i.icon || '💡')}</div>
             <div class="insight-content">
@@ -1134,8 +1133,8 @@ function renderInsights(insights = []) {
               <span class="insight-time">${escapeHtml(i.time || 'Live')}</span>
             </div>
           </div>`
-          )
-          .join('');
+        )
+        .join('');
 
   const root = document.getElementById('insights-list');
   const fullRoot = document.getElementById('ai-full-list');
@@ -1160,11 +1159,10 @@ function renderAppointmentsTable(appointments = []) {
         <div>${toTime12(a.time)}</div>
         <div><span class="pill">${escapeHtml(a.status)}</span></div>
         <div class="row-actions">
-          ${
-            a.clientEmail
-              ? '<button class="btn-secondary btn-email" type="button">Email</button>'
-              : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
-          }
+          ${a.clientEmail
+          ? '<button class="btn-secondary btn-email" type="button">Email</button>'
+          : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
+        }
           <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>Complete</button>
           <button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
           <button class="btn-secondary btn-delete" type="button">Delete</button>
@@ -1472,6 +1470,24 @@ async function ensureAuth() {
 function bindAuthUi() {
   document.querySelectorAll('.auth-tab').forEach((btn) => {
     btn.addEventListener('click', () => setAuthTab(btn.dataset.authTab));
+  });
+
+  document.getElementById('btn-dev-login')?.addEventListener('click', async () => {
+    try {
+      const result = await api('/api/auth/dev-login', { method: 'POST' });
+      state.currentUser = result.user || null;
+      state.currentBusiness = result.business || null;
+      state.authShellDismissed = false;
+      updateAccountUi();
+      hideAuthShell();
+      await loadTypes();
+      await loadDashboard();
+      await loadAppointmentsTable();
+      await loadSettings();
+      showToast('Dev login successful.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Dev login not available.', 'error');
+    }
   });
 
   document.getElementById('auth-login-form')?.addEventListener('submit', async (e) => {

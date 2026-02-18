@@ -1,70 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IntelliSchedule - AI Appointment Manager</title>
+    <meta name="description"
+        content="IntelliSchedule — AI-powered appointment management. Effortlessly schedule, track, and optimize your bookings with intelligent automation.">
+    <title>IntelliSchedule — AI Appointment Manager</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo">
-                <button class="logo-icon logo-notification-btn desktop-notification-btn" id="btn-notifications-desktop" data-notification-button type="button" aria-label="Notifications">
+                <button class="logo-icon logo-notification-btn desktop-notification-btn" id="btn-notifications-desktop"
+                    data-notification-button type="button" aria-label="Notifications">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
                     <span class="notification-dot hidden" id="notification-dot-desktop" data-notification-dot></span>
                 </button>
                 <span class="logo-text">IntelliSchedule</span>
             </div>
-            
+
             <nav class="nav-menu">
                 <a href="#" class="nav-item active" data-view="dashboard">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
                     <span>Dashboard</span>
                 </a>
                 <a href="#" class="nav-item" data-view="appointments">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                     <span>Appointments</span>
                 </a>
                 <a href="#" class="nav-item" data-view="types">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5"/>
-                        <path d="M2 12l10 5 10-5"/>
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5" />
+                        <path d="M2 12l10 5 10-5" />
                     </svg>
                     <span>Types & Services</span>
                 </a>
                 <a href="#" class="nav-item" data-view="ai">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                     <span>AI Assistant</span>
                     <span class="badge">Beta</span>
                 </a>
                 <a href="#" class="nav-item" data-view="settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.24 4.24l-4.24-4.24M6.34 6.34L2.1 2.1"/>
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.24 4.24l-4.24-4.24M6.34 6.34L2.1 2.1" />
                     </svg>
                     <span>Settings</span>
                 </a>
             </nav>
-            
+
         </aside>
 
         <!-- Main Content -->
@@ -74,9 +79,9 @@
                 <div class="header-left">
                     <button class="icon-btn mobile-menu-btn" id="btn-mobile-menu" type="button" aria-label="Open menu">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="6" x2="21" y2="6"/>
-                            <line x1="3" y1="12" x2="21" y2="12"/>
-                            <line x1="3" y1="18" x2="21" y2="18"/>
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
                         </svg>
                     </button>
                     <span class="header-logo-mobile">IntelliSchedule</span>
@@ -84,41 +89,43 @@
                 <div class="header-center">
                     <div class="header-search">
                         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"/>
-                            <path d="m21 21-4.35-4.35"/>
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
                         </svg>
                         <input id="global-search" type="text" placeholder="Search appointments, clients, or types...">
                     </div>
                 </div>
                 <div class="header-right">
                     <span class="account-chip" id="account-chip"></span>
-                    <a class="btn-secondary header-action-btn" id="btn-public-booking" href="/book" target="_blank" rel="noopener">
+                    <a class="btn-secondary header-action-btn" id="btn-public-booking" href="/book" target="_blank"
+                        rel="noopener">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                            <polyline points="15 3 21 3 21 9"/>
-                            <line x1="10" y1="14" x2="21" y2="3"/>
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
                         </svg>
                         <span>Public Page</span>
                     </a>
-                    <button class="icon-btn mobile-notification-btn" id="btn-notifications" data-notification-button type="button" aria-label="Notifications">
+                    <button class="icon-btn mobile-notification-btn" id="btn-notifications" data-notification-button
+                        type="button" aria-label="Notifications">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                         </svg>
                         <span class="notification-dot hidden" id="notification-dot-mobile" data-notification-dot></span>
                     </button>
                     <button class="btn-secondary header-action-btn" id="btn-logout" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                            <polyline points="16 17 21 12 16 7"/>
-                            <line x1="21" y1="12" x2="9" y2="12"/>
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                         <span>Logout</span>
                     </button>
                     <button class="btn-primary" id="btn-new-appointment" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"/>
-                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
                         <span>New Appointment</span>
                     </button>
@@ -128,117 +135,118 @@
             <!-- Dashboard Content -->
             <div class="content-wrapper">
                 <section class="app-view active" data-view="dashboard">
-                <!-- Stats Cards -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon today">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="stat-today">0</span>
-                            <span class="stat-label">Today</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon week">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="stat-week">0</span>
-                            <span class="stat-label">This Week</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon pending">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="stat-pending">0</span>
-                            <span class="stat-label">Pending</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon ai">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                                <path d="M2 17l10 5 10-5"/>
-                                <path d="M2 12l10 5 10-5"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="stat-ai">0</span>
-                            <span class="stat-label">AI Optimized</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Main Grid -->
-                <div class="dashboard-grid">
-                    <!-- Calendar Section -->
-                    <div class="card calendar-card">
-                        <div class="card-header">
-                            <h2>Calendar</h2>
-                            <div class="calendar-nav">
-                                <button class="icon-btn small" type="button" id="calendar-prev">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="15 18 9 12 15 6"/>
-                                    </svg>
-                                </button>
-                                <span class="current-month">February 2026</span>
-                                <button class="icon-btn small" type="button" id="calendar-next">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="9 18 15 12 9 6"/>
-                                    </svg>
-                                </button>
+                    <!-- Stats Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon today">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="stat-today">0</span>
+                                <span class="stat-label">Today</span>
                             </div>
                         </div>
-                        <div class="calendar-grid" id="calendar-grid"></div>
+                        <div class="stat-card">
+                            <div class="stat-icon week">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="16" y1="2" x2="16" y2="6" />
+                                    <line x1="8" y1="2" x2="8" y2="6" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="stat-week">0</span>
+                                <span class="stat-label">This Week</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon pending">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path
+                                        d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="stat-pending">0</span>
+                                <span class="stat-label">Pending</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon ai">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                    <path d="M2 17l10 5 10-5" />
+                                    <path d="M2 12l10 5 10-5" />
+                                </svg>
+                            </div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="stat-ai">0</span>
+                                <span class="stat-label">AI Optimized</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Today's Schedule -->
-                    <div class="card schedule-card">
-                        <div class="card-header">
-                            <h2>Today's Schedule</h2>
-                            <button class="btn-text" id="btn-view-all" type="button">View All</button>
+                    <!-- Main Grid -->
+                    <div class="dashboard-grid">
+                        <!-- Calendar Section -->
+                        <div class="card calendar-card">
+                            <div class="card-header">
+                                <h2>Calendar</h2>
+                                <div class="calendar-nav">
+                                    <button class="icon-btn small" type="button" id="calendar-prev">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="15 18 9 12 15 6" />
+                                        </svg>
+                                    </button>
+                                    <span class="current-month">February 2026</span>
+                                    <button class="icon-btn small" type="button" id="calendar-next">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="9 18 15 12 9 6" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="calendar-grid" id="calendar-grid"></div>
                         </div>
-                        <div class="timeline" id="timeline-list">
-                            <div class="empty-state">No appointments for this day yet.</div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Appointment Types & AI Insights -->
-                <div class="dashboard-grid two-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Appointment Types</h2>
-                            <button class="btn-text" id="btn-manage-types" type="button">Manage</button>
-                        </div>
-                        <div class="appointment-types-list" id="type-list">
-                            <div class="empty-state">Loading appointment types...</div>
+                        <!-- Today's Schedule -->
+                        <div class="card schedule-card">
+                            <div class="card-header">
+                                <h2>Today's Schedule</h2>
+                                <button class="btn-text" id="btn-view-all" type="button">View All</button>
+                            </div>
+                            <div class="timeline" id="timeline-list">
+                                <div class="empty-state">No appointments for this day yet.</div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="card ai-insights">
-                        <div class="card-header">
-                            <h2>🤖 AI Insights</h2>
-                            <span class="badge pulse">Live</span>
+                    <!-- Appointment Types & AI Insights -->
+                    <div class="dashboard-grid two-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Appointment Types</h2>
+                                <button class="btn-text" id="btn-manage-types" type="button">Manage</button>
+                            </div>
+                            <div class="appointment-types-list" id="type-list">
+                                <div class="empty-state">Loading appointment types...</div>
+                            </div>
                         </div>
-                        <div class="insights-list" id="insights-list">
-                            <div class="empty-state">AI insights will appear here as data comes in.</div>
+
+                        <div class="card ai-insights">
+                            <div class="card-header">
+                                <h2>🤖 AI Insights</h2>
+                                <span class="badge pulse">Live</span>
+                            </div>
+                            <div class="insights-list" id="insights-list">
+                                <div class="empty-state">AI insights will appear here as data comes in.</div>
+                            </div>
                         </div>
                     </div>
-                </div>
                 </section>
 
                 <section class="app-view" data-view="appointments">
@@ -254,12 +262,17 @@
                 <section class="app-view" data-view="types">
                     <div class="dashboard-grid two-col">
                         <div class="card">
-                            <div class="card-header"><h2>Create Appointment Type</h2></div>
+                            <div class="card-header">
+                                <h2>Create Appointment Type</h2>
+                            </div>
                             <form class="modal-form" id="type-form">
-                                <div class="form-group"><label>Name</label><input name="name" required placeholder="e.g. Haircut" /></div>
+                                <div class="form-group"><label>Name</label><input name="name" required
+                                        placeholder="e.g. Haircut" /></div>
                                 <div class="form-row">
-                                    <div class="form-group"><label>Duration (min)</label><input name="durationMinutes" type="number" value="30" min="5" /></div>
-                                    <div class="form-group"><label>Price (£)</label><input name="priceGbp" type="number" value="0" min="0" step="1" /></div>
+                                    <div class="form-group"><label>Duration (min)</label><input name="durationMinutes"
+                                            type="number" value="30" min="5" /></div>
+                                    <div class="form-group"><label>Price (£)</label><input name="priceGbp" type="number"
+                                            value="0" min="0" step="1" /></div>
                                 </div>
                                 <div class="form-group">
                                     <label>Location Mode</label>
@@ -270,11 +283,14 @@
                                         <option value="hybrid" selected>Hybrid</option>
                                     </select>
                                 </div>
-                                <div class="form-actions"><button type="submit" class="btn-primary">Create Type</button></div>
+                                <div class="form-actions"><button type="submit" class="btn-primary">Create Type</button>
+                                </div>
                             </form>
                         </div>
                         <div class="card">
-                            <div class="card-header"><h2>Current Types</h2></div>
+                            <div class="card-header">
+                                <h2>Current Types</h2>
+                            </div>
                             <div class="appointment-types-list" id="type-admin-list"></div>
                         </div>
                     </div>
@@ -282,23 +298,31 @@
 
                 <section class="app-view" data-view="ai">
                     <div class="card ai-insights">
-                        <div class="card-header"><h2>AI Assistant Feed</h2></div>
+                        <div class="card-header">
+                            <h2>AI Assistant Feed</h2>
+                        </div>
                         <div class="insights-list" id="ai-full-list"></div>
                     </div>
                 </section>
 
                 <section class="app-view" data-view="settings">
                     <div class="card">
-                        <div class="card-header"><h2>Business Settings</h2></div>
+                        <div class="card-header">
+                            <h2>Business Settings</h2>
+                        </div>
                         <form class="modal-form" id="settings-form">
                             <div class="form-row">
-                                <div class="form-group"><label>Business Name</label><input name="businessName" required /></div>
-                                <div class="form-group"><label>Owner Email</label><input name="ownerEmail" type="email" /></div>
+                                <div class="form-group"><label>Business Name</label><input name="businessName"
+                                        required /></div>
+                                <div class="form-group"><label>Owner Email</label><input name="ownerEmail"
+                                        type="email" /></div>
                             </div>
                             <div class="form-group timezone-group">
                                 <label>Timezone</label>
-                                <input name="timezone" id="timezone-input" autocomplete="off" value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
-                                <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox" aria-label="Timezone suggestions"></div>
+                                <input name="timezone" id="timezone-input" autocomplete="off"
+                                    value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
+                                <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox"
+                                    aria-label="Timezone suggestions"></div>
                             </div>
                             <div class="form-actions">
                                 <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
@@ -316,22 +340,19 @@
     <!-- Modal: New Appointment -->
     <div class="modal" id="new-appointment">
         <div class="modal-overlay" id="new-appointment-overlay"></div>
-        <div
-            class="modal-content appointment-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-appointment-title"
-            aria-describedby="new-appointment-subtitle"
-        >
+        <div class="modal-content appointment-modal" role="dialog" aria-modal="true"
+            aria-labelledby="new-appointment-title" aria-describedby="new-appointment-subtitle">
             <div class="modal-header">
                 <div>
                     <h2 id="new-appointment-title">Create Appointment</h2>
-                    <p class="modal-subtitle" id="new-appointment-subtitle">Add client details, lock a slot, and send confirmation.</p>
+                    <p class="modal-subtitle" id="new-appointment-subtitle">Add client details, lock a slot, and send
+                        confirmation.</p>
                 </div>
-                <button class="icon-btn" id="btn-close-new-appointment" type="button" aria-label="Close appointment modal">
+                <button class="icon-btn" id="btn-close-new-appointment" type="button"
+                    aria-label="Close appointment modal">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
             </div>
@@ -342,7 +363,8 @@
                             <label>Appointment Type</label>
                             <div class="type-selector type-selector-compact" id="type-selector">
                                 <div class="type-option active" data-type="consultation">
-                                    <div class="type-dot" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                    <div class="type-dot"
+                                        style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
                                     <div class="type-copy">
                                         <span>Consultation</span>
                                         <small>45 min</small>
@@ -382,7 +404,8 @@
 
                         <div class="form-group">
                             <label>Notes</label>
-                            <textarea rows="3" name="notes" placeholder="Any special requirements or context..."></textarea>
+                            <textarea rows="3" name="notes"
+                                placeholder="Any special requirements or context..."></textarea>
                         </div>
                     </div>
 
@@ -440,7 +463,8 @@
 
     <div class="auth-shell hidden" id="auth-shell">
         <div class="auth-card">
-            <button type="button" class="auth-close-btn" id="btn-close-auth-shell" aria-label="Close sign in panel">Close</button>
+            <button type="button" class="auth-close-btn" id="btn-close-auth-shell"
+                aria-label="Close sign in panel">Close</button>
             <h2>Sign in to IntelliSchedule</h2>
             <p>Use your business owner account to access your workspace. New accounts require email verification.</p>
             <div class="auth-tabs">
@@ -451,7 +475,10 @@
             <form id="auth-login-form" class="auth-form">
                 <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
                 <div class="form-group"><label>Password</label><input name="password" type="password" required /></div>
-                <div class="form-actions"><button type="submit" class="btn-primary">Sign In</button></div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="btn-dev-login">Dev Login</button>
+                    <button type="submit" class="btn-primary">Sign In</button>
+                </div>
             </form>
 
             <form id="auth-signup-form" class="auth-form hidden">
@@ -461,10 +488,12 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Email</label><input name="email" type="email" required /></div>
-                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="12" required /></div>
+                    <div class="form-group"><label>Password</label><input name="password" type="password" minlength="12"
+                            required /></div>
                 </div>
                 <p class="auth-password-hint">Use 12+ chars with uppercase, lowercase, number, and symbol.</p>
-                <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" /></div>
+                <div class="form-group"><label>Timezone</label><input name="timezone" value="America/Los_Angeles" />
+                </div>
                 <div class="form-actions"><button type="submit" class="btn-primary">Create Account</button></div>
             </form>
         </div>
@@ -472,4 +501,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

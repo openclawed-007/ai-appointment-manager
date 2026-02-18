@@ -1576,6 +1576,45 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, db: USE_POSTGRES ? 'postgres' : 'sqlite' });
 });
 
+// Dev-only: auto-login as a test user (skips email verification)
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/auth/dev-login', async (_req, res) => {
+    const devEmail = 'dev@test.local';
+    let user = await dbGet(
+      'SELECT * FROM users WHERE email = ?',
+      'SELECT * FROM users WHERE email = $1',
+      [devEmail]
+    );
+    if (!user) {
+      try {
+        const created = await createBusinessWithOwner({
+          businessName: 'Dev Test Business',
+          name: 'Dev User',
+          email: devEmail,
+          passwordHash: hashPassword('devpassword123!'),
+          timezone: 'America/Los_Angeles',
+          slug: 'dev-test'
+        });
+        user = { id: created.user.id, business_id: created.business.id, name: created.user.name, email: devEmail, role: 'owner' };
+      } catch (_e) {
+        user = await dbGet(
+          'SELECT * FROM users WHERE email = ?',
+          'SELECT * FROM users WHERE email = $1',
+          [devEmail]
+        );
+      }
+    }
+    if (!user) return res.status(500).json({ error: 'Could not create dev user.' });
+    const business = await getBusinessById(user.business_id);
+    const token = await createSession({ userId: user.id, businessId: user.business_id });
+    setSessionCookie(res, token);
+    return res.json({
+      user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
+      business: business ? { id: Number(business.id), name: business.name, slug: business.slug } : null
+    });
+  });
+}
+
 app.post('/api/auth/signup', async (req, res) => {
   const { businessName, name, email, password, timezone } = req.body || {};
   if (!businessName?.trim()) return res.status(400).json({ error: 'businessName is required' });
