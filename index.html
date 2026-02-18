@@ -81,9 +81,10 @@
                         <circle cx="11" cy="11" r="8"/>
                         <path d="m21 21-4.35-4.35"/>
                     </svg>
-                    <input type="text" placeholder="Search appointments, clients, or types...">
+                    <input id="global-search" type="text" placeholder="Search appointments, clients, or types...">
                 </div>
                 <div class="header-actions">
+                    <a class="btn-secondary" href="/book" target="_blank" rel="noopener">Public Booking Page</a>
                     <button class="icon-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -113,7 +114,7 @@
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <span class="stat-value">4</span>
+                            <span class="stat-value" id="stat-today">0</span>
                             <span class="stat-label">Today</span>
                         </div>
                     </div>
@@ -127,7 +128,7 @@
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <span class="stat-value">12</span>
+                            <span class="stat-value" id="stat-week">0</span>
                             <span class="stat-label">This Week</span>
                         </div>
                     </div>
@@ -138,7 +139,7 @@
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <span class="stat-value">3</span>
+                            <span class="stat-value" id="stat-pending">0</span>
                             <span class="stat-label">Pending</span>
                         </div>
                     </div>
@@ -151,7 +152,7 @@
                             </svg>
                         </div>
                         <div class="stat-content">
-                            <span class="stat-value">8</span>
+                            <span class="stat-value" id="stat-ai">0</span>
                             <span class="stat-label">AI Optimized</span>
                         </div>
                     </div>
@@ -229,55 +230,8 @@
                             <h2>Today's Schedule</h2>
                             <button class="btn-text">View All</button>
                         </div>
-                        <div class="timeline">
-                            <div class="timeline-item">
-                                <div class="time">09:00 AM</div>
-                                <div class="appointment-card consultation">
-                                    <div class="appointment-type">Consultation</div>
-                                    <h3>Initial Client Meeting</h3>
-                                    <p>Sarah Mitchell</p>
-                                    <div class="appointment-meta">
-                                        <span>📍 Office</span>
-                                        <span>⏱ 45 min</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="time">11:30 AM</div>
-                                <div class="appointment-card review">
-                                    <div class="appointment-type">Review</div>
-                                    <h3>Project Progress Review</h3>
-                                    <p>TechCorp Team</p>
-                                    <div class="appointment-meta">
-                                        <span>💻 Zoom</span>
-                                        <span>⏱ 60 min</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="time">02:00 PM</div>
-                                <div class="appointment-card strategy">
-                                    <div class="appointment-type">Strategy</div>
-                                    <h3>Q1 Strategy Session</h3>
-                                    <p>Internal Team</p>
-                                    <div class="appointment-meta">
-                                        <span>📍 Conference Room</span>
-                                        <span>⏱ 90 min</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="time">04:30 PM</div>
-                                <div class="appointment-card call">
-                                    <div class="appointment-type">Call</div>
-                                    <h3>Follow-up Call</h3>
-                                    <p>David Chen</p>
-                                    <div class="appointment-meta">
-                                        <span>📞 Phone</span>
-                                        <span>⏱ 15 min</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="timeline" id="timeline-list">
+                            <div class="empty-state">No appointments for this day yet.</div>
                         </div>
                     </div>
                 </div>
@@ -289,39 +243,8 @@
                             <h2>Appointment Types</h2>
                             <button class="btn-text">Manage</button>
                         </div>
-                        <div class="appointment-types-list">
-                            <div class="type-item">
-                                <div class="type-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-                                <div class="type-info">
-                                    <h4>Consultation</h4>
-                                    <p>45 min • $150 • In-person</p>
-                                </div>
-                                <span class="type-count">24</span>
-                            </div>
-                            <div class="type-item">
-                                <div class="type-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
-                                <div class="type-info">
-                                    <h4>Strategy Session</h4>
-                                    <p>90 min • $300 • Hybrid</p>
-                                </div>
-                                <span class="type-count">8</span>
-                            </div>
-                            <div class="type-item">
-                                <div class="type-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
-                                <div class="type-info">
-                                    <h4>Review</h4>
-                                    <p>60 min • $200 • Virtual</p>
-                                </div>
-                                <span class="type-count">15</span>
-                            </div>
-                            <div class="type-item">
-                                <div class="type-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
-                                <div class="type-info">
-                                    <h4>Follow-up Call</h4>
-                                    <p>15 min • Free • Phone</p>
-                                </div>
-                                <span class="type-count">32</span>
-                            </div>
+                        <div class="appointment-types-list" id="type-list">
+                            <div class="empty-state">Loading appointment types...</div>
                         </div>
                     </div>
 
@@ -330,35 +253,8 @@
                             <h2>🤖 AI Insights</h2>
                             <span class="badge pulse">Live</span>
                         </div>
-                        <div class="insights-list">
-                            <div class="insight-item">
-                                <div class="insight-icon">💡</div>
-                                <div class="insight-content">
-                                    <p>Your peak booking time is Tuesday 10-11 AM. Consider opening more slots.</p>
-                                    <span class="insight-time">Updated just now</span>
-                                </div>
-                            </div>
-                            <div class="insight-item">
-                                <div class="insight-icon">⚠️</div>
-                                <div class="insight-content">
-                                    <p>3 consultations scheduled back-to-back on Friday. Buffer recommended.</p>
-                                    <span class="insight-time">5 min ago</span>
-                                </div>
-                            </div>
-                            <div class="insight-item">
-                                <div class="insight-icon">📊</div>
-                                <div class="insight-content">
-                                    <p>Strategy sessions have 95% attendance vs 78% for reviews.</p>
-                                    <span class="insight-time">1 hour ago</span>
-                                </div>
-                            </div>
-                            <div class="insight-item">
-                                <div class="insight-icon">🎯</div>
-                                <div class="insight-content">
-                                    <p>Client Sarah Mitchell prefers morning slots. Suggested next: March 3rd, 9 AM.</p>
-                                    <span class="insight-time">2 hours ago</span>
-                                </div>
-                            </div>
+                        <div class="insights-list" id="insights-list">
+                            <div class="empty-state">AI insights will appear here as data comes in.</div>
                         </div>
                     </div>
                 </div>
@@ -379,10 +275,10 @@
                     </svg>
                 </button>
             </div>
-            <form class="modal-form">
+            <form class="modal-form" id="appointment-form">
                 <div class="form-group">
                     <label>Appointment Type</label>
-                    <div class="type-selector">
+                    <div class="type-selector" id="type-selector">
                         <div class="type-option active" data-type="consultation">
                             <div class="type-dot" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
                             <span>Consultation</span>
@@ -405,31 +301,31 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Client Name</label>
-                        <input type="text" placeholder="e.g. Jane Smith">
+                        <input type="text" name="clientName" required placeholder="e.g. Jane Smith">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" placeholder="jane@example.com">
+                        <input type="email" name="clientEmail" placeholder="jane@example.com">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Date</label>
-                        <input type="date">
+                        <input type="date" name="date" required>
                     </div>
                     <div class="form-group">
                         <label>Time</label>
-                        <input type="time">
+                        <input type="time" name="time" required>
                     </div>
                     <div class="form-group">
                         <label>Duration</label>
-                        <select>
-                            <option>15 minutes</option>
-                            <option>30 minutes</option>
-                            <option selected>45 minutes</option>
-                            <option>60 minutes</option>
-                            <option>90 minutes</option>
+                        <select name="durationMinutes">
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="45" selected>45 minutes</option>
+                            <option value="60">60 minutes</option>
+                            <option value="90">90 minutes</option>
                         </select>
                     </div>
                 </div>
@@ -454,7 +350,7 @@
                 
                 <div class="form-group">
                     <label>Notes</label>
-                    <textarea rows="3" placeholder="Any special requirements or context..."></textarea>
+                    <textarea rows="3" name="notes" placeholder="Any special requirements or context..."></textarea>
                 </div>
                 
                 <div class="form-actions">

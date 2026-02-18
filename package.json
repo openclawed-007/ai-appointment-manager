@@ -1,0 +1,26 @@
+{
+  "name": "intellischedule",
+  "version": "1.0.0",
+  "description": "AI-powered appointment management that is simple to set up and use.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "appointments",
+    "booking",
+    "calendar",
+    "scheduler",
+    "email"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "nodemailer": "^6.10.0"
+  }
+}

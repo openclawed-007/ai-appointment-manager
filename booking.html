@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book an Appointment • IntelliSchedule</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="booking-shell">
+    <section class="booking-card">
+      <div class="booking-header">
+        <h1>Book an Appointment</h1>
+        <p>Pick a service and time. Confirmation gets emailed automatically.</p>
+      </div>
+
+      <form id="public-booking-form" class="modal-form booking-form">
+        <div class="form-group">
+          <label>Service Type</label>
+          <select name="typeId" id="public-type-select" required></select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input name="clientName" type="text" required placeholder="Jane Smith" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input name="clientEmail" type="email" required placeholder="jane@example.com" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input name="date" type="date" required />
+          </div>
+          <div class="form-group">
+            <label>Time</label>
+            <input name="time" type="time" required />
+          </div>
+          <div class="form-group">
+            <label>Duration</label>
+            <select name="durationMinutes" id="public-duration" required></select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Location</label>
+          <select name="location" id="public-location" required>
+            <option value="office">Office</option>
+            <option value="virtual">Virtual</option>
+            <option value="phone">Phone</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea name="notes" rows="3" placeholder="Anything we should know?"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <a href="/" class="btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center;">Back</a>
+          <button type="submit" class="btn-primary">Book Appointment</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="booking.js"></script>
+</body>
+</html>
