@@ -288,9 +288,12 @@
     <!-- Modal: New Appointment -->
     <div class="modal" id="new-appointment">
         <div class="modal-overlay" onclick="closeModal('new-appointment')"></div>
-        <div class="modal-content">
+        <div class="modal-content appointment-modal">
             <div class="modal-header">
-                <h2>Create New Appointment</h2>
+                <div>
+                    <h2>Create Appointment</h2>
+                    <p class="modal-subtitle">Add client details, lock a slot, and send confirmation.</p>
+                </div>
                 <button class="icon-btn" onclick="closeModal('new-appointment')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
@@ -299,83 +302,92 @@
                 </button>
             </div>
             <form class="modal-form" id="appointment-form">
-                <div class="form-group">
-                    <label>Appointment Type</label>
-                    <div class="type-selector" id="type-selector">
-                        <div class="type-option active" data-type="consultation">
-                            <div class="type-dot" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
-                            <span>Consultation</span>
+                <div class="appointment-layout">
+                    <div class="appointment-main">
+                        <div class="form-group">
+                            <label>Appointment Type</label>
+                            <div class="type-selector type-selector-compact" id="type-selector">
+                                <div class="type-option active" data-type="consultation">
+                                    <div class="type-dot" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                    <div class="type-copy">
+                                        <span>Consultation</span>
+                                        <small>45 min</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="type-option" data-type="strategy">
-                            <div class="type-dot" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
-                            <span>Strategy</span>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Client Name</label>
+                                <input type="text" name="clientName" required placeholder="e.g. Jane Smith">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" name="clientEmail" placeholder="jane@example.com">
+                            </div>
                         </div>
-                        <div class="type-option" data-type="review">
-                            <div class="type-dot" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
-                            <span>Review</span>
+
+                        <div class="form-group">
+                            <label>Location</label>
+                            <div class="location-selector">
+                                <label class="radio-label">
+                                    <input type="radio" name="location" value="office" checked>
+                                    <span>Office</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="location" value="virtual">
+                                    <span>Virtual</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="location" value="phone">
+                                    <span>Phone</span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="type-option" data-type="call">
-                            <div class="type-dot" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
-                            <span>Call</span>
+
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea rows="3" name="notes" placeholder="Any special requirements or context..."></textarea>
                         </div>
                     </div>
+
+                    <aside class="appointment-side">
+                        <div class="side-card">
+                            <h3>Schedule</h3>
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" name="date" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Time</label>
+                                <input type="time" name="time" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Duration</label>
+                                <select name="durationMinutes">
+                                    <option value="15">15 minutes</option>
+                                    <option value="30">30 minutes</option>
+                                    <option value="45" selected>45 minutes</option>
+                                    <option value="60">60 minutes</option>
+                                    <option value="90">90 minutes</option>
+                                </select>
+                            </div>
+                            <div class="quick-actions">
+                                <button type="button" class="quick-pill" data-quick-date="today">Today</button>
+                                <button type="button" class="quick-pill" data-quick-date="tomorrow">Tomorrow</button>
+                                <button type="button" class="quick-pill" data-quick-time="next-hour">Next hour</button>
+                            </div>
+                        </div>
+
+                        <div class="side-card side-summary">
+                            <h3>Summary</h3>
+                            <p id="appointment-preview-type">Pick a service type</p>
+                            <p id="appointment-preview-time">Choose date and time</p>
+                        </div>
+                    </aside>
                 </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Client Name</label>
-                        <input type="text" name="clientName" required placeholder="e.g. Jane Smith">
-                    </div>
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="clientEmail" placeholder="jane@example.com">
-                    </div>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="date" name="date" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Time</label>
-                        <input type="time" name="time" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Duration</label>
-                        <select name="durationMinutes">
-                            <option value="15">15 minutes</option>
-                            <option value="30">30 minutes</option>
-                            <option value="45" selected>45 minutes</option>
-                            <option value="60">60 minutes</option>
-                            <option value="90">90 minutes</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Location</label>
-                    <div class="location-selector">
-                        <label class="radio-label">
-                            <input type="radio" name="location" value="office" checked>
-                            <span>🏢 Office</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="location" value="virtual">
-                            <span>💻 Virtual</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="location" value="phone">
-                            <span>📞 Phone</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Notes</label>
-                    <textarea rows="3" name="notes" placeholder="Any special requirements or context..."></textarea>
-                </div>
-                
+
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="closeModal('new-appointment')">Cancel</button>
                     <button type="submit" class="btn-primary">Create Appointment</button>

@@ -12,6 +12,7 @@ function openModal(modalId) {
   if (!modal) return;
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
+  if (modalId === 'new-appointment') setAppointmentDefaults();
 }
 
 function closeModal(modalId) {
@@ -281,7 +282,10 @@ function renderTypeSelector(types) {
       (t) => `
       <div class="type-option ${state.selectedTypeId === t.id ? 'active' : ''}" data-type-id="${t.id}">
         <div class="type-dot" style="background:${escapeHtml(t.color)}"></div>
-        <span>${escapeHtml(t.name)}</span>
+        <div class="type-copy">
+          <span>${escapeHtml(t.name)}</span>
+          <small>${t.durationMinutes} min${t.priceCents > 0 ? ` • ${toMoney(t.priceCents)}` : ''}</small>
+        </div>
       </div>`
     )
     .join('');
@@ -294,8 +298,109 @@ function renderTypeSelector(types) {
       const selected = state.types.find((t) => t.id === state.selectedTypeId);
       const durationSelect = document.querySelector('select[name="durationMinutes"]');
       if (selected && durationSelect) durationSelect.value = String(selected.durationMinutes);
+      updateAppointmentPreview();
     });
   });
+
+  updateAppointmentPreview();
+}
+
+function formatPreviewDate(dateValue) {
+  if (!dateValue) return '';
+  const dt = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return dateValue;
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function updateAppointmentPreview() {
+  const typeNode = document.getElementById('appointment-preview-type');
+  const timeNode = document.getElementById('appointment-preview-time');
+  if (!typeNode || !timeNode) return;
+
+  const selectedType = state.types.find((t) => t.id === state.selectedTypeId);
+  const dateInput = document.querySelector('#appointment-form input[name="date"]');
+  const timeInput = document.querySelector('#appointment-form input[name="time"]');
+  const durationSelect = document.querySelector('#appointment-form select[name="durationMinutes"]');
+
+  typeNode.textContent = selectedType
+    ? `${selectedType.name} • ${durationSelect?.value || selectedType.durationMinutes} min`
+    : 'Pick a service type';
+
+  if (dateInput?.value && timeInput?.value) {
+    timeNode.textContent = `${formatPreviewDate(dateInput.value)} at ${toTime12(timeInput.value)}`;
+  } else {
+    timeNode.textContent = 'Choose date and time';
+  }
+}
+
+function roundToNextQuarterHour(now = new Date()) {
+  const dt = new Date(now);
+  dt.setSeconds(0, 0);
+  const mins = dt.getMinutes();
+  const rounded = mins === 0 ? 0 : Math.ceil(mins / 15) * 15;
+  if (rounded >= 60) {
+    dt.setHours(dt.getHours() + 1);
+    dt.setMinutes(0);
+  } else {
+    dt.setMinutes(rounded);
+  }
+  return dt;
+}
+
+function setAppointmentDefaults() {
+  const form = document.getElementById('appointment-form');
+  if (!form) return;
+
+  const dateInput = form.querySelector('input[name="date"]');
+  const timeInput = form.querySelector('input[name="time"]');
+
+  if (dateInput && !dateInput.value) {
+    dateInput.value = state.selectedDate || new Date().toISOString().slice(0, 10);
+  }
+
+  if (timeInput && !timeInput.value) {
+    const dt = roundToNextQuarterHour(new Date(Date.now() + 60 * 60 * 1000));
+    timeInput.value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  }
+
+  updateAppointmentPreview();
+}
+
+function bindAppointmentFormEnhancements() {
+  const form = document.getElementById('appointment-form');
+  if (!form) return;
+
+  const dateInput = form.querySelector('input[name="date"]');
+  const timeInput = form.querySelector('input[name="time"]');
+  const durationSelect = form.querySelector('select[name="durationMinutes"]');
+
+  [dateInput, timeInput, durationSelect].forEach((el) => {
+    el?.addEventListener('input', updateAppointmentPreview);
+    el?.addEventListener('change', updateAppointmentPreview);
+  });
+
+  form.querySelectorAll('.quick-pill[data-quick-date]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const now = new Date();
+      if (btn.dataset.quickDate === 'tomorrow') now.setDate(now.getDate() + 1);
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      if (dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
+      updateAppointmentPreview();
+    });
+  });
+
+  form.querySelectorAll('.quick-pill[data-quick-time]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.quickTime !== 'next-hour' || !timeInput) return;
+      const dt = roundToNextQuarterHour(new Date(Date.now() + 60 * 60 * 1000));
+      timeInput.value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+      updateAppointmentPreview();
+    });
+  });
+
+  setAppointmentDefaults();
 }
 
 function renderStats(stats = {}) {
@@ -529,6 +634,7 @@ async function submitAppointment(e) {
   try {
     await api('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
     form.reset();
+    setAppointmentDefaults();
     closeModal('new-appointment');
     await loadDashboard();
     await loadAppointmentsTable();
@@ -598,6 +704,7 @@ function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
   document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
+  bindAppointmentFormEnhancements();
 
   const search = document.getElementById('global-search');
   if (search) {
