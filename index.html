@@ -273,7 +273,12 @@
                                 <input name="timezone" id="timezone-input" autocomplete="off" value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
                                 <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox" aria-label="Timezone suggestions"></div>
                             </div>
-                            <div class="form-actions"><button type="submit" class="btn-primary">Save Settings</button></div>
+                            <div class="form-actions">
+                                <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
+                                <button type="button" class="btn-secondary" id="btn-import-data">Load Data</button>
+                                <button type="submit" class="btn-primary">Save Settings</button>
+                            </div>
+                            <input id="import-data-file" type="file" accept="application/json,.json" hidden />
                         </form>
                     </div>
                 </section>

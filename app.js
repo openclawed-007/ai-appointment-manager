@@ -1297,6 +1297,55 @@ async function loadSettings() {
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
 }
 
+function triggerJsonDownload(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportBusinessData() {
+  try {
+    const payload = await api('/api/data/export');
+    const slug = state.currentBusiness?.slug || 'business';
+    const date = new Date().toISOString().slice(0, 10);
+    triggerJsonDownload(`${slug}-backup-${date}.json`, payload);
+    showToast('Backup exported.', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function importBusinessDataFromFile(file) {
+  if (!file) return;
+  try {
+    const raw = await file.text();
+    const payload = JSON.parse(raw);
+    const ok = window.confirm('Load this backup and replace current appointments/types for this business?');
+    if (!ok) return;
+
+    const result = await api('/api/data/import', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    showToast(
+      `Backup loaded (${result.importedTypes || 0} types, ${result.importedAppointments || 0} appointments).`,
+      'success'
+    );
+    await loadTypes();
+    await loadDashboard();
+    await loadAppointmentsTable();
+    await loadSettings();
+  } catch (error) {
+    showToast(error.message || 'Invalid backup file.', 'error');
+  }
+}
+
 async function runSearch(query) {
   if (!query) {
     await loadAppointmentsTable();
@@ -1467,6 +1516,16 @@ function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
   document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
+  document.getElementById('btn-export-data')?.addEventListener('click', exportBusinessData);
+  document.getElementById('btn-import-data')?.addEventListener('click', () => {
+    document.getElementById('import-data-file')?.click();
+  });
+  document.getElementById('import-data-file')?.addEventListener('change', async (e) => {
+    const input = e.currentTarget;
+    const file = input?.files?.[0];
+    await importBusinessDataFromFile(file);
+    if (input) input.value = '';
+  });
   bindAppointmentFormEnhancements();
   updateAppointmentEditorUi(false);
 

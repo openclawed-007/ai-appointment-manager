@@ -225,4 +225,67 @@ describe('API smoke', () => {
     expect(appointmentsRes.statusCode).toBe(200);
     expect(Array.isArray(appointmentsRes.body.appointments)).toBe(true);
   });
+
+  it('can export and import business data backup', async () => {
+    const agent = request.agent(app);
+    const loginRes = await agent.post('/api/auth/login').send({
+      email: adminEmail,
+      password: adminPassword
+    });
+    expect(loginRes.statusCode).toBe(200);
+
+    const unique = Date.now();
+    const keepTypeName = `Backup Keep Type ${unique}`;
+    const removeTypeName = `Backup Remove Type ${unique}`;
+    const targetDate = '2026-04-01';
+
+    const keepTypeRes = await agent.post('/api/types').send({
+      name: keepTypeName,
+      durationMinutes: 40,
+      priceCents: 4400,
+      locationMode: 'office'
+    });
+    expect(keepTypeRes.statusCode).toBe(201);
+
+    const createApptRes = await agent.post('/api/appointments').send({
+      typeId: keepTypeRes.body.type.id,
+      clientName: `Backup Client ${unique}`,
+      clientEmail: `backup-client-${unique}@example.com`,
+      date: targetDate,
+      time: '10:15',
+      durationMinutes: 40,
+      location: 'office',
+      notes: 'backup test'
+    });
+    expect(createApptRes.statusCode).toBe(201);
+
+    const exportRes = await agent.get('/api/data/export');
+    expect(exportRes.statusCode).toBe(200);
+    expect(Array.isArray(exportRes.body.appointmentTypes)).toBe(true);
+    expect(Array.isArray(exportRes.body.appointments)).toBe(true);
+    expect(exportRes.body.appointmentTypes.some((t) => t.name === keepTypeName)).toBe(true);
+
+    const removeTypeRes = await agent.post('/api/types').send({
+      name: removeTypeName,
+      durationMinutes: 20,
+      priceCents: 1500,
+      locationMode: 'virtual'
+    });
+    expect(removeTypeRes.statusCode).toBe(201);
+
+    const importRes = await agent.post('/api/data/import').send(exportRes.body);
+    expect(importRes.statusCode).toBe(200);
+    expect(importRes.body.ok).toBe(true);
+    expect(importRes.body.importedAppointments).toBe(exportRes.body.appointments.length);
+    expect(importRes.body.importedTypes).toBe(exportRes.body.appointmentTypes.length);
+
+    const typesAfter = await agent.get('/api/types');
+    expect(typesAfter.statusCode).toBe(200);
+    expect(typesAfter.body.types.some((t) => t.name === keepTypeName)).toBe(true);
+    expect(typesAfter.body.types.some((t) => t.name === removeTypeName)).toBe(false);
+
+    const apptsAfter = await agent.get('/api/appointments');
+    expect(apptsAfter.statusCode).toBe(200);
+    expect(apptsAfter.body.appointments.length).toBe(exportRes.body.appointments.length);
+  });
 });
