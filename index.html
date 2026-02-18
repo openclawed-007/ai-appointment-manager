@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntelliSchedule - AI Appointment Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <span class="logo-text">IntelliSchedule</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>Appointments</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Types & Services</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>AI Assistant</span>
+                    <span class="badge">Beta</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6m0 6v6m4.22-10.22l4.24-4.24M6.34 17.66l-4.24 4.24M23 12h-6m-6 0H1m20.24 4.24l-4.24-4.24M6.34 6.34L2.1 2.1"/>
+                    </svg>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="ai-status">
+                    <div class="ai-indicator"></div>
+                    <span>AI Organizing</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-search">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" placeholder="Search appointments, clients, or types...">
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span class="notification-dot"></span>
+                    </button>
+                    <button class="btn-primary" onclick="openModal('new-appointment')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New Appointment
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div class="content-wrapper">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon today">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value">4</span>
+                            <span class="stat-label">Today</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon week">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value">12</span>
+                            <span class="stat-label">This Week</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon pending">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value">3</span>
+                            <span class="stat-label">Pending</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon ai">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5"/>
+                                <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value">8</span>
+                            <span class="stat-label">AI Optimized</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid -->
+                <div class="dashboard-grid">
+                    <!-- Calendar Section -->
+                    <div class="card calendar-card">
+                        <div class="card-header">
+                            <h2>Calendar</h2>
+                            <div class="calendar-nav">
+                                <button class="icon-btn small">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="15 18 9 12 15 6"/>
+                                    </svg>
+                                </button>
+                                <span class="current-month">February 2026</span>
+                                <button class="icon-btn small">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="9 18 15 12 9 6"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="calendar-grid">
+                            <div class="day-header">Sun</div>
+                            <div class="day-header">Mon</div>
+                            <div class="day-header">Tue</div>
+                            <div class="day-header">Wed</div>
+                            <div class="day-header">Thu</div>
+                            <div class="day-header">Fri</div>
+                            <div class="day-header">Sat</div>
+                            
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell empty"></div>
+                            <div class="day-cell">1</div>
+                            <div class="day-cell">2</div>
+                            <div class="day-cell">3</div>
+                            <div class="day-cell">4</div>
+                            <div class="day-cell">5</div>
+                            <div class="day-cell">6</div>
+                            <div class="day-cell">7</div>
+                            <div class="day-cell">8</div>
+                            <div class="day-cell">9</div>
+                            <div class="day-cell">10</div>
+                            <div class="day-cell">11</div>
+                            <div class="day-cell">12</div>
+                            <div class="day-cell">13</div>
+                            <div class="day-cell">14</div>
+                            <div class="day-cell">15</div>
+                            <div class="day-cell">16</div>
+                            <div class="day-cell">17</div>
+                            <div class="day-cell today">18</div>
+                            <div class="day-cell">19</div>
+                            <div class="day-cell has-event">20</div>
+                            <div class="day-cell">21</div>
+                            <div class="day-cell">22</div>
+                            <div class="day-cell">23</div>
+                            <div class="day-cell">24</div>
+                            <div class="day-cell">25</div>
+                            <div class="day-cell has-event">26</div>
+                            <div class="day-cell has-event">27</div>
+                            <div class="day-cell">28</div>
+                        </div>
+                    </div>
+
+                    <!-- Today's Schedule -->
+                    <div class="card schedule-card">
+                        <div class="card-header">
+                            <h2>Today's Schedule</h2>
+                            <button class="btn-text">View All</button>
+                        </div>
+                        <div class="timeline">
+                            <div class="timeline-item">
+                                <div class="time">09:00 AM</div>
+                                <div class="appointment-card consultation">
+                                    <div class="appointment-type">Consultation</div>
+                                    <h3>Initial Client Meeting</h3>
+                                    <p>Sarah Mitchell</p>
+                                    <div class="appointment-meta">
+                                        <span>📍 Office</span>
+                                        <span>⏱ 45 min</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="time">11:30 AM</div>
+                                <div class="appointment-card review">
+                                    <div class="appointment-type">Review</div>
+                                    <h3>Project Progress Review</h3>
+                                    <p>TechCorp Team</p>
+                                    <div class="appointment-meta">
+                                        <span>💻 Zoom</span>
+                                        <span>⏱ 60 min</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="time">02:00 PM</div>
+                                <div class="appointment-card strategy">
+                                    <div class="appointment-type">Strategy</div>
+                                    <h3>Q1 Strategy Session</h3>
+                                    <p>Internal Team</p>
+                                    <div class="appointment-meta">
+                                        <span>📍 Conference Room</span>
+                                        <span>⏱ 90 min</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="time">04:30 PM</div>
+                                <div class="appointment-card call">
+                                    <div class="appointment-type">Call</div>
+                                    <h3>Follow-up Call</h3>
+                                    <p>David Chen</p>
+                                    <div class="appointment-meta">
+                                        <span>📞 Phone</span>
+                                        <span>⏱ 15 min</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appointment Types & AI Insights -->
+                <div class="dashboard-grid two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Appointment Types</h2>
+                            <button class="btn-text">Manage</button>
+                        </div>
+                        <div class="appointment-types-list">
+                            <div class="type-item">
+                                <div class="type-color" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                                <div class="type-info">
+                                    <h4>Consultation</h4>
+                                    <p>45 min • $150 • In-person</p>
+                                </div>
+                                <span class="type-count">24</span>
+                            </div>
+                            <div class="type-item">
+                                <div class="type-color" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                                <div class="type-info">
+                                    <h4>Strategy Session</h4>
+                                    <p>90 min • $300 • Hybrid</p>
+                                </div>
+                                <span class="type-count">8</span>
+                            </div>
+                            <div class="type-item">
+                                <div class="type-color" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                                <div class="type-info">
+                                    <h4>Review</h4>
+                                    <p>60 min • $200 • Virtual</p>
+                                </div>
+                                <span class="type-count">15</span>
+                            </div>
+                            <div class="type-item">
+                                <div class="type-color" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+                                <div class="type-info">
+                                    <h4>Follow-up Call</h4>
+                                    <p>15 min • Free • Phone</p>
+                                </div>
+                                <span class="type-count">32</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card ai-insights">
+                        <div class="card-header">
+                            <h2>🤖 AI Insights</h2>
+                            <span class="badge pulse">Live</span>
+                        </div>
+                        <div class="insights-list">
+                            <div class="insight-item">
+                                <div class="insight-icon">💡</div>
+                                <div class="insight-content">
+                                    <p>Your peak booking time is Tuesday 10-11 AM. Consider opening more slots.</p>
+                                    <span class="insight-time">Updated just now</span>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon">⚠️</div>
+                                <div class="insight-content">
+                                    <p>3 consultations scheduled back-to-back on Friday. Buffer recommended.</p>
+                                    <span class="insight-time">5 min ago</span>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon">📊</div>
+                                <div class="insight-content">
+                                    <p>Strategy sessions have 95% attendance vs 78% for reviews.</p>
+                                    <span class="insight-time">1 hour ago</span>
+                                </div>
+                            </div>
+                            <div class="insight-item">
+                                <div class="insight-icon">🎯</div>
+                                <div class="insight-content">
+                                    <p>Client Sarah Mitchell prefers morning slots. Suggested next: March 3rd, 9 AM.</p>
+                                    <span class="insight-time">2 hours ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: New Appointment -->
+    <div class="modal" id="new-appointment">
+        <div class="modal-overlay" onclick="closeModal('new-appointment')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Appointment</h2>
+                <button class="icon-btn" onclick="closeModal('new-appointment')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <form class="modal-form">
+                <div class="form-group">
+                    <label>Appointment Type</label>
+                    <div class="type-selector">
+                        <div class="type-option active" data-type="consultation">
+                            <div class="type-dot" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                            <span>Consultation</span>
+                        </div>
+                        <div class="type-option" data-type="strategy">
+                            <div class="type-dot" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                            <span>Strategy</span>
+                        </div>
+                        <div class="type-option" data-type="review">
+                            <div class="type-dot" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                            <span>Review</span>
+                        </div>
+                        <div class="type-option" data-type="call">
+                            <div class="type-dot" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+                            <span>Call</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Client Name</label>
+                        <input type="text" placeholder="e.g. Jane Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" placeholder="jane@example.com">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date">
+                    </div>
+                    <div class="form-group">
+                        <label>Time</label>
+                        <input type="time">
+                    </div>
+                    <div class="form-group">
+                        <label>Duration</label>
+                        <select>
+                            <option>15 minutes</option>
+                            <option>30 minutes</option>
+                            <option selected>45 minutes</option>
+                            <option>60 minutes</option>
+                            <option>90 minutes</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Location</label>
+                    <div class="location-selector">
+                        <label class="radio-label">
+                            <input type="radio" name="location" value="office" checked>
+                            <span>🏢 Office</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="location" value="virtual">
+                            <span>💻 Virtual</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="location" value="phone">
+                            <span>📞 Phone</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea rows="3" placeholder="Any special requirements or context..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal('new-appointment')">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Appointment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
