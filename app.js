@@ -16,8 +16,11 @@ const state = {
   cancelMenuDate: '',
   currentUser: null,
   currentBusiness: null,
-  authShellDismissed: false
+  authShellDismissed: false,
+  queueSyncInProgress: false
 };
+
+const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 
 function getFocusableElements(container) {
   if (!container) return [];
@@ -454,7 +457,14 @@ async function openDayMenu(anchorEl, date) {
         const id = btn.dataset.appointmentId;
         if (!id) return;
         try {
-          await api(`/api/appointments/${id}`, { method: 'DELETE' });
+          const result = await queueAwareMutation(`/api/appointments/${id}`, { method: 'DELETE' }, {
+            allowOfflineQueue: true,
+            description: 'Appointment deletion'
+          });
+          if (result.queued) {
+            closeDayMenu();
+            return;
+          }
           await loadDashboard();
           await loadAppointmentsTable();
           await refreshCalendarDots();
@@ -536,6 +546,21 @@ function monthLabel(date) {
 }
 
 async function api(path, options = {}) {
+  const { response, body } = await requestJson(path, options);
+  if (response.status === 401) {
+    const error = new Error(body.error || 'Authentication required.');
+    error.code = 401;
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(body.error || `Request failed (${response.status})`);
+    error.code = response.status;
+    throw error;
+  }
+  return body;
+}
+
+async function requestJson(path, options = {}) {
   let response;
   try {
     response = await fetch(path, {
@@ -554,13 +579,112 @@ async function api(path, options = {}) {
     throw error;
   }
   const body = await response.json().catch(() => ({}));
-  if (response.status === 401) {
-    const error = new Error(body.error || 'Authentication required.');
-    error.code = 401;
-    throw error;
+  return { response, body };
+}
+
+function loadOfflineMutationQueue() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_MUTATION_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
   }
-  if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
-  return body;
+}
+
+function saveOfflineMutationQueue(queue) {
+  localStorage.setItem(OFFLINE_MUTATION_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function enqueueOfflineMutation(item) {
+  const queue = loadOfflineMutationQueue();
+  queue.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+    ...item
+  });
+  saveOfflineMutationQueue(queue);
+  return queue.length;
+}
+
+async function queueAwareMutation(path, options = {}, queueMeta = {}) {
+  try {
+    return { queued: false, body: await api(path, options) };
+  } catch (error) {
+    const queueable = queueMeta.allowOfflineQueue && (error?.code === 'OFFLINE' || error?.code === 'NETWORK');
+    if (!queueable) throw error;
+    const queuedCount = enqueueOfflineMutation({
+      path,
+      method: String(options.method || 'POST').toUpperCase(),
+      body: typeof options.body === 'string' ? options.body : null,
+      description: queueMeta.description || 'Pending update'
+    });
+    showToast(`${queueMeta.description || 'Change'} queued offline (${queuedCount} pending).`, 'info');
+    return { queued: true, body: null };
+  }
+}
+
+async function refreshAfterSync() {
+  if (!state.currentUser) return;
+  try {
+    await loadTypes();
+    await loadDashboard();
+    await loadAppointmentsTable();
+    await loadSettings();
+  } catch (_error) {
+    // Ignore refresh errors; queue replay already handled.
+  }
+}
+
+async function flushOfflineMutationQueue() {
+  if (state.queueSyncInProgress) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const queue = loadOfflineMutationQueue();
+  if (!queue.length) return;
+
+  state.queueSyncInProgress = true;
+  let synced = 0;
+  let dropped = 0;
+
+  try {
+    let pending = [...queue];
+    while (pending.length) {
+      const entry = pending[0];
+      try {
+        const { response } = await requestJson(entry.path, {
+          method: entry.method || 'POST',
+          body: entry.body || undefined
+        });
+        if (!response.ok) {
+          if (response.status >= 500) break;
+          if (response.status === 401) break;
+          dropped += 1;
+          pending = pending.slice(1);
+          saveOfflineMutationQueue(pending);
+          continue;
+        }
+        synced += 1;
+        pending = pending.slice(1);
+        saveOfflineMutationQueue(pending);
+      } catch (error) {
+        if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') break;
+        dropped += 1;
+        pending = pending.slice(1);
+        saveOfflineMutationQueue(pending);
+      }
+    }
+  } finally {
+    state.queueSyncInProgress = false;
+  }
+
+  if (synced > 0) {
+    showToast(`Synced ${synced} offline change${synced === 1 ? '' : 's'}.`, 'success');
+    await refreshAfterSync();
+  }
+  if (dropped > 0) {
+    showToast(`${dropped} offline change${dropped === 1 ? '' : 's'} could not be applied.`, 'error');
+  }
 }
 
 async function registerServiceWorker() {
@@ -589,6 +713,7 @@ function bindNetworkState() {
           : 'You are offline. Cached pages stay available until connection returns.',
         isOnline ? 'success' : 'info'
       );
+      if (isOnline) void flushOfflineMutationQueue();
     }
     initialized = true;
   };
@@ -615,10 +740,14 @@ async function cancelAppointmentById(appointmentId, date = '', cancellationReaso
     const payload = { status: 'cancelled' };
     const cleanReason = String(cancellationReason || '').trim();
     if (cleanReason) payload.cancellationReason = cleanReason;
-    await api(`/api/appointments/${appointmentId}/status`, {
+    const result = await queueAwareMutation(`/api/appointments/${appointmentId}/status`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
+    }, {
+      allowOfflineQueue: true,
+      description: 'Appointment cancellation'
     });
+    if (result.queued) return;
     showToast('Appointment cancelled.', 'success');
     await loadDashboard();
     await loadAppointmentsTable();
@@ -1209,7 +1338,11 @@ function renderTypes(types = []) {
         if (!ok) return;
 
         try {
-          await api(`/api/types/${typeId}`, { method: 'DELETE' });
+          const result = await queueAwareMutation(`/api/types/${typeId}`, { method: 'DELETE' }, {
+            allowOfflineQueue: true,
+            description: 'Type deletion'
+          });
+          if (result.queued) return;
           showToast('Appointment type deleted', 'success');
           await loadTypes();
           await loadDashboard();
@@ -1288,13 +1421,21 @@ function renderAppointmentsTable(appointments = []) {
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
       const id = btn.closest('.data-row')?.dataset.id;
-      await api(`/api/appointments/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'completed' })
-      });
-      showToast('Appointment marked completed', 'success');
-      await loadAppointmentsTable();
-      await loadDashboard();
+      try {
+        const result = await queueAwareMutation(`/api/appointments/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'completed' })
+        }, {
+          allowOfflineQueue: true,
+          description: 'Appointment completion'
+        });
+        if (result.queued) return;
+        showToast('Appointment marked completed', 'success');
+        await loadAppointmentsTable();
+        await loadDashboard();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
     });
   });
 
@@ -1309,10 +1450,18 @@ function renderAppointmentsTable(appointments = []) {
   root.querySelectorAll('.btn-delete').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.closest('.data-row')?.dataset.id;
-      await api(`/api/appointments/${id}`, { method: 'DELETE' });
-      showToast('Appointment deleted', 'success');
-      await loadAppointmentsTable();
-      await loadDashboard();
+      try {
+        const result = await queueAwareMutation(`/api/appointments/${id}`, { method: 'DELETE' }, {
+          allowOfflineQueue: true,
+          description: 'Appointment deletion'
+        });
+        if (result.queued) return;
+        showToast('Appointment deleted', 'success');
+        await loadAppointmentsTable();
+        await loadDashboard();
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
     });
   });
 }
@@ -1396,13 +1545,30 @@ async function submitAppointment(e) {
 
   try {
     if (wasEditing) {
-      await api(`/api/appointments/${state.editingAppointmentId}`, {
+      const result = await queueAwareMutation(`/api/appointments/${state.editingAppointmentId}`, {
         method: 'PUT',
         body: JSON.stringify(payload)
+      }, {
+        allowOfflineQueue: true,
+        description: 'Appointment update'
       });
+      if (result.queued) {
+        form.reset();
+        closeModal('new-appointment');
+        return;
+      }
     } else {
-      const result = await api('/api/appointments', { method: 'POST', body: JSON.stringify(payload) });
-      const provider = result?.notifications?.mode;
+      const result = await queueAwareMutation('/api/appointments', { method: 'POST', body: JSON.stringify(payload) }, {
+        allowOfflineQueue: true,
+        description: 'Appointment creation'
+      });
+      if (result.queued) {
+        form.reset();
+        setAppointmentDefaults();
+        closeModal('new-appointment');
+        return;
+      }
+      const provider = result?.body?.notifications?.mode;
       showToast(
         provider === 'simulation'
           ? 'Appointment created. Email simulation mode is active.'
@@ -1431,7 +1597,7 @@ async function submitType(e) {
   const form = e.currentTarget;
   const data = Object.fromEntries(new FormData(form).entries());
   try {
-    await api('/api/types', {
+    const result = await queueAwareMutation('/api/types', {
       method: 'POST',
       body: JSON.stringify({
         name: data.name,
@@ -1439,7 +1605,14 @@ async function submitType(e) {
         priceCents: Number(data.priceGbp ?? data.priceUsd ?? 0) * 100,
         locationMode: data.locationMode
       })
+    }, {
+      allowOfflineQueue: true,
+      description: 'Type creation'
     });
+    if (result.queued) {
+      form.reset();
+      return;
+    }
     form.reset();
     showToast('Type created', 'success');
     await loadTypes();
@@ -1453,7 +1626,11 @@ async function submitSettings(e) {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.currentTarget).entries());
   try {
-    await api('/api/settings', { method: 'PUT', body: JSON.stringify(data) });
+    const result = await queueAwareMutation('/api/settings', { method: 'PUT', body: JSON.stringify(data) }, {
+      allowOfflineQueue: true,
+      description: 'Settings update'
+    });
+    if (result.queued) return;
     showToast('Settings saved', 'success');
   } catch (error) {
     showToast(error.message, 'error');
@@ -1630,6 +1807,7 @@ function bindAuthUi() {
       await loadDashboard();
       await loadAppointmentsTable();
       await loadSettings();
+      await flushOfflineMutationQueue();
       showToast('Dev login successful.', 'success');
     } catch (error) {
       showToast(error.message || 'Dev login not available.', 'error');
@@ -1653,6 +1831,7 @@ function bindAuthUi() {
       await loadDashboard();
       await loadAppointmentsTable();
       await loadSettings();
+      await flushOfflineMutationQueue();
       showToast('Signed in successfully.', 'success');
     } catch (error) {
       showToast(error.message, 'error');
@@ -1789,6 +1968,7 @@ function bindThemeToggle() {
 async function init() {
   await registerServiceWorker();
   bindNetworkState();
+  if (typeof navigator !== 'undefined' && navigator.onLine) void flushOfflineMutationQueue();
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
@@ -1825,6 +2005,7 @@ async function init() {
     await loadDashboard();
     await loadAppointmentsTable();
     await loadSettings();
+    await flushOfflineMutationQueue();
     state.apiOnline = true;
   } catch (error) {
     if (error?.code === 'OFFLINE') {

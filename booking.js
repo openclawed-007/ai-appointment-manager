@@ -5,6 +5,8 @@ const form = document.getElementById('public-booking-form');
 
 let types = [];
 const businessSlug = new URLSearchParams(window.location.search).get('business') || '';
+const PUBLIC_QUEUE_KEY = 'intellischedule.publicOfflineBookingQueue.v1';
+let publicQueueSyncInProgress = false;
 
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
@@ -27,15 +29,84 @@ async function api(path, options = {}) {
     });
   } catch (_error) {
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-    throw new Error(
+    const error = new Error(
       offline
         ? 'You are offline. Reconnect before creating a booking.'
         : 'Cannot reach the booking server right now.'
     );
+    error.code = offline ? 'OFFLINE' : 'NETWORK';
+    throw error;
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) {
+    const error = new Error(data.error || 'Request failed');
+    error.code = res.status;
+    throw error;
+  }
   return data;
+}
+
+function loadPublicQueue() {
+  try {
+    const raw = localStorage.getItem(PUBLIC_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function savePublicQueue(queue) {
+  localStorage.setItem(PUBLIC_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function enqueuePublicBooking(bookingPayload) {
+  const queue = loadPublicQueue();
+  queue.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+    payload: bookingPayload
+  });
+  savePublicQueue(queue);
+  return queue.length;
+}
+
+async function flushPublicQueue() {
+  if (publicQueueSyncInProgress) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const queue = loadPublicQueue();
+  if (!queue.length) return;
+
+  publicQueueSyncInProgress = true;
+  let synced = 0;
+  let dropped = 0;
+
+  try {
+    let pending = [...queue];
+    while (pending.length) {
+      const entry = pending[0];
+      try {
+        await api('/api/public/bookings', {
+          method: 'POST',
+          body: JSON.stringify(entry.payload)
+        });
+        synced += 1;
+        pending = pending.slice(1);
+        savePublicQueue(pending);
+      } catch (error) {
+        if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') break;
+        dropped += 1;
+        pending = pending.slice(1);
+        savePublicQueue(pending);
+      }
+    }
+  } finally {
+    publicQueueSyncInProgress = false;
+  }
+
+  if (synced > 0) showToast(`Synced ${synced} offline booking${synced === 1 ? '' : 's'}.`, 'success');
+  if (dropped > 0) showToast(`${dropped} queued booking${dropped === 1 ? '' : 's'} failed to sync.`, 'error');
 }
 
 async function registerServiceWorker() {
@@ -95,10 +166,11 @@ form.addEventListener('submit', async (e) => {
   try {
     payload.typeId = Number(payload.typeId);
     payload.durationMinutes = Number(payload.durationMinutes);
+    const bookingPayload = { ...payload, businessSlug };
 
     const result = await api('/api/public/bookings', {
       method: 'POST',
-      body: JSON.stringify({ ...payload, businessSlug })
+      body: JSON.stringify(bookingPayload)
     });
 
     form.reset();
@@ -109,7 +181,13 @@ form.addEventListener('submit', async (e) => {
       'success'
     );
   } catch (error) {
-    showToast(error.message, 'error');
+    if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') {
+      const queued = enqueuePublicBooking({ ...payload, businessSlug });
+      form.reset();
+      showToast(`Offline: booking queued (${queued} pending).`, 'info');
+    } else {
+      showToast(error.message, 'error');
+    }
   } finally {
     button.disabled = false;
     button.textContent = old;
@@ -121,11 +199,16 @@ typeSelect.addEventListener('change', syncTypeFields);
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     await registerServiceWorker();
+    window.addEventListener('online', () => {
+      showToast('Connection restored. Syncing queued bookings...', 'success');
+      void flushPublicQueue();
+    });
     if (!businessSlug) {
       showToast('Missing business link. Use /book?business=your-business-slug', 'error');
       return;
     }
     await loadTypes();
+    await flushPublicQueue();
     const dateInput = form.querySelector('input[name="date"]');
     dateInput.value = new Date().toISOString().slice(0, 10);
   } catch (error) {
