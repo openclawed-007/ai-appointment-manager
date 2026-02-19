@@ -141,9 +141,6 @@
     display: grid;
     place-items: center;
     padding: 20px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(6px);
 }
@@ -155,12 +152,6 @@
 .auth-card {
     position: relative;
     width: min(520px, 100%);
-    max-height: calc(100vh - 40px);
-    max-height: calc(100svh - 40px);
-    max-height: calc(100dvh - 40px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
@@ -235,28 +226,96 @@
     display: none;
 }
 
-/* ── Mobile Nav ── */
-body.auth-shell-open {
-    overflow: hidden;
-}
-
-body.auth-shell-open .content-wrapper {
-    overflow: hidden;
-}
-
+/* ── Mobile Auth Compact Layout ── */
 @media (max-width: 640px) {
     .auth-shell {
-        align-items: start;
-        padding: 12px;
+        place-items: start center;
+        padding: 10px;
     }
 
     .auth-card {
         width: 100%;
-        max-height: calc(100vh - 24px);
-        max-height: calc(100svh - 24px);
-        max-height: calc(100dvh - 24px);
-        border-radius: var(--radius-lg);
-        padding: var(--spacing-lg);
+        max-width: 460px;
+        border-radius: 12px;
+        padding: 12px 12px 14px;
+    }
+
+    .auth-close-btn {
+        top: 8px;
+        right: 8px;
+        padding: 3px 8px;
+        font-size: 0.68rem;
+    }
+
+    .auth-card h2 {
+        margin-bottom: 2px;
+        font-size: 1rem;
+    }
+
+    .auth-card>p {
+        display: none;
+    }
+
+    .auth-tabs {
+        gap: 4px;
+        margin-bottom: 10px;
+    }
+
+    .auth-tab {
+        padding: 7px 8px;
+        font-size: 0.78rem;
+    }
+
+    #auth-login-form .form-group,
+    #auth-signup-form .form-group {
+        margin-bottom: 10px;
+    }
+
+    #auth-login-form .form-group label,
+    #auth-signup-form .form-group label {
+        margin-bottom: 4px;
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+    }
+
+    #auth-login-form .form-group input,
+    #auth-signup-form .form-group input {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+
+    #auth-signup-form .form-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+
+    .auth-password-hint {
+        margin: -2px 0 8px;
+        font-size: 0.65rem;
+    }
+
+    #auth-login-form .form-actions,
+    #auth-signup-form .form-actions {
+        margin-top: 2px;
+        padding-top: 10px;
+    }
+
+    #auth-login-form .btn-primary,
+    #auth-signup-form .btn-primary {
+        width: 100%;
+        justify-content: center;
+        padding: 9px 12px;
+        font-size: 0.82rem;
+    }
+
+    #signup-timezone-suggestions {
+        max-height: 150px;
+    }
+}
+
+@media (max-width: 400px) {
+    #auth-signup-form .form-row {
+        grid-template-columns: 1fr;
     }
 }
 

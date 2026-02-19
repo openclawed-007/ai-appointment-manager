@@ -1778,13 +1778,11 @@ function setAuthTab(tab) {
 function showAuthShell(force = false) {
   if (!force && state.authShellDismissed) return;
   document.getElementById('auth-shell')?.classList.remove('hidden');
-  document.body.classList.add('auth-shell-open');
 }
 
 function hideAuthShell(dismissed = false) {
   if (dismissed) state.authShellDismissed = true;
   document.getElementById('auth-shell')?.classList.add('hidden');
-  document.body.classList.remove('auth-shell-open');
 }
 
 async function ensureAuth() {
