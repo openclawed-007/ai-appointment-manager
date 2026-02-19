@@ -1759,10 +1759,42 @@ function updateAccountUi() {
       link.setAttribute('title', 'Sign in first to open your business booking page.');
     }
   });
-  const authButton = document.getElementById('btn-logout');
-  if (authButton) {
-    authButton.textContent = state.currentUser ? 'Logout' : 'Sign In';
-  }
+  const authButtons = [
+    document.getElementById('btn-logout'),
+    document.getElementById('nav-logout-sidebar')
+  ];
+  const logoutSvg = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  `;
+  const loginSvg = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 5 12 10 7" />
+      <line x1="15" y1="12" x2="5" y2="12" />
+    </svg>
+  `;
+  authButtons.forEach(btn => {
+    if (btn) {
+      const text = state.currentUser ? 'Logout' : 'Sign In';
+      const svg = state.currentUser ? logoutSvg : loginSvg;
+      const span = btn.querySelector('span');
+      if (span) {
+        span.textContent = text;
+      } else {
+        btn.textContent = text;
+      }
+      const existingSvg = btn.querySelector('svg');
+      if (existingSvg) {
+        existingSvg.outerHTML = svg.trim();
+      } else {
+        btn.insertAdjacentHTML('afterbegin', svg.trim());
+      }
+    }
+  });
 }
 
 function setAuthTab(tab) {
@@ -1884,7 +1916,9 @@ function bindAuthUi() {
     }
   });
 
-  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+  const handleAuthAction = async () => {
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+    document.getElementById('sidebar-backdrop')?.classList.remove('visible');
     if (!state.currentUser) {
       state.authShellDismissed = false;
       setAuthTab('login');
@@ -1900,7 +1934,10 @@ function bindAuthUi() {
     state.currentBusiness = null;
     updateAccountUi();
     showAuthShell();
-  });
+  };
+
+  document.getElementById('btn-logout')?.addEventListener('click', handleAuthAction);
+  document.getElementById('nav-logout-sidebar')?.addEventListener('click', handleAuthAction);
 
   document.getElementById('btn-close-auth-shell')?.addEventListener('click', () => {
     hideAuthShell(true);
