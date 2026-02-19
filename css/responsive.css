@@ -142,10 +142,6 @@
         display: none;
     }
 
-    #btn-logout {
-        display: inline-flex;
-    }
-
     .account-chip {
         display: none;
     }
@@ -299,14 +295,6 @@
     .form-actions .btn-secondary {
         width: 100%;
         justify-content: center;
-    }
-
-    .mobile-settings-public-link {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
     }
 
     /* Data rows */

@@ -134,16 +134,7 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <span class="account-chip" id="account-chip"></span>
-                    <a class="btn-secondary header-action-btn" id="btn-public-booking" data-public-booking-link
-                        href="/book" target="_blank" rel="noopener">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                            <polyline points="15 3 21 3 21 9" />
-                            <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                        <span>Public Page</span>
-                    </a>
+                    <span class="account-chip hidden" id="account-chip"></span>
                     <button class="icon-btn mobile-notification-btn" id="btn-notifications" data-notification-button
                         type="button" aria-label="Notifications">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -168,14 +159,6 @@
                         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                         </svg>
-                    </button>
-                    <button class="btn-secondary header-action-btn" id="btn-logout" type="button">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                            <polyline points="16 17 21 12 16 7" />
-                            <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        <span>Logout</span>
                     </button>
                     <button class="btn-primary" id="btn-new-appointment" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -406,9 +389,9 @@
                             <div class="form-actions">
                                 <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
                                 <button type="button" class="btn-secondary" id="btn-import-data">Load Data</button>
-                                <a class="btn-secondary mobile-settings-public-link" id="btn-public-booking-mobile"
+                                <a class="btn-secondary settings-public-link" id="btn-public-booking-settings"
                                     data-public-booking-link href="/book" target="_blank" rel="noopener">
-                                    Public Page
+                                    Customer Booking Link
                                 </a>
                                 <button type="submit" class="btn-primary">Save Settings</button>
                             </div>

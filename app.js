@@ -762,6 +762,8 @@ async function cancelAppointmentById(appointmentId, date = '', cancellationReaso
 }
 
 function setActiveView(view) {
+  if (!view) return;
+  localStorage.setItem('currentView', view);
   document.querySelectorAll('.nav-item').forEach((n) => {
     n.classList.toggle('active', n.dataset.view === view);
   });
@@ -1737,8 +1739,10 @@ function updateAccountUi() {
   if (chip) {
     if (state.currentUser && state.currentBusiness) {
       chip.textContent = `${state.currentBusiness.name} • ${state.currentUser.email}`;
+      chip.classList.remove('hidden');
     } else {
       chip.textContent = '';
+      chip.classList.add('hidden');
     }
   }
   const liveSlug = state.currentBusiness?.slug ? String(state.currentBusiness.slug) : '';
@@ -1759,10 +1763,8 @@ function updateAccountUi() {
       link.setAttribute('title', 'Sign in first to open your business booking page.');
     }
   });
-  const authButtons = [
-    document.getElementById('btn-logout'),
-    document.getElementById('nav-logout-sidebar')
-  ];
+  const sidebarAuth = document.getElementById('nav-logout-sidebar');
+  
   const logoutSvg = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -1777,24 +1779,20 @@ function updateAccountUi() {
       <line x1="15" y1="12" x2="5" y2="12" />
     </svg>
   `;
-  authButtons.forEach(btn => {
-    if (btn) {
-      const text = state.currentUser ? 'Logout' : 'Sign In';
-      const svg = state.currentUser ? logoutSvg : loginSvg;
-      const span = btn.querySelector('span');
-      if (span) {
-        span.textContent = text;
-      } else {
-        btn.textContent = text;
-      }
-      const existingSvg = btn.querySelector('svg');
-      if (existingSvg) {
-        existingSvg.outerHTML = svg.trim();
-      } else {
-        btn.insertAdjacentHTML('afterbegin', svg.trim());
-      }
+
+  // Sidebar button: toggle between Sign In / Logout
+  if (sidebarAuth) {
+    const text = state.currentUser ? 'Logout' : 'Sign In';
+    const svg = state.currentUser ? logoutSvg : loginSvg;
+    const span = sidebarAuth.querySelector('span');
+    if (span) span.textContent = text;
+    const existingSvg = sidebarAuth.querySelector('svg');
+    if (existingSvg) {
+      existingSvg.outerHTML = svg.trim();
+    } else {
+      sidebarAuth.insertAdjacentHTML('afterbegin', svg.trim());
     }
-  });
+  }
 }
 
 function setAuthTab(tab) {
@@ -1916,7 +1914,8 @@ function bindAuthUi() {
     }
   });
 
-  const handleAuthAction = async () => {
+  const handleAuthAction = async (e) => {
+    if (e) e.preventDefault();
     document.getElementById('sidebar')?.classList.remove('mobile-open');
     document.getElementById('sidebar-backdrop')?.classList.remove('visible');
     if (!state.currentUser) {
@@ -2069,6 +2068,9 @@ async function init() {
     await loadSettings();
     await flushOfflineMutationQueue();
     state.apiOnline = true;
+    
+    const savedView = localStorage.getItem('currentView');
+    if (savedView) setActiveView(savedView);
   } catch (error) {
     if (error?.code === 'OFFLINE') {
       state.apiOnline = false;

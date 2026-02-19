@@ -318,11 +318,16 @@
     border-top: 1px solid var(--border);
 }
 
-.mobile-settings-public-link {
-    display: none;
+.settings-public-link {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    font-weight: 600;
+    width: 100% !important;
 }
 
-.mobile-settings-public-link.is-disabled {
+.settings-public-link.is-disabled {
     opacity: 0.55;
     pointer-events: none;
 }
