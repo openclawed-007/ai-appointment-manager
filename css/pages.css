@@ -141,6 +141,8 @@
     display: grid;
     place-items: center;
     padding: 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(6px);
 }
@@ -152,6 +154,9 @@
 .auth-card {
     position: relative;
     width: min(520px, 100%);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
@@ -227,6 +232,20 @@
 }
 
 /* ── Mobile Nav ── */
+@media (max-width: 640px) {
+    .auth-shell {
+        align-items: start;
+        padding: 12px;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-height: calc(100dvh - 24px);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+    }
+}
+
 .mobile-nav {
     display: none;
 }
