@@ -1,4 +1,4 @@
-# IntelliSchedule
+# IntelliBook
 
 Sleek appointment management software with:
 - Flexible appointment types for **any business**
@@ -91,7 +91,7 @@ DATABASE_URL=
 # Optional fallback when DATABASE_URL is empty
 DB_PATH=./data/data.db
 
-BUSINESS_NAME=IntelliSchedule
+BUSINESS_NAME=IntelliBook
 OWNER_EMAIL=owner@example.com
 TIMEZONE=America/Los_Angeles
 ADMIN_EMAIL=owner@example.com

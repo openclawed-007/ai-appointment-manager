@@ -1,6 +1,6 @@
 {
-  "name": "IntelliSchedule",
-  "short_name": "IntelliSchedule",
+  "name": "IntelliBook",
+  "short_name": "IntelliBook",
   "description": "AI-powered appointment management.",
   "start_url": "/",
   "scope": "/",

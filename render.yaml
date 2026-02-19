@@ -15,6 +15,6 @@ services:
       - key: DB_PATH
         value: ./data/data.db
       - key: BUSINESS_NAME
-        value: IntelliSchedule
+        value: IntelliBook
       - key: TIMEZONE
         value: America/Los_Angeles

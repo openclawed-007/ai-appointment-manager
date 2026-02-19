@@ -315,7 +315,7 @@ async function initDb() {
     await pgPool.query('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
     await pgPool.query('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
 
-    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliSchedule';
+    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliBook';
     const defaultSlug = slugifyBusinessName(defaultBusinessName);
     const businessRow = (
       await pgPool.query(
@@ -484,7 +484,7 @@ async function initDb() {
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
 
-    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliSchedule';
+    const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliBook';
     const defaultSlug = slugifyBusinessName(defaultBusinessName);
     sqlite
       .prepare(
@@ -678,8 +678,8 @@ async function importBusinessData(businessId, backup) {
         payload.settings.business_name ||
         payload.business.name ||
         payload.business.business_name ||
-        'IntelliSchedule'
-      ).trim() || 'IntelliSchedule',
+        'IntelliBook'
+      ).trim() || 'IntelliBook',
     owner_email: payload.settings.owner_email || payload.business.owner_email || null,
     timezone: payload.settings.timezone || payload.business.timezone || 'America/Los_Angeles'
   };
@@ -1052,7 +1052,7 @@ function textToHtmlParagraphs(text = '') {
 }
 
 function buildBrandedEmailHtml({ businessName, title, subtitle, message, details = [] }) {
-  const brand = escapeHtmlEmail(businessName || 'IntelliSchedule');
+  const brand = escapeHtmlEmail(businessName || 'IntelliBook');
   const safeTitle = escapeHtmlEmail(title || 'Appointment Update');
   const safeSubtitle = subtitle ? `<p style="margin:6px 0 0;color:#64748b;font-size:14px;">${escapeHtmlEmail(subtitle)}</p>` : '';
   const safeMessage = textToHtmlParagraphs(message || '');
@@ -1108,7 +1108,7 @@ function buildBrandedEmailHtml({ businessName, title, subtitle, message, details
 }
 
 function buildCancellationEmailHtml({ businessName, appointment, cancellationReason = '' }) {
-  const brand = escapeHtmlEmail(businessName || 'IntelliSchedule');
+  const brand = escapeHtmlEmail(businessName || 'IntelliBook');
   const clientName = escapeHtmlEmail(appointment?.clientName || 'there');
   const typeName = escapeHtmlEmail(appointment?.typeName || 'Appointment');
   const dateValue = escapeHtmlEmail(appointment?.date || '');
@@ -1467,7 +1467,7 @@ async function createInsights(date, businessId) {
     getSettings(scopedBusinessId)
   ]);
   const businessSettings = settings || {
-    business_name: 'IntelliSchedule',
+    business_name: 'IntelliBook',
     timezone: 'America/Los_Angeles'
   };
 
@@ -1709,10 +1709,10 @@ app.post('/api/auth/signup', async (req, res) => {
     );
 
     const verifyLink = `${BASE_URL}/verify-email?token=${encodeURIComponent(verifyToken)}`;
-    const verifyText = `Hi ${name.trim()},\n\nConfirm your IntelliSchedule account by clicking this link:\n${verifyLink}\n\nThis link expires in ${VERIFY_HOURS} hours.`;
+    const verifyText = `Hi ${name.trim()},\n\nConfirm your IntelliBook account by clicking this link:\n${verifyLink}\n\nThis link expires in ${VERIFY_HOURS} hours.`;
     const verifyResult = await sendEmail({
       to: emailValue,
-      subject: 'Verify your IntelliSchedule account',
+      subject: 'Verify your IntelliBook account',
       text: verifyText,
       html: buildBrandedEmailHtml({
         businessName: businessName.trim(),
@@ -2499,7 +2499,7 @@ const db = {
 const boot = initDb().then(() => {
   if (require.main === module) {
     app.listen(PORT, () => {
-      console.log(`🗓️ IntelliSchedule running on http://localhost:${PORT} (${db.mode})`);
+      console.log(`🗓️ IntelliBook running on http://localhost:${PORT} (${db.mode})`);
     });
   }
 });
