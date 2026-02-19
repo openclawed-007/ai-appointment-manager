@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'intellischedule-static-v1';
+const STATIC_CACHE = 'intellischedule-static-v2';
 const RUNTIME_CACHE = 'intellischedule-runtime-v1';
 
 const APP_SHELL = [
@@ -8,6 +8,8 @@ const APP_SHELL = [
   '/styles.css',
   '/app.js',
   '/booking.js',
+  '/favicon.ico',
+  '/favicon.svg',
   '/manifest.webmanifest',
   '/css/base.css',
   '/css/content.css',
@@ -46,7 +48,14 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(request));
+    event.respondWith(
+      fetch(request).catch(() =>
+        new Response(JSON.stringify({ error: 'Offline' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+    );
     return;
   }
 
@@ -69,11 +78,18 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-        return response;
-      });
+      return fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => {
+          if (url.pathname === '/favicon.ico') {
+            return caches.match('/favicon.ico').then((res) => res || new Response('', { status: 204 }));
+          }
+          return new Response('', { status: 503 });
+        });
     })
   );
 });
