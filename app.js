@@ -1741,12 +1741,22 @@ function updateAccountUi() {
       chip.textContent = '';
     }
   }
+  const liveSlug = state.currentBusiness?.slug ? String(state.currentBusiness.slug) : '';
+  if (liveSlug) localStorage.setItem('lastBusinessSlug', liveSlug);
+  const slug = liveSlug || localStorage.getItem('lastBusinessSlug') || '';
+
   document.querySelectorAll('[data-public-booking-link]').forEach((link) => {
     if (!(link instanceof HTMLAnchorElement)) return;
-    if (state.currentBusiness?.slug) {
-      link.href = `/book?business=${encodeURIComponent(state.currentBusiness.slug)}`;
+    if (slug) {
+      link.href = `/book?business=${encodeURIComponent(slug)}`;
+      link.classList.remove('is-disabled');
+      link.removeAttribute('aria-disabled');
+      link.removeAttribute('title');
     } else {
       link.href = '/book';
+      link.classList.add('is-disabled');
+      link.setAttribute('aria-disabled', 'true');
+      link.setAttribute('title', 'Sign in first to open your business booking page.');
     }
   });
   const authButton = document.getElementById('btn-logout');

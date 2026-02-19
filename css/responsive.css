@@ -302,8 +302,10 @@
     }
 
     .mobile-settings-public-link {
-        display: inline-flex;
+        display: flex;
+        width: 100%;
         align-items: center;
+        justify-content: center;
         text-decoration: none;
     }
 

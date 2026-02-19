@@ -322,6 +322,11 @@
     display: none;
 }
 
+.mobile-settings-public-link.is-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 /* ── Timezone ── */
 .timezone-group {
     position: relative;
