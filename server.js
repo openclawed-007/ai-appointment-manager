@@ -58,7 +58,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 // Serve ONLY the public-facing files — never the project root
-const STATIC_FILES = ['index.html', 'app.js', 'booking.html', 'booking.js', 'styles.css'];
+const STATIC_FILES = ['index.html', 'app.js', 'booking.html', 'booking.js', 'styles.css', 'manifest.webmanifest', 'sw.js'];
 STATIC_FILES.forEach(f => {
   const full = path.join(__dirname, f);
   if (fs.existsSync(full)) app.use(`/${f}`, express.static(full));

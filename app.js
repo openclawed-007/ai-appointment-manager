@@ -536,11 +536,23 @@ function monthLabel(date) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'same-origin',
-    ...options
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      ...options
+    });
+  } catch (_error) {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const error = new Error(
+      offline
+        ? 'You are offline. Reconnect to sync your latest appointments.'
+        : 'Cannot reach the server right now. Please try again in a moment.'
+    );
+    error.code = offline ? 'OFFLINE' : 'NETWORK';
+    throw error;
+  }
   const body = await response.json().catch(() => ({}));
   if (response.status === 401) {
     const error = new Error(body.error || 'Authentication required.');
@@ -549,6 +561,40 @@ async function api(path, options = {}) {
   }
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
   return body;
+}
+
+async function registerServiceWorker() {
+  if (typeof window === 'undefined') return;
+  if (!('serviceWorker' in navigator)) return;
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (!window.isSecureContext && !isLocalhost) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+  } catch (error) {
+    console.warn('Service worker registration failed:', error);
+  }
+}
+
+function bindNetworkState() {
+  if (typeof window === 'undefined') return;
+  let initialized = false;
+  const sync = () => {
+    const isOnline = navigator.onLine;
+    const changed = initialized && state.apiOnline !== isOnline;
+    state.apiOnline = isOnline;
+    if (changed) {
+      showToast(
+        isOnline
+          ? 'Connection restored. Syncing latest data.'
+          : 'You are offline. Cached pages stay available until connection returns.',
+        isOnline ? 'success' : 'info'
+      );
+    }
+    initialized = true;
+  };
+  window.addEventListener('online', sync);
+  window.addEventListener('offline', sync);
+  sync();
 }
 
 function showToast(message, type = 'info') {
@@ -1557,7 +1603,8 @@ async function ensureAuth() {
     updateAccountUi();
     hideAuthShell();
     return true;
-  } catch (_error) {
+  } catch (error) {
+    if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') throw error;
     state.currentUser = null;
     state.currentBusiness = null;
     updateAccountUi();
@@ -1740,6 +1787,8 @@ function bindThemeToggle() {
 }
 
 async function init() {
+  await registerServiceWorker();
+  bindNetworkState();
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
@@ -1778,6 +1827,17 @@ async function init() {
     await loadSettings();
     state.apiOnline = true;
   } catch (error) {
+    if (error?.code === 'OFFLINE') {
+      state.apiOnline = false;
+      showToast('You are offline. Reconnect to load account and appointment data.', 'info');
+      return;
+    }
+    if (error?.code === 'NETWORK') {
+      state.apiOnline = false;
+      showToast('Backend API is unreachable. Start server with: npm run dev', 'error');
+      console.error(error);
+      return;
+    }
     if (error?.code === 401) {
       showAuthShell();
       return;

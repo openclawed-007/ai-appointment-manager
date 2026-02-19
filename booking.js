@@ -19,13 +19,35 @@ function showToast(message, type = 'info') {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+  } catch (_error) {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    throw new Error(
+      offline
+        ? 'You are offline. Reconnect before creating a booking.'
+        : 'Cannot reach the booking server right now.'
+    );
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
+}
+
+async function registerServiceWorker() {
+  if (typeof window === 'undefined') return;
+  if (!('serviceWorker' in navigator)) return;
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  if (!window.isSecureContext && !isLocalhost) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+  } catch (_error) {
+    // Ignore registration failures on unsupported/degraded browsers.
+  }
 }
 
 function clearChildren(node) {
@@ -98,6 +120,7 @@ typeSelect.addEventListener('change', syncTypeFields);
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    await registerServiceWorker();
     if (!businessSlug) {
       showToast('Missing business link. Use /book?business=your-business-slug', 'error');
       return;
