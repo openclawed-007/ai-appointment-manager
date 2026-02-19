@@ -64,6 +64,7 @@ STATIC_FILES.forEach(f => {
   if (fs.existsSync(full)) app.use(`/${f}`, express.static(full));
 });
 app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/logo', express.static(path.join(__dirname, 'logo')));
 
 // Express 4 does not automatically forward rejected async handlers to error middleware.
 // Wrap async route/middleware handlers so rejected promises become regular 500 responses

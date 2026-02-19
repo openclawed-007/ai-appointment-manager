@@ -763,22 +763,36 @@ async function cancelAppointmentById(appointmentId, date = '', cancellationReaso
 
 function setActiveView(view) {
   if (!view) return;
-  localStorage.setItem('currentView', view);
+
+  const views = [...document.querySelectorAll('.app-view')];
+  const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
+  const fallbackView = availableViews.has('dashboard') ? 'dashboard' : views[0]?.dataset.view;
+  const activeView = availableViews.has(view) ? view : fallbackView;
+  if (!activeView) return;
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem('currentView', activeView);
+    } catch (_error) {
+      // Ignore storage write failures (private mode, disabled storage, etc.)
+    }
+  }
+
   document.querySelectorAll('.nav-item').forEach((n) => {
-    n.classList.toggle('active', n.dataset.view === view);
+    n.classList.toggle('active', n.dataset.view === activeView);
   });
 
   document.querySelectorAll('.mobile-nav-item').forEach((n) => {
-    n.classList.toggle('active', n.dataset.view === view);
+    n.classList.toggle('active', n.dataset.view === activeView);
   });
 
-  document.querySelectorAll('.app-view').forEach((section) => {
-    section.classList.toggle('active', section.dataset.view === view);
+  views.forEach((section) => {
+    section.classList.toggle('active', section.dataset.view === activeView);
   });
 
   const canAutoLoadAppointments =
     typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
-  if (view === 'appointments' && canAutoLoadAppointments) void loadAppointmentsTable();
+  if (activeView === 'appointments' && canAutoLoadAppointments) void loadAppointmentsTable();
 }
 
 function getActiveView() {
@@ -934,8 +948,11 @@ function bindCalendarNav() {
     const btn = document.getElementById('btn-view-all');
     if (btn) btn.textContent = 'View All';
 
-    renderCalendarGrid();
-    const selectedCell = document.querySelector(`.day-cell[data-day="${day}"]`);
+    const prevSelected = document.querySelector('.day-cell.selected');
+    if (prevSelected && prevSelected !== dayCell) prevSelected.classList.remove('selected');
+    dayCell.classList.add('selected');
+
+    const selectedCell = dayCell;
     const selectedDate = state.selectedDate;
     if (selectedCell) void openDayMenu(selectedCell, selectedDate);
     void loadDashboard(selectedDate, { refreshDots: false });
@@ -2069,7 +2086,14 @@ async function init() {
     await flushOfflineMutationQueue();
     state.apiOnline = true;
     
-    const savedView = localStorage.getItem('currentView');
+    let savedView = null;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        savedView = localStorage.getItem('currentView');
+      } catch (_error) {
+        savedView = null;
+      }
+    }
     if (savedView) setActiveView(savedView);
   } catch (error) {
     if (error?.code === 'OFFLINE') {
