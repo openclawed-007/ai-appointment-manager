@@ -1855,15 +1855,26 @@ function bindAuthUi() {
   document.getElementById('auth-signup-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-    const passwordCheck = validatePasswordStrength(data.password);
+    const password = String(data.password || '');
+    const passwordConfirm = String(data.passwordConfirm || '');
+
+    const passwordCheck = validatePasswordStrength(password);
     if (!passwordCheck.ok) {
       showToast(passwordCheck.message, 'error');
       return;
     }
+
+    if (password !== passwordConfirm) {
+      showToast('Passwords do not match. Please verify and try again.', 'error');
+      return;
+    }
+
+    const { passwordConfirm: _passwordConfirm, ...signupPayload } = data;
+
     try {
       const result = await api('/api/auth/signup', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: JSON.stringify(signupPayload)
       });
       const debugToken = result.verificationToken ? ` (dev token: ${result.verificationToken})` : '';
       showToast(`Verification email sent. Open your inbox to activate account.${debugToken}`, 'success');

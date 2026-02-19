@@ -237,19 +237,25 @@
         width: 100%;
         max-width: 460px;
         border-radius: 12px;
-        padding: 12px 12px 14px;
+        padding: 14px 12px 14px;
     }
 
     .auth-close-btn {
         top: 8px;
         right: 8px;
-        padding: 3px 8px;
-        font-size: 0.68rem;
+        min-height: 34px;
+        padding: 6px 12px;
+        font-size: 0.76rem;
     }
 
     .auth-card h2 {
-        margin-bottom: 2px;
-        font-size: 1rem;
+        margin-bottom: 6px;
+        padding-right: 90px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        font-size: 1.08rem;
+        line-height: 1.2;
     }
 
     .auth-card>p {
