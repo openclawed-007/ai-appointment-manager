@@ -301,6 +301,12 @@
         justify-content: center;
     }
 
+    .mobile-settings-public-link {
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+    }
+
     /* Data rows */
     .data-row {
         grid-template-columns: 1fr;

@@ -318,6 +318,10 @@
     border-top: 1px solid var(--border);
 }
 
+.mobile-settings-public-link {
+    display: none;
+}
+
 /* ── Timezone ── */
 .timezone-group {
     position: relative;

@@ -127,8 +127,8 @@
                 </div>
                 <div class="header-right">
                     <span class="account-chip" id="account-chip"></span>
-                    <a class="btn-secondary header-action-btn" id="btn-public-booking" href="/book" target="_blank"
-                        rel="noopener">
+                    <a class="btn-secondary header-action-btn" id="btn-public-booking" data-public-booking-link
+                        href="/book" target="_blank" rel="noopener">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                             <polyline points="15 3 21 3 21 9" />
@@ -398,6 +398,10 @@
                             <div class="form-actions">
                                 <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
                                 <button type="button" class="btn-secondary" id="btn-import-data">Load Data</button>
+                                <a class="btn-secondary mobile-settings-public-link" id="btn-public-booking-mobile"
+                                    data-public-booking-link href="/book" target="_blank" rel="noopener">
+                                    Public Page
+                                </a>
                                 <button type="submit" class="btn-primary">Save Settings</button>
                             </div>
                             <input id="import-data-file" type="file" accept="application/json,.json" hidden />

@@ -1741,10 +1741,14 @@ function updateAccountUi() {
       chip.textContent = '';
     }
   }
-  const publicBookingLink = document.getElementById('btn-public-booking');
-  if (publicBookingLink && state.currentBusiness?.slug) {
-    publicBookingLink.href = `/book?business=${encodeURIComponent(state.currentBusiness.slug)}`;
-  }
+  document.querySelectorAll('[data-public-booking-link]').forEach((link) => {
+    if (!(link instanceof HTMLAnchorElement)) return;
+    if (state.currentBusiness?.slug) {
+      link.href = `/book?business=${encodeURIComponent(state.currentBusiness.slug)}`;
+    } else {
+      link.href = '/book';
+    }
+  });
   const authButton = document.getElementById('btn-logout');
   if (authButton) {
     authButton.textContent = state.currentUser ? 'Logout' : 'Sign In';
