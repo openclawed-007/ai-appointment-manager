@@ -109,8 +109,16 @@
 }
 
 .booking-logo .logo-icon {
-    width: 34px;
-    height: 34px;
+    width: clamp(110px, 26vw, 150px);
+    height: 42px;
+    border-radius: 0;
+    flex: 0 0 auto;
+}
+
+.booking-logo .logo-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .booking-logo .logo-text {
