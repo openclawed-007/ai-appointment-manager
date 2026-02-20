@@ -54,6 +54,21 @@ async function signupAndVerify(agent, payload) {
   return verify.body;
 }
 
+async function loginAndVerify(agent, email, password) {
+  const loginRes = await agent.post('/api/auth/login').send({ email, password });
+  expect(loginRes.statusCode).toBe(202);
+  expect(loginRes.body.codeRequired).toBe(true);
+  expect(loginRes.body.challengeToken).toBeTruthy();
+  expect(loginRes.body.loginCode).toBeTruthy();
+
+  const verifyRes = await agent.post('/api/auth/login/verify-code').send({
+    challengeToken: loginRes.body.challengeToken,
+    code: loginRes.body.loginCode
+  });
+  expect(verifyRes.statusCode).toBe(200);
+  return verifyRes.body;
+}
+
 describe('API smoke', () => {
   it('health should be ok', async () => {
     const res = await request(app).get('/api/health');
@@ -68,13 +83,8 @@ describe('API smoke', () => {
 
   it('default owner can login and access protected endpoints', async () => {
     const agent = request.agent(app);
-    const loginRes = await agent.post('/api/auth/login').send({
-      email: adminEmail,
-      password: adminPassword
-    });
-
-    expect(loginRes.statusCode).toBe(200);
-    expect(loginRes.body.user.email).toBe(adminEmail);
+    const loginRes = await loginAndVerify(agent, adminEmail, adminPassword);
+    expect(loginRes.user.email).toBe(adminEmail);
 
     const meRes = await agent.get('/api/auth/me');
     expect(meRes.statusCode).toBe(200);
@@ -85,13 +95,58 @@ describe('API smoke', () => {
     expect(settingsRes.body.settings).toHaveProperty('business_name');
   });
 
-  it('can create type and appointment, then update and delete it when authenticated', async () => {
+  it('requires valid email code to complete login', async () => {
     const agent = request.agent(app);
-    const loginRes = await agent.post('/api/auth/login').send({
+    const challenge = await agent.post('/api/auth/login').send({
       email: adminEmail,
       password: adminPassword
     });
-    expect(loginRes.statusCode).toBe(200);
+
+    expect(challenge.statusCode).toBe(202);
+    expect(challenge.body.codeRequired).toBe(true);
+    expect(challenge.body.challengeToken).toBeTruthy();
+    expect(challenge.body.loginCode).toBeTruthy();
+
+    const wrongCode = challenge.body.loginCode === '000000' ? '111111' : '000000';
+    const wrong = await agent.post('/api/auth/login/verify-code').send({
+      challengeToken: challenge.body.challengeToken,
+      code: wrongCode
+    });
+    expect(wrong.statusCode).toBe(401);
+
+    const ok = await agent.post('/api/auth/login/verify-code').send({
+      challengeToken: challenge.body.challengeToken,
+      code: challenge.body.loginCode
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.body.user.email).toBe(adminEmail);
+
+    const reused = await agent.post('/api/auth/login/verify-code').send({
+      challengeToken: challenge.body.challengeToken,
+      code: challenge.body.loginCode
+    });
+    expect(reused.statusCode).toBe(400);
+  });
+
+  it('enforces login-code resend cooldown', async () => {
+    const agent = request.agent(app);
+    const challenge = await agent.post('/api/auth/login').send({
+      email: adminEmail,
+      password: adminPassword
+    });
+    expect(challenge.statusCode).toBe(202);
+    expect(challenge.body.challengeToken).toBeTruthy();
+
+    const resend = await agent.post('/api/auth/login/resend-code').send({
+      challengeToken: challenge.body.challengeToken
+    });
+    expect(resend.statusCode).toBe(429);
+    expect(String(resend.body.error || '')).toContain('Please wait');
+  });
+
+  it('can create type and appointment, then update and delete it when authenticated', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
 
     const typeRes = await agent.post('/api/types').send({
       name: 'Test Type',
@@ -214,13 +269,49 @@ describe('API smoke', () => {
     expect(second.body.error).toBe('Email already in use.');
   });
 
+  it('can reset password via emailed reset token', async () => {
+    const email = `reset-${Date.now()}@example.com`;
+    const originalPassword = 'ResetPass123!';
+    const newPassword = 'ResetPass456!';
+    const agent = request.agent(app);
+
+    await signupAndVerify(agent, {
+      businessName: `Reset Biz ${Date.now()}`,
+      name: 'Reset Owner',
+      email,
+      password: originalPassword,
+      timezone: 'America/Los_Angeles'
+    });
+
+    const requestReset = await request(app).post('/api/auth/password-reset/request').send({ email });
+    expect(requestReset.statusCode).toBe(200);
+    expect(requestReset.body.ok).toBe(true);
+    expect(requestReset.body.resetToken).toBeTruthy();
+
+    const confirmReset = await request(app).post('/api/auth/password-reset/confirm').send({
+      token: requestReset.body.resetToken,
+      password: newPassword
+    });
+    expect(confirmReset.statusCode).toBe(200);
+    expect(confirmReset.body.ok).toBe(true);
+
+    const oldLogin = await request(app).post('/api/auth/login').send({
+      email,
+      password: originalPassword
+    });
+    expect(oldLogin.statusCode).toBe(401);
+
+    const newLogin = await request(app).post('/api/auth/login').send({
+      email,
+      password: newPassword
+    });
+    expect(newLogin.statusCode).toBe(202);
+    expect(newLogin.body.codeRequired).toBe(true);
+  });
+
   it('dashboard and appointments endpoints return structured data for authenticated owner', async () => {
     const agent = request.agent(app);
-    const loginRes = await agent.post('/api/auth/login').send({
-      email: adminEmail,
-      password: adminPassword
-    });
-    expect(loginRes.statusCode).toBe(200);
+    await loginAndVerify(agent, adminEmail, adminPassword);
 
     const dashRes = await agent.get('/api/dashboard');
     expect(dashRes.statusCode).toBe(200);
@@ -234,11 +325,7 @@ describe('API smoke', () => {
 
   it('can export and import business data backup', async () => {
     const agent = request.agent(app);
-    const loginRes = await agent.post('/api/auth/login').send({
-      email: adminEmail,
-      password: adminPassword
-    });
-    expect(loginRes.statusCode).toBe(200);
+    await loginAndVerify(agent, adminEmail, adminPassword);
 
     const unique = Date.now();
     const keepTypeName = `Backup Keep Type ${unique}`;
@@ -299,11 +386,7 @@ describe('API smoke', () => {
     'reliably restores varied datasets across 10 export/import rounds',
     async () => {
       const agent = request.agent(app);
-      const loginRes = await agent.post('/api/auth/login').send({
-        email: adminEmail,
-        password: adminPassword
-      });
-      expect(loginRes.statusCode).toBe(200);
+      await loginAndVerify(agent, adminEmail, adminPassword);
 
       for (let round = 1; round <= 10; round += 1) {
         const existing = await agent.get('/api/appointments');

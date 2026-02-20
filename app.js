@@ -37,7 +37,10 @@ const state = {
   authShellDismissed: false,
   queueSyncInProgress: false,
   calendarExpanded: getStoredBoolean('calendarExpanded'),
-  unreadNotifications: 0
+  unreadNotifications: 0,
+  authLoginChallengeToken: '',
+  authLoginEmail: '',
+  authResendCooldownUntil: 0
 };
 
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
@@ -2008,12 +2011,15 @@ function updateAccountUi() {
 
 function setAuthTab(tab) {
   const loginForm = document.getElementById('auth-login-form');
+  const codeForm = document.getElementById('auth-code-form');
   const signupForm = document.getElementById('auth-signup-form');
   document.querySelectorAll('.auth-tab').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.authTab === tab);
   });
   if (loginForm) loginForm.classList.toggle('hidden', tab !== 'login');
+  if (codeForm) codeForm.classList.add('hidden');
   if (signupForm) signupForm.classList.toggle('hidden', tab !== 'signup');
+  resetAuthCodeFlow();
 }
 
 function showAuthShell(force = false) {
@@ -2024,6 +2030,68 @@ function showAuthShell(force = false) {
 function hideAuthShell(dismissed = false) {
   if (dismissed) state.authShellDismissed = true;
   document.getElementById('auth-shell')?.classList.add('hidden');
+  resetAuthCodeFlow();
+}
+
+let authResendTimer = null;
+
+function resetAuthCodeFlow() {
+  state.authLoginChallengeToken = '';
+  state.authLoginEmail = '';
+  state.authResendCooldownUntil = 0;
+  if (authResendTimer) {
+    clearInterval(authResendTimer);
+    authResendTimer = null;
+  }
+  const codeForm = document.getElementById('auth-code-form');
+  const codeInput = document.getElementById('auth-login-code');
+  const codeCopy = document.getElementById('auth-code-copy');
+  const resendBtn = document.getElementById('btn-auth-resend-code');
+  if (codeForm) codeForm.classList.add('hidden');
+  if (codeInput) codeInput.value = '';
+  if (codeCopy) codeCopy.textContent = 'Enter the 6-digit code sent to your email.';
+  if (resendBtn) {
+    resendBtn.disabled = false;
+    resendBtn.textContent = 'Resend Code';
+  }
+}
+
+function updateAuthResendButton() {
+  const resendBtn = document.getElementById('btn-auth-resend-code');
+  if (!resendBtn) return;
+  const remainingMs = state.authResendCooldownUntil - Date.now();
+  const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  resendBtn.disabled = remainingSeconds > 0;
+  resendBtn.textContent = remainingSeconds > 0 ? `Resend (${remainingSeconds}s)` : 'Resend Code';
+  if (remainingSeconds <= 0 && authResendTimer) {
+    clearInterval(authResendTimer);
+    authResendTimer = null;
+  }
+}
+
+function startAuthResendCooldown(seconds = 30) {
+  state.authResendCooldownUntil = Date.now() + Number(seconds || 0) * 1000;
+  updateAuthResendButton();
+  if (authResendTimer) clearInterval(authResendTimer);
+  authResendTimer = setInterval(updateAuthResendButton, 1000);
+}
+
+function showAuthCodeStep({ challengeToken, email }) {
+  const loginForm = document.getElementById('auth-login-form');
+  const codeForm = document.getElementById('auth-code-form');
+  const codeInput = document.getElementById('auth-login-code');
+  const codeCopy = document.getElementById('auth-code-copy');
+  state.authLoginChallengeToken = String(challengeToken || '');
+  state.authLoginEmail = String(email || '');
+  if (loginForm) loginForm.classList.add('hidden');
+  if (codeForm) codeForm.classList.remove('hidden');
+  if (codeCopy) {
+    codeCopy.textContent = state.authLoginEmail
+      ? `Enter the 6-digit code sent to ${state.authLoginEmail}.`
+      : 'Enter the 6-digit code sent to your email.';
+  }
+  startAuthResendCooldown(30);
+  codeInput?.focus();
 }
 
 async function ensureAuth() {
@@ -2069,6 +2137,26 @@ function bindAuthUi() {
     }
   });
 
+  document.getElementById('btn-forgot-password')?.addEventListener('click', async () => {
+    const emailInput = document.getElementById('auth-email');
+    const email = String(emailInput?.value || '').trim();
+    if (!email) {
+      showToast('Enter your email first, then click Forgot password.', 'info');
+      emailInput?.focus();
+      return;
+    }
+    try {
+      const result = await api('/api/auth/password-reset/request', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      const debugToken = result?.resetToken ? ` (dev token: ${result.resetToken})` : '';
+      showToast(`If your account exists, a reset link has been sent.${debugToken}`, 'success');
+    } catch (error) {
+      showToast(error.message || 'Could not send reset link right now.', 'error');
+    }
+  });
+
   document.getElementById('auth-login-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
@@ -2077,8 +2165,39 @@ function bindAuthUi() {
         method: 'POST',
         body: JSON.stringify(data)
       });
-      state.currentUser = result.user || null;
-      state.currentBusiness = result.business || null;
+      if (!result?.codeRequired || !result?.challengeToken) {
+        throw new Error('Login verification challenge was not created.');
+      }
+      showAuthCodeStep({ challengeToken: result.challengeToken, email: data.email });
+      const debugCode = result.loginCode ? ` (dev code: ${result.loginCode})` : '';
+      showToast(`Verification code sent. Check your email.${debugCode}`, 'info');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('auth-code-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get('code') || '').trim();
+    if (!code) {
+      showToast('Enter your login code to continue.', 'error');
+      return;
+    }
+    if (!state.authLoginChallengeToken) {
+      showToast('Login challenge expired. Sign in again.', 'error');
+      resetAuthCodeFlow();
+      return;
+    }
+    try {
+      const verified = await api('/api/auth/login/verify-code', {
+        method: 'POST',
+        body: JSON.stringify({
+          challengeToken: state.authLoginChallengeToken,
+          code
+        })
+      });
+      state.currentUser = verified.user || null;
+      state.currentBusiness = verified.business || null;
       state.authShellDismissed = false;
       updateAccountUi();
       hideAuthShell();
@@ -2091,6 +2210,39 @@ function bindAuthUi() {
     } catch (error) {
       showToast(error.message, 'error');
     }
+  });
+
+  document.getElementById('btn-auth-resend-code')?.addEventListener('click', async () => {
+    if (!state.authLoginChallengeToken) {
+      showToast('Login challenge expired. Sign in again.', 'error');
+      resetAuthCodeFlow();
+      return;
+    }
+    try {
+      const result = await api('/api/auth/login/resend-code', {
+        method: 'POST',
+        body: JSON.stringify({ challengeToken: state.authLoginChallengeToken })
+      });
+      if (!result?.challengeToken) throw new Error('Could not resend login code.');
+      state.authLoginChallengeToken = result.challengeToken;
+      startAuthResendCooldown(30);
+      const debugCode = result.loginCode ? ` (dev code: ${result.loginCode})` : '';
+      showToast(`A new verification code was sent.${debugCode}`, 'success');
+    } catch (error) {
+      if (Number(error?.code) === 429) {
+        const retryMatch = String(error.message || '').match(/(\d+)s/);
+        const retrySeconds = retryMatch ? Number(retryMatch[1]) : 0;
+        if (retrySeconds > 0) startAuthResendCooldown(retrySeconds);
+      }
+      showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('btn-auth-back-to-login')?.addEventListener('click', () => {
+    const loginForm = document.getElementById('auth-login-form');
+    resetAuthCodeFlow();
+    if (loginForm) loginForm.classList.remove('hidden');
+    document.getElementById('auth-password')?.focus();
   });
 
   document.getElementById('auth-signup-form')?.addEventListener('submit', async (e) => {

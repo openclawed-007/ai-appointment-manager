@@ -231,6 +231,12 @@
     color: var(--text-muted);
 }
 
+.auth-code-copy {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
 .auth-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -307,11 +313,13 @@
     }
 
     #auth-login-form .form-group,
+    #auth-code-form .form-group,
     #auth-signup-form .form-group {
         margin-bottom: 10px;
     }
 
     #auth-login-form .form-group label,
+    #auth-code-form .form-group label,
     #auth-signup-form .form-group label {
         margin-bottom: 4px;
         font-size: 0.66rem;
@@ -319,6 +327,7 @@
     }
 
     #auth-login-form .form-group input,
+    #auth-code-form .form-group input,
     #auth-signup-form .form-group input {
         padding: 8px 10px;
         font-size: 0.8rem;
@@ -335,12 +344,14 @@
     }
 
     #auth-login-form .form-actions,
+    #auth-code-form .form-actions,
     #auth-signup-form .form-actions {
         margin-top: 2px;
         padding-top: 10px;
     }
 
     #auth-login-form .btn-primary,
+    #auth-code-form .btn-primary,
     #auth-signup-form .btn-primary {
         width: 100%;
         justify-content: center;

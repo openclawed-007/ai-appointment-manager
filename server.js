@@ -21,6 +21,10 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'data.db');
 const SESSION_COOKIE = 'sid';
 const SESSION_DAYS = 30;
 const VERIFY_HOURS = 24;
+const LOGIN_CODE_MINUTES = 10;
+const LOGIN_CODE_MAX_ATTEMPTS = 5;
+const LOGIN_RESEND_COOLDOWN_SECONDS = 30;
+const PASSWORD_RESET_HOURS = 1;
 const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.OWNER_EMAIL || '';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -50,15 +54,25 @@ app.use(helmet({
 // Rate-limit auth endpoints (login, signup, verify)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 20,                    // 20 attempts per window per IP
+  max: process.env.NODE_ENV === 'test' ? 1000 : 20, // avoid test-suite throttling
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please try again later.' }
 });
 app.use('/api/auth', authLimiter);
 
+// Public booking endpoint protection against abuse/spam traffic.
+const publicBookingLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many booking attempts. Please try again shortly.' }
+});
+app.use('/api/public/bookings', publicBookingLimiter);
+
 // Serve ONLY the public-facing files — never the project root
-const STATIC_FILES = ['index.html', 'app.js', 'booking.html', 'booking.js', 'styles.css', 'manifest.webmanifest', 'sw.js', 'favicon.ico', 'favicon.svg'];
+const STATIC_FILES = ['index.html', 'app.js', 'booking.html', 'booking.js', 'reset-password.html', 'reset-password.js', 'styles.css', 'manifest.webmanifest', 'sw.js', 'favicon.ico', 'favicon.svg'];
 STATIC_FILES.forEach(f => {
   const full = path.join(__dirname, f);
   if (fs.existsSync(full)) app.use(`/${f}`, express.static(full));
@@ -257,6 +271,27 @@ async function initDb() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
 
+      CREATE TABLE IF NOT EXISTS login_verifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        business_id INTEGER NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        code_hash TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY,
         business_id INTEGER,
@@ -306,6 +341,8 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_signup_verifications_email ON signup_verifications(email);
+      CREATE INDEX IF NOT EXISTS idx_login_verifications_token_hash ON login_verifications(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash);
       CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
 
@@ -424,6 +461,30 @@ async function initDb() {
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS login_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        business_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        code_hash TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(business_id) REFERENCES businesses(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        email TEXT NOT NULL,
+        token_hash TEXT UNIQUE NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         business_id INTEGER,
@@ -475,6 +536,8 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash);
       CREATE INDEX IF NOT EXISTS idx_signup_verifications_email ON signup_verifications(email);
+      CREATE INDEX IF NOT EXISTS idx_login_verifications_token_hash ON login_verifications(token_hash);
+      CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets(token_hash);
       CREATE INDEX IF NOT EXISTS idx_business_settings_business ON business_settings(business_id);
     `);
 
@@ -1002,6 +1065,98 @@ async function getPendingSignupByToken(token) {
     'SELECT * FROM signup_verifications WHERE token_hash = ?',
     'SELECT * FROM signup_verifications WHERE token_hash = $1',
     [tokenHash]
+  );
+}
+
+function generateLoginCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function createLoginVerification({ userId, businessId, email }) {
+  const challengeToken = makeSessionToken();
+  const code = generateLoginCode();
+  const tokenHash = hashToken(challengeToken);
+  const codeHash = hashToken(code);
+  const expiresAt = new Date(Date.now() + LOGIN_CODE_MINUTES * 60 * 1000).toISOString();
+
+  await dbRun(
+    'DELETE FROM login_verifications WHERE user_id = ?',
+    'DELETE FROM login_verifications WHERE user_id = $1',
+    [Number(userId)]
+  );
+
+  await dbRun(
+    `INSERT INTO login_verifications (user_id, business_id, email, token_hash, code_hash, attempts, expires_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?)`,
+    `INSERT INTO login_verifications (user_id, business_id, email, token_hash, code_hash, attempts, expires_at)
+     VALUES ($1, $2, $3, $4, $5, 0, $6)`,
+    [Number(userId), Number(businessId), String(email).toLowerCase(), tokenHash, codeHash, expiresAt]
+  );
+
+  return { challengeToken, code, expiresAt };
+}
+
+async function getLoginVerificationByToken(challengeToken) {
+  const tokenHash = hashToken(challengeToken);
+  return dbGet(
+    'SELECT * FROM login_verifications WHERE token_hash = ?',
+    'SELECT * FROM login_verifications WHERE token_hash = $1',
+    [tokenHash]
+  );
+}
+
+async function deleteLoginVerificationById(id) {
+  await dbRun(
+    'DELETE FROM login_verifications WHERE id = ?',
+    'DELETE FROM login_verifications WHERE id = $1',
+    [Number(id)]
+  );
+}
+
+async function createPasswordReset({ userId, email }) {
+  const resetToken = makeSessionToken();
+  const tokenHash = hashToken(resetToken);
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_HOURS * 60 * 60 * 1000).toISOString();
+
+  await dbRun(
+    'DELETE FROM password_resets WHERE user_id = ?',
+    'DELETE FROM password_resets WHERE user_id = $1',
+    [Number(userId)]
+  );
+
+  await dbRun(
+    `INSERT INTO password_resets (user_id, email, token_hash, expires_at)
+     VALUES (?, ?, ?, ?)`,
+    `INSERT INTO password_resets (user_id, email, token_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [Number(userId), String(email).toLowerCase(), tokenHash, expiresAt]
+  );
+
+  return { resetToken, expiresAt };
+}
+
+async function getPasswordResetByToken(token) {
+  const tokenHash = hashToken(token);
+  return dbGet(
+    'SELECT * FROM password_resets WHERE token_hash = ?',
+    'SELECT * FROM password_resets WHERE token_hash = $1',
+    [tokenHash]
+  );
+}
+
+async function deletePasswordResetById(id) {
+  await dbRun(
+    'DELETE FROM password_resets WHERE id = ?',
+    'DELETE FROM password_resets WHERE id = $1',
+    [Number(id)]
+  );
+}
+
+async function deleteSessionsForUser(userId) {
+  await dbRun(
+    'DELETE FROM sessions WHERE user_id = ?',
+    'DELETE FROM sessions WHERE user_id = $1',
+    [Number(userId)]
   );
 }
 
@@ -1836,6 +1991,150 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
+  const challenge = await createLoginVerification({
+    userId: user.id,
+    businessId: user.business_id,
+    email: user.email
+  });
+
+  const business = await getBusinessById(user.business_id);
+  const codeText = `Hi ${user.name || 'there'},\n\nYour IntelliBook login code is ${challenge.code}.\n\nThis code expires in ${LOGIN_CODE_MINUTES} minutes.\n\nIf you did not request this, you can ignore this email.`;
+  const businessName = business?.name || 'IntelliBook';
+  const notify = await sendEmail({
+    to: user.email,
+    subject: `${businessName}: Your login code`,
+    text: codeText,
+    html: buildBrandedEmailHtml({
+      businessName,
+      title: 'Your Login Code',
+      subtitle: 'Sign in verification',
+      message: `Use this one-time code to finish signing in:\n${challenge.code}`,
+      details: [{ label: 'Expires', value: `${LOGIN_CODE_MINUTES} minutes` }]
+    })
+  });
+
+  const payload = {
+    ok: true,
+    codeRequired: true,
+    challengeToken: challenge.challengeToken,
+    provider: notify.provider || 'unknown',
+    message: 'A login verification code was sent to your email.'
+  };
+  if (process.env.NODE_ENV !== 'production') payload.loginCode = challenge.code;
+  return res.status(202).json(payload);
+});
+
+app.post('/api/auth/login/resend-code', async (req, res) => {
+  const challengeToken = String(req.body?.challengeToken || '').trim();
+  if (!challengeToken) return res.status(400).json({ error: 'challengeToken is required' });
+
+  const existing = await getLoginVerificationByToken(challengeToken);
+  if (!existing) {
+    return res.status(400).json({ error: 'Invalid or expired login challenge.' });
+  }
+
+  const expiresAt = new Date(existing.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    await deleteLoginVerificationById(existing.id);
+    return res.status(400).json({ error: 'Login code expired. Please sign in again.' });
+  }
+
+  const createdAtMs = new Date(existing.created_at).getTime();
+  const ageSeconds = Number.isFinite(createdAtMs) ? Math.floor((Date.now() - createdAtMs) / 1000) : LOGIN_RESEND_COOLDOWN_SECONDS;
+  const retryAfterSeconds = Math.max(0, LOGIN_RESEND_COOLDOWN_SECONDS - ageSeconds);
+  if (retryAfterSeconds > 0) {
+    return res.status(429).json({
+      error: `Please wait ${retryAfterSeconds}s before requesting another code.`,
+      retryAfterSeconds
+    });
+  }
+
+  const user = await dbGet(
+    'SELECT * FROM users WHERE id = ?',
+    'SELECT * FROM users WHERE id = $1',
+    [Number(existing.user_id)]
+  );
+  if (!user) {
+    await deleteLoginVerificationById(existing.id);
+    return res.status(401).json({ error: 'User not found.' });
+  }
+
+  const challenge = await createLoginVerification({
+    userId: user.id,
+    businessId: user.business_id,
+    email: user.email
+  });
+  const business = await getBusinessById(user.business_id);
+  const businessName = business?.name || 'IntelliBook';
+  const notify = await sendEmail({
+    to: user.email,
+    subject: `${businessName}: Your login code`,
+    text: `Hi ${user.name || 'there'},\n\nYour IntelliBook login code is ${challenge.code}.\n\nThis code expires in ${LOGIN_CODE_MINUTES} minutes.\n\nIf you did not request this, you can ignore this email.`,
+    html: buildBrandedEmailHtml({
+      businessName,
+      title: 'Your Login Code',
+      subtitle: 'Sign in verification',
+      message: `Use this one-time code to finish signing in:\n${challenge.code}`,
+      details: [{ label: 'Expires', value: `${LOGIN_CODE_MINUTES} minutes` }]
+    })
+  });
+
+  const payload = {
+    ok: true,
+    codeRequired: true,
+    challengeToken: challenge.challengeToken,
+    provider: notify.provider || 'unknown',
+    message: 'A new login verification code was sent to your email.'
+  };
+  if (process.env.NODE_ENV !== 'production') payload.loginCode = challenge.code;
+  return res.status(200).json(payload);
+});
+
+app.post('/api/auth/login/verify-code', async (req, res) => {
+  const challengeToken = String(req.body?.challengeToken || '').trim();
+  const code = String(req.body?.code || '').trim();
+  if (!challengeToken || !code) {
+    return res.status(400).json({ error: 'challengeToken and code are required' });
+  }
+
+  const verification = await getLoginVerificationByToken(challengeToken);
+  if (!verification) {
+    return res.status(400).json({ error: 'Invalid or expired login challenge.' });
+  }
+
+  const expiresAt = new Date(verification.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    await deleteLoginVerificationById(verification.id);
+    return res.status(400).json({ error: 'Login code expired. Please sign in again.' });
+  }
+
+  const attempts = Number(verification.attempts || 0);
+  if (attempts >= LOGIN_CODE_MAX_ATTEMPTS) {
+    await deleteLoginVerificationById(verification.id);
+    return res.status(429).json({ error: 'Too many invalid code attempts. Sign in again.' });
+  }
+
+  if (hashToken(code) !== String(verification.code_hash)) {
+    await dbRun(
+      'UPDATE login_verifications SET attempts = attempts + 1 WHERE id = ?',
+      'UPDATE login_verifications SET attempts = attempts + 1 WHERE id = $1',
+      [Number(verification.id)]
+    );
+    return res.status(401).json({ error: 'Invalid verification code.' });
+  }
+
+  const user = await dbGet(
+    'SELECT * FROM users WHERE id = ?',
+    'SELECT * FROM users WHERE id = $1',
+    [Number(verification.user_id)]
+  );
+  if (!user) {
+    await deleteLoginVerificationById(verification.id);
+    return res.status(401).json({ error: 'User not found.' });
+  }
+
+  await deleteLoginVerificationById(verification.id);
+
   const business = await getBusinessById(user.business_id);
   const token = await createSession({ userId: user.id, businessId: user.business_id });
   setSessionCookie(res, token);
@@ -1843,6 +2142,71 @@ app.post('/api/auth/login', async (req, res) => {
     user: { id: Number(user.id), name: user.name, email: user.email, role: user.role },
     business: business ? { id: Number(business.id), name: business.name, slug: business.slug } : null
   });
+});
+
+app.post('/api/auth/password-reset/request', async (req, res) => {
+  const emailValue = String(req.body?.email || '').trim().toLowerCase();
+  const response = {
+    ok: true,
+    message: 'If an account exists for that email, a reset link has been sent.'
+  };
+  if (!emailValue) return res.json(response);
+
+  const user = await dbGet(
+    'SELECT * FROM users WHERE email = ?',
+    'SELECT * FROM users WHERE email = $1',
+    [emailValue]
+  );
+  if (!user) return res.json(response);
+
+  const reset = await createPasswordReset({ userId: user.id, email: user.email });
+  const business = await getBusinessById(user.business_id);
+  const businessName = business?.name || 'IntelliBook';
+  const resetLink = `${BASE_URL}/reset-password?token=${encodeURIComponent(reset.resetToken)}`;
+  await sendEmail({
+    to: user.email,
+    subject: `${businessName}: Reset your password`,
+    text: `Hi ${user.name || 'there'},\n\nYou requested a password reset.\n\nReset your password here:\n${resetLink}\n\nThis link expires in ${PASSWORD_RESET_HOURS} hour${PASSWORD_RESET_HOURS === 1 ? '' : 's'}.\n\nIf you did not request this, you can ignore this email.`,
+    html: buildBrandedEmailHtml({
+      businessName,
+      title: 'Reset Password',
+      subtitle: 'Account security',
+      message: `Use this secure link to reset your password:\n${resetLink}`,
+      details: [{ label: 'Expires', value: `${PASSWORD_RESET_HOURS} hour${PASSWORD_RESET_HOURS === 1 ? '' : 's'}` }]
+    })
+  });
+
+  if (process.env.NODE_ENV !== 'production') response.resetToken = reset.resetToken;
+  return res.json(response);
+});
+
+app.post('/api/auth/password-reset/confirm', async (req, res) => {
+  const token = String(req.body?.token || '').trim();
+  const password = String(req.body?.password || '');
+  if (!token || !password) return res.status(400).json({ error: 'token and password are required' });
+
+  const passwordCheck = validatePasswordStrength(password);
+  if (!passwordCheck.ok) return res.status(400).json({ error: passwordCheck.error });
+
+  const reset = await getPasswordResetByToken(token);
+  if (!reset) return res.status(400).json({ error: 'Invalid or expired reset link.' });
+
+  const expiresAt = new Date(reset.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    await deletePasswordResetById(reset.id);
+    return res.status(400).json({ error: 'Invalid or expired reset link.' });
+  }
+
+  await dbRun(
+    'UPDATE users SET password_hash = ? WHERE id = ?',
+    'UPDATE users SET password_hash = $1 WHERE id = $2',
+    [hashPassword(password), Number(reset.user_id)]
+  );
+  await deletePasswordResetById(reset.id);
+  await deleteSessionsForUser(reset.user_id);
+  clearSessionCookie(res);
+
+  return res.json({ ok: true, message: 'Password has been reset. You can sign in with your new password.' });
 });
 
 app.post('/api/auth/logout', async (req, res) => {
@@ -2109,6 +2473,9 @@ app.post('/api/appointments', async (req, res) => {
 
 app.post('/api/public/bookings', async (req, res) => {
   try {
+    const honeypot = String(req.body?.website || '').trim();
+    if (honeypot) return res.status(400).json({ error: 'Invalid request.' });
+
     const slug = String(req.body?.businessSlug || '').trim();
     if (!slug) return res.status(400).json({ error: 'businessSlug is required for public bookings.' });
     const business = await getBusinessBySlug(slug);
@@ -2503,6 +2870,10 @@ app.get('/', (_req, res) => {
 
 app.get('/book', (_req, res) => {
   res.sendFile(path.join(__dirname, 'booking.html'));
+});
+
+app.get('/reset-password', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'reset-password.html'));
 });
 
 app.get('/verify-email', (req, res) => {

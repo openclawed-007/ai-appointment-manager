@@ -579,9 +579,26 @@
                     <label for="auth-password">Password</label>
                     <input id="auth-password" name="password" type="password" required />
                 </div>
+                <div class="form-actions" style="border-top:none;padding-top:0;justify-content:flex-start;">
+                    <button type="button" class="btn-text" id="btn-forgot-password">Forgot password?</button>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary hidden" id="btn-dev-login">Dev Login</button>
                     <button type="submit" class="btn-primary">Sign In</button>
+                </div>
+            </form>
+
+            <form id="auth-code-form" class="auth-form hidden">
+                <p class="auth-code-copy" id="auth-code-copy">Enter the 6-digit code sent to your email.</p>
+                <div class="form-group">
+                    <label for="auth-login-code">Login Code</label>
+                    <input id="auth-login-code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}"
+                        maxlength="6" autocomplete="one-time-code" required />
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="btn-auth-back-to-login">Back</button>
+                    <button type="button" class="btn-secondary" id="btn-auth-resend-code">Resend Code</button>
+                    <button type="submit" class="btn-primary">Verify & Sign In</button>
                 </div>
             </form>
 
