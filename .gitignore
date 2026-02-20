@@ -6,3 +6,4 @@ tests/.tmp/
 *.db-shm
 *.db-wal
 .DS_Store
+session-*.md

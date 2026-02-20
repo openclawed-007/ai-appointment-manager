@@ -1,0 +1,165 @@
+/* ── Calendar ── */
+.calendar-card {
+    min-height: 420px;
+}
+
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.current-month {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 130px;
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: var(--spacing-sm);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+}
+
+.day-header {
+    background: var(--bg-surface);
+    padding: 10px 0;
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.day-cell {
+    aspect-ratio: 1 / 1.2;
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    container-type: inline-size;
+}
+
+@media (min-width: 1024px) {
+    .dashboard-grid.calendar-expanded .day-cell {
+        min-height: 90px;
+    }
+}
+
+.day-cell:hover {
+    background: var(--bg-hover);
+    z-index: 2;
+    box-shadow: inset 0 0 0 1px var(--gold-glow);
+}
+
+.day-cell.empty {
+    background: var(--bg-base);
+    cursor: default;
+}
+
+.day-cell.empty:hover {
+    background: transparent;
+}
+
+.day-cell.today {
+    background: linear-gradient(180deg, var(--bg-surface) 0%, var(--gold-dim) 100%);
+}
+
+.day-cell.today .day-number {
+    color: var(--gold);
+    font-weight: 800;
+}
+
+.day-cell.today::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gold);
+}
+
+.day-cell.selected {
+    background: var(--gold-dim);
+    box-shadow: inset 0 0 0 1px var(--gold);
+    z-index: 1;
+}
+
+.day-number {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 2cqi;
+}
+
+.day-events-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5cqi;
+    flex: 1;
+    overflow: hidden;
+}
+
+.cal-event {
+    display: flex;
+    align-items: center;
+    gap: 3cqi;
+    font-size: clamp(0.5rem, 9cqi, 1rem);
+    line-height: 1.2;
+    padding: 1.5cqi 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.cal-event::before {
+    content: '';
+    width: 5cqi;
+    height: 5cqi;
+    min-width: 3px;
+    min-height: 3px;
+    border-radius: 50%;
+    background: var(--event-color, var(--gold));
+    flex-shrink: 0;
+}
+
+.cal-event-time {
+    font-weight: 700;
+    color: var(--text-muted);
+    font-size: clamp(0.45rem, 8cqi, 0.9rem);
+    font-variant-numeric: tabular-nums;
+}
+
+.cal-event-name {
+    color: var(--text);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.cal-event-more {
+    font-size: clamp(0.45rem, 8cqi, 0.9rem);
+    font-weight: 700;
+    color: var(--gold);
+    margin-top: auto;
+    padding-top: 2cqi;
+    text-align: right;
+    letter-spacing: 0.02em;
+}
+
+/* Density indicators */
+.day-cell.event-low .day-number { color: var(--text); }
+.day-cell.event-med .day-number { color: var(--gold); }
+.day-cell.event-high .day-number { color: var(--warning); font-weight: 800; }

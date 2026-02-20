@@ -811,6 +811,45 @@ function showToast(message, type = 'info') {
   }, 2400);
 }
 
+/**
+ * Styled replacement for window.confirm(). Returns a Promise<boolean>.
+ */
+function showConfirm(title, body) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'confirm-dialog-backdrop';
+    backdrop.innerHTML = `
+      <div class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+        <div class="confirm-dialog-title" id="confirm-title">${escapeHtml(title)}</div>
+        <div class="confirm-dialog-body" id="confirm-body">${escapeHtml(body)}</div>
+        <div class="confirm-dialog-actions">
+          <button type="button" class="btn-secondary" id="confirm-cancel">Cancel</button>
+          <button type="button" class="btn-primary" id="confirm-ok">Confirm</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+
+    const cleanup = (result) => {
+      backdrop.remove();
+      resolve(result);
+    };
+
+    backdrop.querySelector('#confirm-ok').addEventListener('click', () => cleanup(true));
+    backdrop.querySelector('#confirm-cancel').addEventListener('click', () => cleanup(false));
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(false); });
+    backdrop.addEventListener('keydown', (e) => { if (e.key === 'Escape') cleanup(false); });
+    backdrop.querySelector('#confirm-ok').focus();
+  });
+}
+
+/** Render a skeleton placeholder inside an element while content is loading. */
+function renderSkeleton(el, lines = 3) {
+  if (!el) return;
+  el.innerHTML = `<div class="skeleton-card">${
+    Array.from({ length: lines }, () => '<div class="skeleton skeleton-line"></div>').join('')
+  }</div>`;
+}
+
 async function cancelAppointmentById(appointmentId, date = '', cancellationReason = '') {
   if (!appointmentId) return;
   try {
@@ -1307,18 +1346,16 @@ function renderStats(stats = {}) {
 }
 
 async function refreshCalendarDots() {
-  const { appointments } = await api('/api/appointments');
   const yyyy = state.calendarDate.getFullYear();
   const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
+  const monthParam = `${yyyy}-${mm}`;
 
-  const monthAppointments = appointments.filter((a) => {
+  // Only fetch appointments for the visible calendar month rather than all appointments.
+  const { appointments: rawAppointments } = await api(`/api/appointments?month=${encodeURIComponent(monthParam)}`);
+
+  const monthAppointments = rawAppointments.filter((a) => {
     const status = String(a.status || '').toLowerCase();
-    return (
-      status !== 'completed' &&
-      status !== 'cancelled' &&
-      typeof a.date === 'string' &&
-      a.date.startsWith(`${yyyy}-${mm}-`)
-    );
+    return status !== 'completed' && status !== 'cancelled';
   });
   const dayAppointments = new Map();
 
@@ -1510,7 +1547,7 @@ function renderTypes(types = []) {
         const typeId = btn.closest('.data-row')?.dataset.typeId;
         if (!typeId) return;
 
-        const ok = window.confirm('Delete this appointment type? Existing bookings remain, but this type will no longer be selectable.');
+        const ok = await showConfirm('Delete Appointment Type', 'Existing bookings remain, but this type will no longer be selectable.');
         if (!ok) return;
 
         try {
@@ -1694,39 +1731,63 @@ async function loadTypes() {
 
 async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   const { refreshDots = true } = options;
-  const [dashboardResult, completedResult, allAppointmentsResult] = await Promise.all([
+  const today = localYmd();
+
+  // Show skeleton placeholders while data is loading
+  renderSkeleton(document.getElementById('timeline-list'), 3);
+  renderSkeleton(document.getElementById('insights-list'), 4);
+
+  // Fetch dashboard data + completed appointments in parallel.
+  // The /api/dashboard endpoint already returns today's appointments.
+  // We still fetch the appointments list to calculate the true next upcoming day.
+  const [dashboardResult, completedResult, upcomingResult] = await Promise.all([
     api(`/api/dashboard?date=${encodeURIComponent(targetDate)}`),
     api('/api/appointments?status=completed'),
     api('/api/appointments')
   ]);
-  const { stats, types, insights } = dashboardResult;
+
+  const { stats, types, insights, appointments: todayFromDashboard } = dashboardResult;
   if (targetDate !== state.selectedDate) return;
+
   const scheduleTitle = document.getElementById('schedule-title');
-  const today = localYmd();
-  const scheduleCandidates = (allAppointmentsResult?.appointments || [])
-    .filter((a) => {
-      const status = String(a.status || '').toLowerCase();
-      return status !== 'completed' && status !== 'cancelled';
-    })
-    .slice()
-    .sort((a, b) => {
-      const aKey = `${a.date || ''} ${a.time || ''}`;
-      const bKey = `${b.date || ''} ${b.time || ''}`;
-      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
-    });
-  const todayAppointments = scheduleCandidates.filter((a) => a.date === today);
+
+  // Use today's appointments from the dashboard response (already scoped to today).
+  const todayAppointments = (todayFromDashboard || []).filter((a) => {
+    const status = String(a.status || '').toLowerCase();
+    return status !== 'completed' && status !== 'cancelled';
+  });
+
   let activeAppointments = todayAppointments;
+
   if (todayAppointments.length) {
-    if (scheduleTitle) scheduleTitle.textContent = 'Today\'s Schedule';
+    if (scheduleTitle) scheduleTitle.textContent = "Today's Schedule";
   } else {
-    const next = scheduleCandidates.find((a) => typeof a.date === 'string' && a.date >= today);
-    if (next?.date) {
-      activeAppointments = scheduleCandidates.filter((a) => a.date === next.date);
+    // Fall back to the next upcoming day from all appointments.
+    const upcomingFiltered = (upcomingResult?.appointments || [])
+      .filter((a) => {
+        const status = String(a.status || '').toLowerCase();
+        return status !== 'completed' && status !== 'cancelled' && typeof a.date === 'string' && a.date >= today;
+      })
+      .sort((a, b) => {
+        const aKey = `${a.date || ''} ${a.time || ''}`;
+        const bKey = `${b.date || ''} ${b.time || ''}`;
+        return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+      });
+
+    const next = upcomingFiltered[0];
+    if (next?.date && next.date > today) {
+      // next upcoming day — need to fetch that day specifically
+      const nextDayResult = await api(`/api/appointments?date=${encodeURIComponent(next.date)}`);
+      activeAppointments = (nextDayResult?.appointments || []).filter((a) => {
+        const status = String(a.status || '').toLowerCase();
+        return status !== 'completed' && status !== 'cancelled';
+      });
       if (scheduleTitle) scheduleTitle.textContent = `Next: ${formatScheduleDate(next.date)}`;
     } else if (scheduleTitle) {
-      scheduleTitle.textContent = 'Today\'s Schedule';
+      scheduleTitle.textContent = "Today's Schedule";
     }
   }
+
   const completedAppointments = (completedResult?.appointments || [])
     .slice()
     .sort((a, b) => {
@@ -1734,6 +1795,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       const bKey = `${b.date || ''} ${b.time || ''}`;
       return aKey < bKey ? 1 : -1;
     });
+
   renderStats(stats);
   renderTimeline(activeAppointments);
   renderCompletedAppointments(completedAppointments);
@@ -1746,6 +1808,7 @@ async function loadAppointmentsTable() {
   const activeView = getActiveView();
   const showAll = activeView === 'appointments' || state.viewAll;
   const query = showAll ? '' : `?date=${encodeURIComponent(state.selectedDate)}`;
+  renderSkeleton(document.getElementById('appointments-table'), 5);
   const { appointments } = await api(`/api/appointments${query}`);
   renderAppointmentsTable(appointments);
 }
@@ -1895,7 +1958,7 @@ async function importBusinessDataFromFile(file) {
   try {
     const raw = await file.text();
     const payload = JSON.parse(raw);
-    const ok = window.confirm('Load this backup and replace current appointments/types for this business?');
+    const ok = await showConfirm('Load Backup', 'This will replace all current appointments and types for this business. This cannot be undone.');
     if (!ok) return;
 
     const result = await api('/api/data/import', {
@@ -2284,7 +2347,6 @@ function bindAuthUi() {
   const handleAuthAction = async (e) => {
     if (e) e.preventDefault();
     document.getElementById('sidebar')?.classList.remove('mobile-open');
-    document.getElementById('sidebar-backdrop')?.classList.remove('visible');
     if (!state.currentUser) {
       state.authShellDismissed = false;
       setAuthTab('login');

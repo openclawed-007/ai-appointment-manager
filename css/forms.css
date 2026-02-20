@@ -318,6 +318,13 @@
     border-top: 1px solid var(--border);
 }
 
+/* Variant without top border — used in auth form for secondary actions */
+.form-actions-inline {
+    border-top: none;
+    padding-top: 0;
+    justify-content: flex-start;
+}
+
 .settings-public-link {
     display: flex !important;
     align-items: center !important;
@@ -375,4 +382,80 @@
 .timezone-option.muted {
     color: var(--text-muted);
     cursor: default;
+}
+
+/* ── Skeleton loading shimmer ── */
+@keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+}
+
+.skeleton {
+    background: linear-gradient(90deg, var(--bg-raised) 25%, var(--bg-hover) 50%, var(--bg-raised) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-md);
+}
+
+.skeleton-line {
+    height: 0.85rem;
+    border-radius: var(--radius-full);
+    margin-bottom: 0.5rem;
+}
+
+.skeleton-line:last-child {
+    margin-bottom: 0;
+    width: 60%;
+}
+
+.skeleton-card {
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* ── Custom confirm dialog (replaces window.confirm) ── */
+.confirm-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fade-in 150ms ease;
+}
+
+.confirm-dialog {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    max-width: 420px;
+    width: calc(100% - 2rem);
+    box-shadow: var(--shadow-xl);
+    animation: modal-up 200ms var(--ease-spring);
+}
+
+.confirm-dialog-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: var(--spacing-sm);
+}
+
+.confirm-dialog-body {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: var(--spacing-lg);
+}
+
+.confirm-dialog-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
 }

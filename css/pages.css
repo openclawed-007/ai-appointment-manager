@@ -18,6 +18,13 @@
     font-size: 0.85rem;
 }
 
+/* ── Utility: anchor button that renders like a button ── */
+.btn-back {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
 /* ── Data Rows ── */
 .data-row {
     display: grid;

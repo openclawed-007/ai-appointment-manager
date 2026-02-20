@@ -1,0 +1,60 @@
+/* ── AI Insights ── */
+.ai-insights {
+    background: linear-gradient(135deg, rgba(226, 168, 75, 0.02) 0%, rgba(92, 184, 122, 0.02) 100%);
+}
+
+.insights-list {
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.insight-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-raised);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    transition: all var(--transition-fast);
+}
+
+.insight-item:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-1px);
+}
+
+.insight-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.insight-content p {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.5;
+    margin-bottom: 3px;
+}
+
+.insight-action {
+    font-size: 0.75rem;
+    color: var(--gold);
+    margin-bottom: 3px;
+}
+
+.insight-confidence {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    background: var(--bg-surface);
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    margin-bottom: 3px;
+    border: 1px solid var(--border);
+}
+
+.insight-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
