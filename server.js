@@ -2201,6 +2201,21 @@ app.put('/api/appointments/:id', async (req, res) => {
     return res.status(400).json({ error: 'durationMinutes must be greater than 0' });
   }
 
+  const previousRow = await dbGet(
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = ? AND a.business_id = ?`,
+    `SELECT a.*, t.name AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.id = $1 AND a.business_id = $2`,
+    [id, businessId]
+  );
+
+  if (!previousRow) return res.status(404).json({ error: 'appointment not found' });
+  const previousAppointment = rowToAppointment(previousRow);
+
   try {
     await assertNoOverlap({
       businessId,
@@ -2280,7 +2295,35 @@ app.put('/api/appointments/:id', async (req, res) => {
     [id, businessId]
   );
 
-  res.json({ appointment: rowToAppointment(row) });
+  const appointment = rowToAppointment(row);
+  const scheduleChanged = previousAppointment.date !== appointment.date || previousAppointment.time !== appointment.time;
+
+  if (scheduleChanged && appointment.clientEmail) {
+    const settings = await getSettings(businessId);
+    const message = `Hi ${appointment.clientName},\n\nYour appointment has been rescheduled.\n\nPrevious: ${previousAppointment.date} at ${fmtTime(
+      previousAppointment.time
+    )}\nNew: ${appointment.date} at ${fmtTime(appointment.time)}\n\nService: ${appointment.typeName}\nDuration: ${appointment.durationMinutes} minutes\nLocation: ${appointment.location}\n\nIf this change does not work for you, reply to this email and we can help.\n\nThanks,\n${settings.business_name}`;
+
+    await sendEmail({
+      to: appointment.clientEmail,
+      subject: `${settings.business_name}: Appointment rescheduled`,
+      text: message,
+      html: buildBrandedEmailHtml({
+        businessName: settings.business_name,
+        title: 'Appointment Rescheduled',
+        subtitle: appointment.typeName,
+        message,
+        details: [
+          { label: 'Previous', value: `${previousAppointment.date} • ${fmtTime(previousAppointment.time)}` },
+          { label: 'New', value: `${appointment.date} • ${fmtTime(appointment.time)}` },
+          { label: 'Duration', value: `${appointment.durationMinutes} minutes` },
+          { label: 'Location', value: appointment.location }
+        ]
+      })
+    });
+  }
+
+  res.json({ appointment });
 });
 
 app.delete('/api/appointments/:id', async (req, res) => {
