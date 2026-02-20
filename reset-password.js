@@ -12,8 +12,12 @@ function showToast(message, type = 'info') {
 
 async function api(path, options = {}) {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      ...(options.headers || {})
+    }
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

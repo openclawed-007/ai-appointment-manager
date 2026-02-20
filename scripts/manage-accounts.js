@@ -25,7 +25,7 @@ async function dbConnect() {
   if (USE_POSTGRES) {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: true }
     });
     return;
   }

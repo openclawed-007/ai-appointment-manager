@@ -2,6 +2,14 @@ const path = require('path');
 const fs = require('fs');
 const request = require('supertest');
 
+// All state-mutating requests must include X-Requested-With to pass CSRF check.
+const CSRF = { 'X-Requested-With': 'XMLHttpRequest' };
+
+function post(agent, url) { return agent.post(url).set(CSRF); }
+function put(agent, url) { return agent.put(url).set(CSRF); }
+function patch(agent, url) { return agent.patch(url).set(CSRF); }
+function del(agent, url) { return agent.delete(url).set(CSRF); }
+
 const testDbDir = path.join(__dirname, '.tmp');
 const testDbPath = path.join(testDbDir, 'test-data.db');
 
@@ -42,12 +50,12 @@ afterAll(async () => {
 });
 
 async function signupAndVerify(agent, payload) {
-  const signup = await agent.post('/api/auth/signup').send(payload);
+  const signup = await post(agent, '/api/auth/signup').send(payload);
   expect(signup.statusCode).toBe(202);
   expect(signup.body.pendingVerification).toBe(true);
   expect(signup.body.verificationToken).toBeTruthy();
 
-  const verify = await agent.post('/api/auth/verify-email').send({
+  const verify = await post(agent, '/api/auth/verify-email').send({
     token: signup.body.verificationToken
   });
   expect(verify.statusCode).toBe(200);
@@ -55,13 +63,13 @@ async function signupAndVerify(agent, payload) {
 }
 
 async function loginAndVerify(agent, email, password) {
-  const loginRes = await agent.post('/api/auth/login').send({ email, password });
+  const loginRes = await post(agent, '/api/auth/login').send({ email, password });
   expect(loginRes.statusCode).toBe(202);
   expect(loginRes.body.codeRequired).toBe(true);
   expect(loginRes.body.challengeToken).toBeTruthy();
   expect(loginRes.body.loginCode).toBeTruthy();
 
-  const verifyRes = await agent.post('/api/auth/login/verify-code').send({
+  const verifyRes = await post(agent, '/api/auth/login/verify-code').send({
     challengeToken: loginRes.body.challengeToken,
     code: loginRes.body.loginCode
   });
@@ -97,7 +105,7 @@ describe('API smoke', () => {
 
   it('requires valid email code to complete login', async () => {
     const agent = request.agent(app);
-    const challenge = await agent.post('/api/auth/login').send({
+    const challenge = await post(agent, '/api/auth/login').send({
       email: adminEmail,
       password: adminPassword
     });
@@ -108,20 +116,20 @@ describe('API smoke', () => {
     expect(challenge.body.loginCode).toBeTruthy();
 
     const wrongCode = challenge.body.loginCode === '000000' ? '111111' : '000000';
-    const wrong = await agent.post('/api/auth/login/verify-code').send({
+    const wrong = await post(agent, '/api/auth/login/verify-code').send({
       challengeToken: challenge.body.challengeToken,
       code: wrongCode
     });
     expect(wrong.statusCode).toBe(401);
 
-    const ok = await agent.post('/api/auth/login/verify-code').send({
+    const ok = await post(agent, '/api/auth/login/verify-code').send({
       challengeToken: challenge.body.challengeToken,
       code: challenge.body.loginCode
     });
     expect(ok.statusCode).toBe(200);
     expect(ok.body.user.email).toBe(adminEmail);
 
-    const reused = await agent.post('/api/auth/login/verify-code').send({
+    const reused = await post(agent, '/api/auth/login/verify-code').send({
       challengeToken: challenge.body.challengeToken,
       code: challenge.body.loginCode
     });
@@ -130,14 +138,14 @@ describe('API smoke', () => {
 
   it('enforces login-code resend cooldown', async () => {
     const agent = request.agent(app);
-    const challenge = await agent.post('/api/auth/login').send({
+    const challenge = await post(agent, '/api/auth/login').send({
       email: adminEmail,
       password: adminPassword
     });
     expect(challenge.statusCode).toBe(202);
     expect(challenge.body.challengeToken).toBeTruthy();
 
-    const resend = await agent.post('/api/auth/login/resend-code').send({
+    const resend = await post(agent, '/api/auth/login/resend-code').send({
       challengeToken: challenge.body.challengeToken
     });
     expect(resend.statusCode).toBe(429);
@@ -148,7 +156,7 @@ describe('API smoke', () => {
     const agent = request.agent(app);
     await loginAndVerify(agent, adminEmail, adminPassword);
 
-    const typeRes = await agent.post('/api/types').send({
+    const typeRes = await post(agent, '/api/types').send({
       name: 'Test Type',
       durationMinutes: 35,
       priceCents: 5000,
@@ -158,7 +166,7 @@ describe('API smoke', () => {
     expect(typeRes.statusCode).toBe(201);
     expect(typeRes.body.type.name).toBe('Test Type');
 
-    const appointmentRes = await agent.post('/api/appointments').send({
+    const appointmentRes = await post(agent, '/api/appointments').send({
       typeId: typeRes.body.type.id,
       clientName: 'QA User',
       clientEmail: 'qa@example.com',
@@ -172,14 +180,13 @@ describe('API smoke', () => {
     expect(appointmentRes.statusCode).toBe(201);
     const appointmentId = appointmentRes.body.appointment.id;
 
-    const updateRes = await agent
-      .patch(`/api/appointments/${appointmentId}/status`)
+    const updateRes = await patch(agent, `/api/appointments/${appointmentId}/status`)
       .send({ status: 'completed' });
 
     expect(updateRes.statusCode).toBe(200);
     expect(updateRes.body.appointment.status).toBe('completed');
 
-    const deleteRes = await agent.delete(`/api/appointments/${appointmentId}`);
+    const deleteRes = await del(agent, `/api/appointments/${appointmentId}`);
     expect(deleteRes.statusCode).toBe(200);
     expect(deleteRes.body.ok).toBe(true);
   });
@@ -198,7 +205,7 @@ describe('API smoke', () => {
     });
     const businessASlug = verifiedA.business.slug;
 
-    const typeARes = await agentA.post('/api/types').send({
+    const typeARes = await post(agentA, '/api/types').send({
       name: `Alpha Exclusive ${unique}`,
       durationMinutes: 30,
       priceCents: 2500,
@@ -206,7 +213,7 @@ describe('API smoke', () => {
     });
     expect(typeARes.statusCode).toBe(201);
 
-    const apptARes = await agentA.post('/api/appointments').send({
+    const apptARes = await post(agentA, '/api/appointments').send({
       typeId: typeARes.body.type.id,
       clientName: 'Alpha Client',
       clientEmail: `alpha-client-${unique}@example.com`,
@@ -236,7 +243,7 @@ describe('API smoke', () => {
   });
 
   it('rejects weak signup passwords', async () => {
-    const weakRes = await request(app).post('/api/auth/signup').send({
+    const weakRes = await request(app).post('/api/auth/signup').set(CSRF).send({
       businessName: `Weak Biz ${Date.now()}`,
       name: 'Weak Owner',
       email: `weak-${Date.now()}@example.com`,
@@ -258,10 +265,10 @@ describe('API smoke', () => {
       timezone: 'America/Los_Angeles'
     };
 
-    const first = await request(app).post('/api/auth/signup').send(payload);
+    const first = await request(app).post('/api/auth/signup').set(CSRF).send(payload);
     expect(first.statusCode).toBe(202);
 
-    const second = await request(app).post('/api/auth/signup').send({
+    const second = await request(app).post('/api/auth/signup').set(CSRF).send({
       ...payload,
       businessName: `Dup Biz Second ${ts}`
     });
@@ -283,25 +290,25 @@ describe('API smoke', () => {
       timezone: 'America/Los_Angeles'
     });
 
-    const requestReset = await request(app).post('/api/auth/password-reset/request').send({ email });
+    const requestReset = await request(app).post('/api/auth/password-reset/request').set(CSRF).send({ email });
     expect(requestReset.statusCode).toBe(200);
     expect(requestReset.body.ok).toBe(true);
     expect(requestReset.body.resetToken).toBeTruthy();
 
-    const confirmReset = await request(app).post('/api/auth/password-reset/confirm').send({
+    const confirmReset = await request(app).post('/api/auth/password-reset/confirm').set(CSRF).send({
       token: requestReset.body.resetToken,
       password: newPassword
     });
     expect(confirmReset.statusCode).toBe(200);
     expect(confirmReset.body.ok).toBe(true);
 
-    const oldLogin = await request(app).post('/api/auth/login').send({
+    const oldLogin = await request(app).post('/api/auth/login').set(CSRF).send({
       email,
       password: originalPassword
     });
     expect(oldLogin.statusCode).toBe(401);
 
-    const newLogin = await request(app).post('/api/auth/login').send({
+    const newLogin = await request(app).post('/api/auth/login').set(CSRF).send({
       email,
       password: newPassword
     });
@@ -332,7 +339,7 @@ describe('API smoke', () => {
     const removeTypeName = `Backup Remove Type ${unique}`;
     const targetDate = '2026-04-01';
 
-    const keepTypeRes = await agent.post('/api/types').send({
+    const keepTypeRes = await post(agent, '/api/types').send({
       name: keepTypeName,
       durationMinutes: 40,
       priceCents: 4400,
@@ -340,7 +347,7 @@ describe('API smoke', () => {
     });
     expect(keepTypeRes.statusCode).toBe(201);
 
-    const createApptRes = await agent.post('/api/appointments').send({
+    const createApptRes = await post(agent, '/api/appointments').send({
       typeId: keepTypeRes.body.type.id,
       clientName: `Backup Client ${unique}`,
       clientEmail: `backup-client-${unique}@example.com`,
@@ -358,7 +365,7 @@ describe('API smoke', () => {
     expect(Array.isArray(exportRes.body.appointments)).toBe(true);
     expect(exportRes.body.appointmentTypes.some((t) => t.name === keepTypeName)).toBe(true);
 
-    const removeTypeRes = await agent.post('/api/types').send({
+    const removeTypeRes = await post(agent, '/api/types').send({
       name: removeTypeName,
       durationMinutes: 20,
       priceCents: 1500,
@@ -366,7 +373,7 @@ describe('API smoke', () => {
     });
     expect(removeTypeRes.statusCode).toBe(201);
 
-    const importRes = await agent.post('/api/data/import').send(exportRes.body);
+    const importRes = await post(agent, '/api/data/import').send(exportRes.body);
     expect(importRes.statusCode).toBe(200);
     expect(importRes.body.ok).toBe(true);
     expect(importRes.body.importedAppointments).toBe(exportRes.body.appointments.length);
@@ -392,11 +399,11 @@ describe('API smoke', () => {
         const existing = await agent.get('/api/appointments');
         expect(existing.statusCode).toBe(200);
         for (const appt of existing.body.appointments) {
-          const del = await agent.delete(`/api/appointments/${appt.id}`);
-          expect(del.statusCode).toBe(200);
+          const delRes = await del(agent, `/api/appointments/${appt.id}`);
+          expect(delRes.statusCode).toBe(200);
         }
 
-        const typeRes = await agent.post('/api/types').send({
+        const typeRes = await post(agent, '/api/types').send({
           name: `Round ${round} Type ${Date.now()}`,
           durationMinutes: 20 + round * 5,
           priceCents: round * 1000,
@@ -414,7 +421,7 @@ describe('API smoke', () => {
           const clientName = `Round${round}-Client${i + 1}`;
           expectedClients.push(clientName);
 
-          const create = await agent.post('/api/appointments').send({
+          const create = await post(agent, '/api/appointments').send({
             typeId,
             clientName,
             clientEmail: `r${round}c${i + 1}@example.com`,
@@ -434,11 +441,11 @@ describe('API smoke', () => {
         const toDelete = await agent.get('/api/appointments');
         expect(toDelete.statusCode).toBe(200);
         for (const appt of toDelete.body.appointments) {
-          const del = await agent.delete(`/api/appointments/${appt.id}`);
-          expect(del.statusCode).toBe(200);
+          const delRes = await del(agent, `/api/appointments/${appt.id}`);
+          expect(delRes.statusCode).toBe(200);
         }
 
-        const importRes = await agent.post('/api/data/import').send(exportRes.body);
+        const importRes = await post(agent, '/api/data/import').send(exportRes.body);
         expect(importRes.statusCode).toBe(200);
         expect(importRes.body.ok).toBe(true);
         expect(importRes.body.importedAppointments).toBe(count);

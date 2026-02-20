@@ -637,9 +637,13 @@ async function requestJson(path, options = {}) {
   let response;
   try {
     response = await fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      ...options
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {})
+      }
     });
   } catch (_error) {
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;

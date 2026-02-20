@@ -337,7 +337,8 @@
     position: fixed;
     right: 24px;
     bottom: 24px;
-    z-index: 2000;
+    /* Must exceed auth-shell (2100) so toasts are never hidden behind the login overlay */
+    z-index: 2200;
     padding: 12px 18px;
     border-radius: var(--radius-lg);
     color: var(--text);
@@ -354,6 +355,20 @@
 .toast.show {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* When the auth overlay is open, centre toasts horizontally so they appear
+   inside the visible modal area rather than behind the blurred backdrop */
+body:has(.auth-shell:not(.hidden)) .toast {
+    right: auto;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%) translateY(12px);
+    max-width: min(400px, calc(100vw - 32px));
+}
+
+body:has(.auth-shell:not(.hidden)) .toast.show {
+    transform: translateX(-50%) translateY(0);
 }
 
 .toast.info {

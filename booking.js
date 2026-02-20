@@ -24,8 +24,12 @@ async function api(path, options = {}) {
   let res;
   try {
     res = await fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {})
+      }
     });
   } catch (_error) {
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;

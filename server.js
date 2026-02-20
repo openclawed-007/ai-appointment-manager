@@ -48,8 +48,40 @@ app.use(express.json({ limit: '5mb' }));
 
 // ─── Security ──────────────────────────────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: false   // CSP handled by app's inline scripts/styles
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],  // inline style="" attributes used throughout
+      imgSrc: ["'self'", "data:"],               // data: URIs used in CSS background-image
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"]
+    }
+  },
+  crossOriginOpenerPolicy: { policy: 'same-origin' },
+  crossOriginResourcePolicy: { policy: 'same-origin' }
 }));
+
+// CSRF mitigation: require the custom header sent by the SPA on all state-mutating
+// API requests. Cross-origin requests cannot set arbitrary headers without a
+// CORS preflight, which will be blocked because no Access-Control-Allow-Origin
+// is set for third-party origins. GET requests and the unauthenticated public
+// booking endpoint are exempt.
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  // Public booking is called from the booking page which sends the header too,
+  // but also allow it for backwards-compatibility (bots / direct API callers won't have sessions anyway)
+  if (req.path === '/public/bookings' || req.path === '/public/bookings/') return next();
+  const xrw = req.headers['x-requested-with'];
+  if (!xrw || String(xrw).toLowerCase() !== 'xmlhttprequest') {
+    return res.status(403).json({ error: 'Forbidden: missing CSRF header.' });
+  }
+  next();
+});
 
 // Rate-limit auth endpoints (login, signup, verify)
 const authLimiter = rateLimit({
@@ -1330,8 +1362,14 @@ function buildCancellationEmailHtml({ businessName, appointment, cancellationRea
 </html>`;
 }
 
+// Strip CR/LF from email subject to prevent header injection attacks
+function sanitizeEmailSubject(s = '') {
+  return String(s).replace(/[\r\n]+/g, ' ').trim();
+}
+
 async function sendEmail({ to, subject, html, text }) {
   if (!to) return { ok: false, reason: 'missing-to' };
+  const safeSubject = sanitizeEmailSubject(subject);
   const fromEmail = process.env.FROM_EMAIL;
 
   if (process.env.RESEND_API_KEY && fromEmail) {
@@ -1342,7 +1380,7 @@ async function sendEmail({ to, subject, html, text }) {
           Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ from: fromEmail, to: [to], subject, html, text })
+        body: JSON.stringify({ from: fromEmail, to: [to], subject: safeSubject, html, text })
       });
 
       if (!response.ok) {
@@ -1366,7 +1404,7 @@ async function sendEmail({ to, subject, html, text }) {
         auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined
       });
 
-      await transporter.sendMail({ from: fromEmail, to, subject, html, text });
+      await transporter.sendMail({ from: fromEmail, to, subject: safeSubject, html, text });
       return { ok: true, provider: 'smtp' };
     } catch (error) {
       console.error('SMTP error:', error);
@@ -1374,7 +1412,7 @@ async function sendEmail({ to, subject, html, text }) {
     }
   }
 
-  console.log('[EMAIL_SIMULATION]', { to, subject, preview: text?.slice(0, 120) });
+  console.log('[EMAIL_SIMULATION]', { to, subject: safeSubject, preview: text?.slice(0, 120) });
   return { ok: true, provider: 'simulation' };
 }
 
@@ -1394,6 +1432,10 @@ async function createAppointment(payload = {}) {
   } = payload;
 
   if (!clientName?.trim()) throw new Error('clientName is required');
+  if (String(clientName).trim().length > 200) throw new Error('clientName is too long (max 200 characters)');
+  if (clientEmail && String(clientEmail).length > 320) throw new Error('clientEmail is too long');
+  if (notes && String(notes).length > 5000) throw new Error('notes is too long (max 5000 characters)');
+  if (title && String(title).length > 500) throw new Error('title is too long (max 500 characters)');
   const scopedBusinessId = Number(businessId);
   if (!Number.isFinite(scopedBusinessId) || scopedBusinessId <= 0) throw new Error('businessId is required');
   if (!date) throw new Error('date is required');
@@ -1838,6 +1880,9 @@ app.post('/api/auth/signup', async (req, res) => {
   if (!businessName?.trim()) return res.status(400).json({ error: 'businessName is required' });
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
   if (!email?.trim()) return res.status(400).json({ error: 'email is required' });
+  if (String(businessName).trim().length > 200) return res.status(400).json({ error: 'businessName is too long (max 200 characters)' });
+  if (String(name).trim().length > 200) return res.status(400).json({ error: 'name is too long (max 200 characters)' });
+  if (String(email).trim().length > 320) return res.status(400).json({ error: 'email is too long' });
   const passwordCheck = validatePasswordStrength(password);
   if (!passwordCheck.ok) return res.status(400).json({ error: passwordCheck.error });
 
@@ -2315,6 +2360,7 @@ app.post('/api/types', async (req, res) => {
   const businessId = req.auth.businessId;
   const { name, durationMinutes, priceCents, locationMode, color } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+  if (String(name).trim().length > 200) return res.status(400).json({ error: 'name is too long (max 200 characters)' });
 
   const params = [
     name.trim(),
@@ -2879,6 +2925,12 @@ app.get('/reset-password', (_req, res) => {
 app.get('/verify-email', (req, res) => {
   const token = String(req.query.token || '').trim();
   if (!token) return res.status(400).send('Missing verification token.');
+  // Generate a per-request nonce for the inline script so CSP allows it
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.setHeader(
+    'Content-Security-Policy',
+    `default-src 'self'; script-src 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'`
+  );
   res.type('html').send(`<!doctype html>
 <html>
   <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
@@ -2888,10 +2940,10 @@ app.get('/verify-email', (req, res) => {
       <p id="msg" style="color:#475569;">Please wait.</p>
       <a href="/" style="display:inline-block;margin-top:10px;">Go to dashboard</a>
     </div>
-    <script>
+    <script nonce="${nonce}">
       fetch('/api/auth/verify-email', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
         body: JSON.stringify({ token: ${JSON.stringify(token)} })
       })
       .then(async (r) => {
