@@ -1,3 +1,21 @@
+function getStoredBoolean(key, fallback = false) {
+  if (typeof localStorage === 'undefined') return fallback;
+  try {
+    return localStorage.getItem(key) === 'true';
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function setStoredValue(key, value) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, String(value));
+  } catch (_error) {
+    // Ignore storage write failures.
+  }
+}
+
 const state = {
   types: [],
   selectedTypeId: null,
@@ -17,7 +35,9 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   authShellDismissed: false,
-  queueSyncInProgress: false
+  queueSyncInProgress: false,
+  calendarExpanded: getStoredBoolean('calendarExpanded'),
+  unreadNotifications: 0
 };
 
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
@@ -378,6 +398,10 @@ async function openDayMenu(anchorEl, date) {
             ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email appointment details">Email</button>`
             : ''
           }
+                ${a.status === 'pending'
+            ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm appointment">Confirm</button>`
+            : ''
+          }
                 <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
                 <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel appointment">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
                 <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
@@ -488,6 +512,44 @@ async function openDayMenu(anchorEl, date) {
         await openCancelReasonMenu(id, date);
       });
     });
+
+    menu.querySelectorAll('.day-menu-confirm').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.appointmentId;
+        if (!id || btn.disabled) return;
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.classList.add('is-busy');
+        btn.textContent = 'Confirming...';
+        try {
+          const result = await queueAwareMutation(`/api/appointments/${id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'confirmed' })
+          }, {
+            allowOfflineQueue: true,
+            description: 'Appointment confirmation'
+          });
+          if (result.queued) {
+            btn.classList.remove('is-busy');
+            btn.textContent = 'Queued';
+            return;
+          }
+          showToast('Appointment confirmed!', 'success');
+          await loadDashboard();
+          await loadAppointmentsTable();
+          await refreshCalendarDots();
+          const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
+          if (selectedCell && state.dayMenuDate === date) {
+            await openDayMenu(selectedCell, date);
+          }
+        } catch (error) {
+          showToast(error.message, 'error');
+          btn.disabled = false;
+          btn.classList.remove('is-busy');
+          btn.textContent = originalText;
+        }
+      });
+    });
   } catch (error) {
     menu.innerHTML = `
       <div class="day-menu-header">
@@ -520,6 +582,14 @@ function toTime12(time24 = '09:00') {
   const suffix = h >= 12 ? 'PM' : 'AM';
   const hh = ((h + 11) % 12) + 1;
   return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function toTimeCompact(time24 = '09:00') {
+  const [h, m] = String(time24).split(':').map(Number);
+  const suffix = h >= 12 ? ' PM' : ' AM';
+  const hh = ((h + 11) % 12) + 1;
+  const mm = m === 0 ? '' : `:${String(m).padStart(2, '0')}`;
+  return `${hh}${mm}${suffix}`;
 }
 
 function addMinutesToTime(time24 = '09:00', durationMinutes = 0) {
@@ -865,6 +935,13 @@ function bindHeaderButtons() {
   document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
 }
 
+function renderNotificationDots(count = 0) {
+  const hasNotifications = Number(count) > 0;
+  document.querySelectorAll('[data-notification-dot]').forEach((dot) => {
+    dot.classList.toggle('hidden', !hasNotifications);
+  });
+}
+
 function bindModalControls() {
   document.getElementById('new-appointment-overlay')?.addEventListener('click', () => closeModal('new-appointment'));
   document
@@ -905,11 +982,23 @@ function renderCalendarGrid() {
     return `
       <div class="${classes.join(' ')}" data-day="${day}" aria-label="${day}">
         <span class="day-number">${day}</span>
-        <span class="day-booking-badge" aria-hidden="true"></span>
+        <div class="day-events-preview" aria-hidden="true"></div>
       </div>`;
   }).join('');
 
   grid.innerHTML = `${headers}${empties}${days}`;
+}
+
+function updateCalendarExpandedState() {
+  const calendarCard = document.querySelector('.calendar-card');
+  const grid = calendarCard?.closest('.dashboard-grid');
+  const btn = document.getElementById('btn-calendar-expand');
+  if (!grid || !btn) return;
+
+  grid.classList.toggle('calendar-expanded', state.calendarExpanded);
+  btn.querySelector('.expand-icon')?.classList.toggle('hidden', state.calendarExpanded);
+  btn.querySelector('.collapse-icon')?.classList.toggle('hidden', !state.calendarExpanded);
+  setStoredValue('calendarExpanded', state.calendarExpanded);
 }
 
 function bindCalendarNav() {
@@ -919,6 +1008,13 @@ function bindCalendarNav() {
     renderCalendarGrid();
   };
   setMonth();
+
+  document.getElementById('btn-calendar-expand')?.addEventListener('click', () => {
+    state.calendarExpanded = !state.calendarExpanded;
+    updateCalendarExpandedState();
+  });
+
+  updateCalendarExpandedState();
 
   document.getElementById('calendar-prev')?.addEventListener('click', async () => {
     closeDayMenu();
@@ -1199,10 +1295,8 @@ function renderStats(stats = {}) {
   document.getElementById('stat-today').textContent = stats.today ?? 0;
   document.getElementById('stat-week').textContent = stats.week ?? 0;
   document.getElementById('stat-pending').textContent = stats.pending ?? 0;
-
-  document.querySelectorAll('[data-notification-dot]').forEach((dot) => {
-    dot.classList.toggle('hidden', Number(stats.pending || 0) <= 0);
-  });
+  state.unreadNotifications = Number(stats.pending || 0);
+  renderNotificationDots(state.unreadNotifications);
 }
 
 async function refreshCalendarDots() {
@@ -1213,28 +1307,30 @@ async function refreshCalendarDots() {
   const monthAppointments = appointments.filter((a) => {
     const status = String(a.status || '').toLowerCase();
     return (
+      status !== 'completed' &&
+      status !== 'cancelled' &&
       typeof a.date === 'string' &&
-      a.date.startsWith(`${yyyy}-${mm}-`) &&
-      status !== 'completed'
+      a.date.startsWith(`${yyyy}-${mm}-`)
     );
   });
-  const dayCounts = new Map();
-  const dayTypes = new Map();
+  const dayAppointments = new Map();
 
   monthAppointments.forEach((a) => {
     const day = Number(a.date.slice(8, 10));
-    dayCounts.set(day, (dayCounts.get(day) || 0) + 1);
-    if (!dayTypes.has(day)) dayTypes.set(day, []);
-    if (dayTypes.get(day).length < 2 && a.typeName) dayTypes.get(day).push(a.typeName);
+    if (!dayAppointments.has(day)) dayAppointments.set(day, []);
+    dayAppointments.get(day).push(a);
   });
 
   document.querySelectorAll('.day-cell:not(.empty)').forEach((cell) => {
     const day = Number(cell.dataset.day);
-    const count = dayCounts.get(day) || 0;
-    const badge = cell.querySelector('.day-booking-badge');
-    const typeList = dayTypes.get(day) || [];
+    const appts = dayAppointments.get(day) || [];
+    const count = appts.length;
+    const preview = cell.querySelector('.day-events-preview');
     const labelParts = [`${count} booking${count === 1 ? '' : 's'}`];
-    if (typeList.length) labelParts.push(typeList.join(', '));
+
+    if (appts.length) {
+      labelParts.push(appts.map(a => a.typeName).filter(Boolean).join(', '));
+    }
 
     cell.classList.toggle('has-event', count > 0);
     cell.classList.toggle('event-low', count > 0 && count <= 2);
@@ -1243,9 +1339,18 @@ async function refreshCalendarDots() {
     cell.setAttribute('aria-label', count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`);
     cell.title = count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`;
 
-    if (badge) {
-      badge.textContent = count > 0 ? String(count) : '';
+    if (preview) {
+      preview.innerHTML = appts.slice(0, 3).map(a =>
+        `<div class="cal-event" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
+           <span class="cal-event-time">${toTimeCompact(a.time)}</span>
+           <span class="cal-event-name">${escapeHtml(a.clientName)}</span>
+         </div>`
+      ).join('');
+      if (count > 3) {
+        preview.innerHTML += `<div class="cal-event-more">+${count - 3} more</div>`;
+      }
     }
+
   });
 }
 
@@ -1259,22 +1364,67 @@ function renderTimeline(appointments = []) {
 
   root.innerHTML = appointments
     .map(
-      (a) => `
-      <div class="timeline-item">
-        <div class="time">${toTime12(a.time)} - ${toTime12(addMinutesToTime(a.time, a.durationMinutes))}</div>
-        <div class="appointment-card ${escapeHtml(a.typeClass)}">
-          <div class="appointment-type">${escapeHtml(a.typeName)}</div>
-          <h3>${escapeHtml(a.title || a.typeName)}</h3>
-          <p>${escapeHtml(a.clientName)}</p>
-          <div class="appointment-meta">
-            <span>📍 ${escapeHtml(a.location)}</span>
-            <span>⏱ ${a.durationMinutes} min</span>
-            <span>• ${escapeHtml(a.status)}</span>
+      (a) => {
+        const statusClass = `status-${(a.status || 'pending').toLowerCase()}`;
+        return `
+      <div class="timeline-item" data-id="${a.id}">
+        <div class="time-column">
+          <div class="time-start">${toTime12(a.time)}</div>
+          <div class="time-end">${toTime12(addMinutesToTime(a.time, a.durationMinutes))}</div>
+        </div>
+        <div class="appointment-card ${escapeHtml(a.typeClass || '')}" data-id="${a.id}">
+          <div class="appointment-card-header">
+            <span class="appointment-type-tag">${escapeHtml(a.typeName)}</span>
+            <span class="status-badge ${statusClass}">${escapeHtml(a.status)}</span>
+          </div>
+          <div class="appointment-card-body">
+            <h3 class="client-name">${escapeHtml(a.clientName)}</h3>
+            <p class="appointment-title">${escapeHtml(a.title || a.typeName)}</p>
+          </div>
+          <div class="appointment-card-footer">
+            <div class="appointment-meta">
+              <span>📍 ${escapeHtml(a.location)}</span>
+              <span>⏱ ${a.durationMinutes} min</span>
+            </div>
+            <div class="appointment-actions">
+              ${a.clientEmail ? `<button type="button" class="action-btn email-btn" title="Send Email">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              </button>` : ''}
+              <button type="button" class="action-btn edit-btn" title="Edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
-      </div>`
+      </div>`;
+      }
     )
     .join('');
+
+  root.querySelectorAll('.email-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.timeline-item').dataset.id;
+      openEmailComposerMenu(id);
+    });
+  });
+
+  root.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.timeline-item').dataset.id;
+      const appointment = appointments.find(appt => String(appt.id) === String(id));
+      if (appointment) startEditAppointment(appointment);
+    });
+  });
+
+  root.querySelectorAll('.appointment-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const id = card.dataset.id;
+      const appointment = appointments.find(appt => String(appt.id) === String(id));
+      if (appointment) startEditAppointment(appointment);
+    });
+  });
 }
 
 function renderCompletedAppointments(appointments = []) {
@@ -1290,12 +1440,12 @@ function renderCompletedAppointments(appointments = []) {
       (a) => `
       <div class="completed-item">
         <div class="completed-item-main">
-          <strong>${escapeHtml(a.typeName || a.title || 'Appointment')}</strong>
-          <span>${escapeHtml(a.clientName || 'Client')}</span>
+          <strong class="client-name">${escapeHtml(a.clientName || 'Client')}</strong>
+          <span class="appointment-type-tag">${escapeHtml(a.typeName || a.title || 'Appointment')}</span>
         </div>
         <div class="completed-item-meta">
-          <span>${escapeHtml(a.date || '')}</span>
-          <span>${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</span>
+          <span>${escapeHtml(formatScheduleDate(a.date))}</span>
+          <span class="time-range">${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</span>
         </div>
       </div>`
     )
@@ -1408,22 +1558,32 @@ function renderAppointmentsTable(appointments = []) {
 
   root.innerHTML = appointments
     .map(
-      (a) => `
+      (a) => {
+        const statusClass = `status-${(a.status || 'pending').toLowerCase()}`;
+        return `
       <div class="data-row" data-id="${a.id}">
-        <div><strong>${escapeHtml(a.clientName)}</strong><div class="pill">${escapeHtml(a.typeName)}</div></div>
-        <div>${escapeHtml(formatScheduleDate(a.date))}</div>
-        <div>${toTime12(a.time)}</div>
-        <div><span class="pill">${escapeHtml(a.status)}</span></div>
+        <div>
+          <strong class="client-name">${escapeHtml(a.clientName)}</strong>
+          <div class="appointment-type-tag">${escapeHtml(a.typeName)}</div>
+        </div>
+        <div class="appointment-date-cell">${escapeHtml(formatScheduleDate(a.date))}</div>
+        <div class="appointment-time-cell">${toTime12(a.time)}</div>
+        <div><span class="status-badge ${statusClass}">${escapeHtml(a.status)}</span></div>
         <div class="row-actions">
           ${a.clientEmail
-          ? '<button class="btn-secondary btn-email" type="button">Email</button>'
-          : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
-        }
+            ? '<button class="btn-secondary btn-email" type="button" title="Send Email">Email</button>'
+            : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
+          }
+          ${a.status === 'pending'
+            ? '<button class="btn-secondary btn-confirm-booking" type="button">Confirm</button>'
+            : ''
+          }
           <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>Complete</button>
           <button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
           <button class="btn-secondary btn-delete" type="button">Delete</button>
         </div>
-      </div>`
+      </div>`;
+      }
     )
     .join('');
 
@@ -1454,6 +1614,40 @@ function renderAppointmentsTable(appointments = []) {
         await loadDashboard();
       } catch (error) {
         showToast(error.message, 'error');
+      }
+    });
+  });
+
+  root.querySelectorAll('.btn-confirm-booking').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      const id = btn.closest('.data-row')?.dataset.id;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.classList.add('is-busy');
+      btn.textContent = 'Confirming...';
+      try {
+        const result = await queueAwareMutation(`/api/appointments/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'confirmed' })
+        }, {
+          allowOfflineQueue: true,
+          description: 'Appointment confirmation'
+        });
+        if (result.queued) {
+          btn.classList.remove('is-busy');
+          btn.textContent = 'Queued';
+          return;
+        }
+        showToast('Appointment confirmed!', 'success');
+        await loadAppointmentsTable();
+        await loadDashboard();
+        await refreshCalendarDots();
+      } catch (error) {
+        showToast(error.message, 'error');
+        btn.disabled = false;
+        btn.classList.remove('is-busy');
+        btn.textContent = originalText;
       }
     });
   });
@@ -1781,7 +1975,7 @@ function updateAccountUi() {
     }
   });
   const sidebarAuth = document.getElementById('nav-logout-sidebar');
-  
+
   const logoutSvg = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -2085,7 +2279,7 @@ async function init() {
     await loadSettings();
     await flushOfflineMutationQueue();
     state.apiOnline = true;
-    
+
     let savedView = null;
     if (typeof localStorage !== 'undefined') {
       try {

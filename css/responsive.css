@@ -1,7 +1,8 @@
 /* ── Responsive ── */
 @media (max-width: 1280px) {
     .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-sm);
     }
 
     .dashboard-grid,
@@ -186,27 +187,38 @@
     }
 
     .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: var(--spacing-sm);
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
         margin-bottom: var(--spacing-md);
     }
 
     .stat-card {
-        padding: var(--spacing-md);
+        border-radius: var(--radius-md);
+    }
+
+    .stat-accent {
+        width: 3px;
+    }
+
+    .stat-body {
+        padding: 6px 8px;
     }
 
     .stat-icon {
-        width: 40px;
-        height: 40px;
-    }
-
-    .stat-icon svg {
-        width: 18px;
-        height: 18px;
+        display: none;
     }
 
     .stat-value {
-        font-size: 1.4rem;
+        font-size: 1.15rem;
+    }
+
+    .stat-label {
+        font-size: 0.6rem;
+        letter-spacing: 0.06em;
+    }
+
+    .stat-hint {
+        display: none;
     }
 
     .card-header {
@@ -239,15 +251,6 @@
 
     .type-selector {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .day-booking-badge {
-        min-width: 14px;
-        height: 14px;
-        font-size: 0.55rem;
-        top: 2px;
-        right: 2px;
-        padding: 0 3px;
     }
 
     /* Modal adjustments */
@@ -309,6 +312,7 @@
         grid-template-columns: 1fr;
         gap: 8px;
         padding: 10px;
+        min-width: 0;
     }
 
     #appointments-table .data-row>div:nth-child(2),

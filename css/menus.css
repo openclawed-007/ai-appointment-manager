@@ -164,6 +164,32 @@
     cursor: pointer;
 }
 
+.day-menu-confirm {
+    border: 1px solid rgba(92, 184, 122, 0.35);
+    background: rgba(92, 184, 122, 0.12);
+    color: var(--success);
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform var(--transition-fast), opacity var(--transition-fast), border-color var(--transition-fast);
+}
+
+.day-menu-confirm:hover {
+    border-color: rgba(92, 184, 122, 0.55);
+}
+
+.day-menu-confirm:active {
+    transform: translateY(1px);
+}
+
+.day-menu-confirm:disabled,
+.day-menu-confirm.is-busy {
+    opacity: 0.6;
+    cursor: wait;
+}
+
 .btn-cancel {
     background: rgba(226, 168, 75, 0.08);
     color: var(--warning);

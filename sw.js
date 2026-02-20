@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'intellischedule-static-v2';
-const RUNTIME_CACHE = 'intellischedule-runtime-v1';
+const STATIC_CACHE = 'intellischedule-static-v3';
+const RUNTIME_CACHE = 'intellischedule-runtime-v2';
 
 const APP_SHELL = [
   '/',
@@ -76,20 +76,19 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => {
-          if (url.pathname === '/favicon.ico') {
-            return caches.match('/favicon.ico').then((res) => res || new Response('', { status: 204 }));
-          }
-          return new Response('', { status: 503 });
-        });
-    })
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (url.pathname === '/favicon.ico') {
+          return (await caches.match('/favicon.ico')) || new Response('', { status: 204 });
+        }
+        return new Response('', { status: 503 });
+      })
   );
 });

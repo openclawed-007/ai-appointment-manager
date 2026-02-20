@@ -24,7 +24,7 @@
     grid-template-columns: 1.2fr 1fr 1fr 1fr auto;
     gap: 12px;
     align-items: center;
-    padding: 12px;
+    padding: 8px 12px;
     border-radius: var(--radius-md);
 }
 
@@ -48,7 +48,7 @@
 
 /* Keep appointment rows aligned across all entries */
 #appointments-table .data-row {
-    grid-template-columns: minmax(180px, 1.3fr) minmax(170px, 1fr) 110px 110px minmax(330px, 1.2fr);
+    grid-template-columns: minmax(160px, 1.25fr) minmax(140px, 1fr) 92px 96px;
 }
 
 #appointments-table .data-row>div {
@@ -62,12 +62,38 @@
 }
 
 #appointments-table .row-actions {
+    grid-column: 1 / -1;
     justify-content: flex-end;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    row-gap: 6px;
 }
 
 #appointments-table .row-actions .btn-secondary {
     white-space: nowrap;
+    padding: 7px 12px;
+    font-size: 0.76rem;
+}
+
+#appointments-table .row-actions .btn-confirm-booking {
+    border-color: rgba(92, 184, 122, 0.35);
+    background: rgba(92, 184, 122, 0.12);
+    color: var(--success);
+    font-weight: 700;
+}
+
+#appointments-table .row-actions .btn-confirm-booking:hover {
+    border-color: rgba(92, 184, 122, 0.55);
+    background: rgba(92, 184, 122, 0.2);
+    color: #8ed3a6;
+}
+
+#appointments-table .row-actions .btn-confirm-booking:active {
+    transform: translateY(1px);
+}
+
+#appointments-table .row-actions .btn-confirm-booking.is-busy {
+    opacity: 0.65;
+    cursor: wait;
 }
 
 /* ── Booking Page ── */

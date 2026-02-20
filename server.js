@@ -1275,18 +1275,20 @@ async function createAppointment(payload = {}) {
     time,
     resolvedDuration,
     location || type?.location_mode || 'office',
-    notes || null,
-    source || 'owner'
+    notes || null
   ];
+
+  const resolvedStatus = (source === 'public') ? 'pending' : 'confirmed';
+  const resolvedSource = source || 'owner';
 
   let id;
   if (USE_POSTGRES) {
     const insert = await pgPool.query(
       `INSERT INTO appointments
        (business_id, type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'confirmed',$11)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING id`,
-      params
+      [...params, resolvedStatus, resolvedSource]
     );
     id = insert.rows[0].id;
   } else {
@@ -1294,9 +1296,9 @@ async function createAppointment(payload = {}) {
       .prepare(
         `INSERT INTO appointments
          (business_id, type_id, title, client_name, client_email, date, time, duration_minutes, location, notes, status, source)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(...params);
+      .run(...params, resolvedStatus, resolvedSource);
     id = result.lastInsertRowid;
   }
 
@@ -1315,36 +1317,52 @@ async function createAppointment(payload = {}) {
   const appointment = rowToAppointment(row);
   const settings = await getSettings(scopedBusinessId);
 
-  const clientText = `Hi ${appointment.clientName},\n\nYour ${appointment.typeName} is confirmed for ${appointment.date} at ${fmtTime(
-    appointment.time
-  )}.\n\nLocation: ${appointment.location}\nDuration: ${appointment.durationMinutes} minutes\n\nThanks,\n${settings.business_name}`;
+  const isPublic = appointment.source === 'public';
+
+  const clientText = isPublic
+    ? `Hi ${appointment.clientName},\n\nYour ${appointment.typeName} request for ${appointment.date} at ${fmtTime(
+      appointment.time
+    )} has been received and is awaiting confirmation from the business.\n\nLocation: ${appointment.location}\nDuration: ${appointment.durationMinutes} minutes\n\nYou will be notified once it is confirmed.\n\nThanks,\n${settings.business_name}`
+    : `Hi ${appointment.clientName},\n\nYour ${appointment.typeName} is confirmed for ${appointment.date} at ${fmtTime(
+      appointment.time
+    )}.\n\nLocation: ${appointment.location}\nDuration: ${appointment.durationMinutes} minutes\n\nThanks,\n${settings.business_name}`;
   const clientHtml = buildBrandedEmailHtml({
     businessName: settings.business_name,
-    title: 'Appointment Confirmed',
+    title: isPublic ? 'Booking Received — Awaiting Confirmation' : 'Appointment Confirmed',
     subtitle: appointment.typeName,
-    message: `Hi ${appointment.clientName},\n\nYour appointment is confirmed.`,
+    message: isPublic
+      ? `Hi ${appointment.clientName},\n\nYour booking request has been received and is pending confirmation.`
+      : `Hi ${appointment.clientName},\n\nYour appointment is confirmed.`,
     details: [
       { label: 'Service', value: appointment.typeName },
       { label: 'Date', value: appointment.date },
       { label: 'Time', value: fmtTime(appointment.time) },
       { label: 'Duration', value: `${appointment.durationMinutes} minutes` },
-      { label: 'Location', value: appointment.location }
+      { label: 'Location', value: appointment.location },
+      { label: 'Status', value: isPublic ? 'Pending Confirmation' : 'Confirmed' }
     ]
   });
 
-  const ownerText = `New booking received in ${settings.business_name}\n\nType: ${appointment.typeName}\nClient: ${appointment.clientName}\nWhen: ${appointment.date} ${fmtTime(
-    appointment.time
-  )}\nSource: ${appointment.source}`;
+  const ownerText = isPublic
+    ? `New booking request in ${settings.business_name} — ACTION REQUIRED\n\nType: ${appointment.typeName}\nClient: ${appointment.clientName}\nWhen: ${appointment.date} ${fmtTime(
+      appointment.time
+    )}\nSource: ${appointment.source}\n\nLog in to your dashboard to confirm or decline this booking.`
+    : `New booking received in ${settings.business_name}\n\nType: ${appointment.typeName}\nClient: ${appointment.clientName}\nWhen: ${appointment.date} ${fmtTime(
+      appointment.time
+    )}\nSource: ${appointment.source}`;
   const ownerHtml = buildBrandedEmailHtml({
     businessName: settings.business_name,
-    title: 'New Booking Alert',
+    title: isPublic ? 'New Booking Request — Action Required' : 'New Booking Alert',
     subtitle: 'Owner Notification',
-    message: 'A new booking has been created.',
+    message: isPublic
+      ? 'A new booking request needs your approval. Log in to confirm or decline.'
+      : 'A new booking has been created.',
     details: [
       { label: 'Service', value: appointment.typeName },
       { label: 'Client', value: appointment.clientName },
       { label: 'When', value: `${appointment.date} ${fmtTime(appointment.time)}` },
-      { label: 'Source', value: appointment.source }
+      { label: 'Source', value: appointment.source },
+      ...(isPublic ? [{ label: 'Status', value: 'Pending Your Approval' }] : [])
     ]
   });
 
@@ -1352,7 +1370,9 @@ async function createAppointment(payload = {}) {
     appointment.clientEmail
       ? sendEmail({
         to: appointment.clientEmail,
-        subject: `${settings.business_name}: Appointment confirmed`,
+        subject: isPublic
+          ? `${settings.business_name}: Booking received — awaiting confirmation`
+          : `${settings.business_name}: Appointment confirmed`,
         text: clientText,
         html: clientHtml
       })
