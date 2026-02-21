@@ -131,18 +131,25 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-xs);
 }
 
 .booking-logo {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-sm);
+    gap: calc(var(--spacing-xs) + 2px);
+    margin-bottom: 0;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(0, 0, 0, 0.04) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        inset 0 -2px 5px rgba(0, 0, 0, 0.22);
 }
 
 .booking-logo .logo-icon {
-    width: clamp(110px, 26vw, 150px);
+    width: 42px;
     height: 42px;
     border-radius: 0;
     flex: 0 0 auto;
@@ -156,6 +163,8 @@
 
 .booking-logo .logo-text {
     font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
 
 .booking-header h1 {
@@ -163,11 +172,13 @@
     font-size: clamp(1.3rem, 4vw, 1.5rem);
     font-weight: 700;
     letter-spacing: -0.02em;
+    margin: 0;
 }
 
 .booking-header p {
     color: var(--text-secondary);
     font-size: clamp(0.82rem, 2vw, 0.875rem);
+    margin: 2px 0 0;
 }
 
 .booking-form {

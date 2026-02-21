@@ -66,6 +66,15 @@
     max-height: 100%;
     object-fit: contain;
     display: block;
+    transition: filter 160ms ease;
+}
+
+[data-theme="dark"] .sidebar .logo-icon img {
+    filter: none;
+}
+
+[data-theme="light"] .sidebar .logo-icon img {
+    filter: brightness(0) saturate(100%);
 }
 
 .logo-notification-btn {
