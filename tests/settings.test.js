@@ -30,6 +30,7 @@ let db;
 let boot;
 const adminEmail    = 'settings-owner@example.com';
 const adminPassword = 'SettingsTest123!';
+const appModule = require('../app.js');
 
 beforeAll(async () => {
   fs.mkdirSync(testDbDir, { recursive: true });
@@ -228,7 +229,11 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
   it('date range filter: from only excludes earlier appointments', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    const filtered = all.filter((a) => a.date >= '2026-01-01');
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      from: '2026-01-01',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(filtered.every((a) => a.date >= '2026-01-01')).toBe(true);
     expect(filtered.some((a) => a.date < '2026-01-01')).toBe(false);
     // Should include Diana (2026-01-05), Evan (2026-02-01), Fiona (2026-02-15)
@@ -240,7 +245,11 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
   it('date range filter: to only excludes later appointments', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    const filtered = all.filter((a) => a.date <= '2025-09-30');
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      to: '2025-09-30',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(filtered.every((a) => a.date <= '2025-09-30')).toBe(true);
     // Should include Alice (2025-08-10) and Bob (2025-09-15), not Charlie (2025-10-20)
     const names = filtered.map((a) => a.clientName);
@@ -254,7 +263,12 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
     const all = res.body.appointments;
     const from = '2025-09-01';
     const to   = '2026-01-31';
-    const filtered = all.filter((a) => a.date >= from && a.date <= to);
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      from,
+      to,
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     const names = filtered.map((a) => a.clientName);
     // Bob (2025-09-15), Charlie (2025-10-20), Diana (2026-01-05)
     expect(names).toContain('Bob');
@@ -268,7 +282,10 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
   it('type filter: selecting only typeIdA excludes typeIdB appointments', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    const filtered = all.filter((a) => a.typeId === typeIdA);
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      selectedTypeIds: [typeIdA],
+      totalTypes: 2
+    });
     const names = filtered.map((a) => a.clientName);
     // Alice, Bob, Evan, Fiona are typeIdA; Charlie, Diana are typeIdB
     expect(names).toContain('Alice');
@@ -280,7 +297,10 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
   it('type filter: selecting only typeIdB excludes typeIdA appointments', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    const filtered = all.filter((a) => a.typeId === typeIdB);
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      selectedTypeIds: [typeIdB],
+      totalTypes: 2
+    });
     const names = filtered.map((a) => a.clientName);
     expect(names).toContain('Charlie');
     expect(names).toContain('Diana');
@@ -292,16 +312,28 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
 
-    const completed = all.filter((a) => a.status === 'completed');
+    const completed = appModule.filterAppointmentsForExport(all, {
+      statusFilter: 'completed',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(completed.every((a) => a.status === 'completed')).toBe(true);
     expect(completed.map((a) => a.clientName)).toContain('Bob');
     expect(completed.map((a) => a.clientName)).toContain('Fiona');
 
-    const pending = all.filter((a) => a.status === 'pending');
+    const pending = appModule.filterAppointmentsForExport(all, {
+      statusFilter: 'pending',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(pending.every((a) => a.status === 'pending')).toBe(true);
     expect(pending.map((a) => a.clientName)).toContain('Diana');
 
-    const cancelled = all.filter((a) => a.status === 'cancelled');
+    const cancelled = appModule.filterAppointmentsForExport(all, {
+      statusFilter: 'cancelled',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(cancelled.every((a) => a.status === 'cancelled')).toBe(true);
     expect(cancelled.map((a) => a.clientName)).toContain('Evan');
   });
@@ -310,11 +342,13 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
 
-    // Date: 2025-08-01 – 2025-12-31, Type: Haircut (typeIdA), Status: confirmed
-    const filtered = all
-      .filter((a) => a.date >= '2025-08-01' && a.date <= '2025-12-31')
-      .filter((a) => a.typeId === typeIdA)
-      .filter((a) => a.status === 'confirmed');
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      from: '2025-08-01',
+      to: '2025-12-31',
+      statusFilter: 'confirmed',
+      selectedTypeIds: [typeIdA],
+      totalTypes: 2
+    });
 
     // Only Alice matches (typeIdA, 2025-08-10, confirmed)
     expect(filtered).toHaveLength(1);
@@ -324,17 +358,23 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
   it('empty date range with all types returns full dataset', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    // No filters applied — should have at least the 6 seeded appointments
-    expect(all.length).toBeGreaterThanOrEqual(6);
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
+    // No filters applied (all types selected) — should include all seeded appointments
+    expect(filtered.length).toBeGreaterThanOrEqual(6);
   });
 
   it('non-matching filter combination returns empty result', async () => {
     const res = await agent.get('/api/appointments');
     const all = res.body.appointments;
-    // Filter to a date range where no appointments exist AND wrong status
-    const filtered = all
-      .filter((a) => a.date >= '2030-01-01')
-      .filter((a) => a.status === 'confirmed');
+    const filtered = appModule.filterAppointmentsForExport(all, {
+      from: '2030-01-01',
+      statusFilter: 'confirmed',
+      selectedTypeIds: [typeIdA, typeIdB],
+      totalTypes: 2
+    });
     expect(filtered).toHaveLength(0);
   });
 });
@@ -344,34 +384,12 @@ describe('Filtered export — data pipeline via /api/appointments', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('CSV export helpers', () => {
-  // Replicate the csvEscape and column logic from app.js for unit testing
-  function csvEscape(val) {
-    if (val == null) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  }
-
-  const CSV_COLUMNS = [
-    'id', 'typeName', 'clientName', 'clientEmail',
-    'date', 'time', 'durationMinutes', 'location',
-    'status', 'notes', 'source', 'createdAt'
-  ];
-
-  const CSV_HEADERS = [
-    'ID', 'Type', 'Client Name', 'Client Email',
-    'Date', 'Time', 'Duration (min)', 'Location',
-    'Status', 'Notes', 'Source', 'Created At'
-  ];
-
-  function buildCsvLines(rows) {
-    return [
-      CSV_HEADERS.map(csvEscape).join(','),
-      ...rows.map((row) => CSV_COLUMNS.map((col) => csvEscape(row[col])).join(','))
-    ].join('\r\n');
-  }
+  const {
+    csvEscape,
+    buildCsvLines,
+    EXPORT_CSV_COLUMNS: CSV_COLUMNS,
+    EXPORT_CSV_HEADERS: CSV_HEADERS
+  } = appModule;
 
   it('header row contains all expected column names', () => {
     const csv = buildCsvLines([]);
@@ -460,7 +478,39 @@ describe('CSV export helpers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. extractSwatchColour helper logic
+// 4. Filtered export metadata helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Filtered export metadata helpers', () => {
+  it('buildFilteredExportFilename creates stable slug+date name', () => {
+    const fixedNow = new Date('2026-07-04T12:34:56.000Z');
+    expect(appModule.buildFilteredExportFilename('my-shop', fixedNow)).toBe('my-shop-export-2026-07-04');
+    expect(appModule.buildFilteredExportFilename('', fixedNow)).toBe('business-export-2026-07-04');
+  });
+
+  it('buildFilteredExportJsonPayload includes filters, count, and exportedAt', () => {
+    const fixedNow = new Date('2026-07-04T12:34:56.000Z');
+    const rows = [{ id: 1, clientName: 'Alice' }];
+    const payload = appModule.buildFilteredExportJsonPayload(
+      rows,
+      { from: '2026-07-01', to: '2026-07-31', status: 'confirmed', typeIds: [11, 12] },
+      fixedNow
+    );
+
+    expect(payload.exportedAt).toBe('2026-07-04T12:34:56.000Z');
+    expect(payload.count).toBe(1);
+    expect(payload.appointments).toEqual(rows);
+    expect(payload.filters).toEqual({
+      from: '2026-07-01',
+      to: '2026-07-31',
+      status: 'confirmed',
+      typeIds: [11, 12]
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. extractSwatchColour helper logic
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('extractSwatchColour', () => {
@@ -506,7 +556,7 @@ describe('extractSwatchColour', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. index.html structure — three-section settings layout
+// 6. index.html structure — three-section settings layout
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('index.html — settings page structure', () => {
@@ -699,12 +749,10 @@ describe('index.html — settings page structure', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. app.js exported helpers
+// 7. app.js exported helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('app.js exported helpers', () => {
-  const appModule = require('../app.js');
-
   it('exports toTime12', () => {
     expect(typeof appModule.toTime12).toBe('function');
   });
@@ -730,6 +778,19 @@ describe('app.js exported helpers', () => {
     expect(Array.isArray(appModule.state.types)).toBe(true);
   });
 
+  it('exports export-filter helpers', () => {
+    expect(typeof appModule.filterAppointmentsForExport).toBe('function');
+    expect(typeof appModule.buildFilteredExportFilename).toBe('function');
+    expect(typeof appModule.buildFilteredExportJsonPayload).toBe('function');
+  });
+
+  it('exports CSV helpers and constants', () => {
+    expect(typeof appModule.csvEscape).toBe('function');
+    expect(typeof appModule.buildCsvLines).toBe('function');
+    expect(Array.isArray(appModule.EXPORT_CSV_COLUMNS)).toBe(true);
+    expect(Array.isArray(appModule.EXPORT_CSV_HEADERS)).toBe(true);
+  });
+
   it('escapeHtml handles all injection vectors', () => {
     const { escapeHtml } = appModule;
     expect(escapeHtml('<script>alert(1)</script>')).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
@@ -741,7 +802,7 @@ describe('app.js exported helpers', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. CSS partial — settings.css exists and contains expected rules
+// 8. CSS partial — settings.css exists and contains expected rules
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('css/settings.css', () => {

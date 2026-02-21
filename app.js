@@ -2146,39 +2146,80 @@ function getSelectedExportFormat() {
 
 // ── CSV download helper ───────────────────────────────────────────────────────
 
+const EXPORT_CSV_COLUMNS = [
+  'id', 'typeName', 'clientName', 'clientEmail',
+  'date', 'time', 'durationMinutes', 'location',
+  'status', 'notes', 'source', 'createdAt'
+];
+
+const EXPORT_CSV_HEADERS = [
+  'ID', 'Type', 'Client Name', 'Client Email',
+  'Date', 'Time', 'Duration (min)', 'Location',
+  'Status', 'Notes', 'Source', 'Created At'
+];
+
+function csvEscape(val) {
+  if (val == null) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function buildCsvLines(rows = []) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  return [
+    EXPORT_CSV_HEADERS.map(csvEscape).join(','),
+    ...safeRows.map((row) => EXPORT_CSV_COLUMNS.map((col) => csvEscape(row?.[col])).join(','))
+  ].join('\r\n');
+}
+
+function filterAppointmentsForExport(appointments = [], options = {}) {
+  const safeAppointments = Array.isArray(appointments) ? appointments : [];
+  const from = options.from || '';
+  const to = options.to || '';
+  const statusFilter = options.statusFilter || '';
+  const selectedTypeIds = Array.isArray(options.selectedTypeIds) ? options.selectedTypeIds.map(Number) : [];
+  const totalTypes = Number(options.totalTypes) || 0;
+
+  let filtered = safeAppointments;
+  if (from) filtered = filtered.filter((a) => a.date >= from);
+  if (to) filtered = filtered.filter((a) => a.date <= to);
+  if (statusFilter) filtered = filtered.filter((a) => a.status === statusFilter);
+  if (totalTypes > 0 && selectedTypeIds.length < totalTypes) {
+    filtered = filtered.filter((a) => a.typeId != null && selectedTypeIds.includes(Number(a.typeId)));
+  }
+  return filtered;
+}
+
+function buildFilteredExportFilename(slug, now = new Date()) {
+  const base = slug || 'business';
+  const date = now.toISOString().slice(0, 10);
+  return `${base}-export-${date}`;
+}
+
+function buildFilteredExportJsonPayload(filteredAppointments, filters, now = new Date()) {
+  const safeFilters = filters || {};
+  return {
+    exportedAt: now.toISOString(),
+    filters: {
+      from: safeFilters.from || null,
+      to: safeFilters.to || null,
+      status: safeFilters.status || null,
+      typeIds: Array.isArray(safeFilters.typeIds) ? safeFilters.typeIds : []
+    },
+    count: filteredAppointments.length,
+    appointments: filteredAppointments
+  };
+}
+
 function triggerCsvDownload(filename, rows) {
   if (!rows || rows.length === 0) {
     showToast('No appointments matched your filters.', 'info');
     return;
   }
-
-  const CSV_COLUMNS = [
-    'id', 'typeName', 'clientName', 'clientEmail',
-    'date', 'time', 'durationMinutes', 'location',
-    'status', 'notes', 'source', 'createdAt'
-  ];
-
-  const CSV_HEADERS = [
-    'ID', 'Type', 'Client Name', 'Client Email',
-    'Date', 'Time', 'Duration (min)', 'Location',
-    'Status', 'Notes', 'Source', 'Created At'
-  ];
-
-  function csvEscape(val) {
-    if (val == null) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  }
-
-  const lines = [
-    CSV_HEADERS.map(csvEscape).join(','),
-    ...rows.map((row) => CSV_COLUMNS.map((col) => csvEscape(row[col])).join(','))
-  ];
-
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([buildCsvLines(rows)], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -2205,43 +2246,31 @@ async function runFilteredExport() {
     // Fetch all appointments from the server
     const { appointments: all } = await api('/api/appointments');
 
-    // Apply filters
-    let filtered = all;
-
-    if (from) {
-      filtered = filtered.filter((a) => a.date >= from);
-    }
-    if (to) {
-      filtered = filtered.filter((a) => a.date <= to);
-    }
-    if (statusFilter) {
-      filtered = filtered.filter((a) => a.status === statusFilter);
-    }
-
-    // Type filter — only apply if types exist and a selection has been made
-    const totalTypes = (state.types || []).length;
-    if (totalTypes > 0 && selectedTypeIds.length < totalTypes) {
-      filtered = filtered.filter((a) => a.typeId != null && selectedTypeIds.includes(Number(a.typeId)));
-    }
+    const filtered = filterAppointmentsForExport(all, {
+      from,
+      to,
+      statusFilter,
+      selectedTypeIds,
+      totalTypes: (state.types || []).length
+    });
 
     if (filtered.length === 0) {
       showToast('No appointments matched the selected filters.', 'info');
       return;
     }
 
-    const slug = state.currentBusiness?.slug || 'business';
-    const date = new Date().toISOString().slice(0, 10);
-    const filename = `${slug}-export-${date}`;
+    const now = new Date();
+    const filename = buildFilteredExportFilename(state.currentBusiness?.slug, now);
 
     if (format === 'csv') {
       triggerCsvDownload(`${filename}.csv`, filtered);
     } else {
-      triggerJsonDownload(`${filename}.json`, {
-        exportedAt: new Date().toISOString(),
-        filters: { from: from || null, to: to || null, status: statusFilter || null, typeIds: selectedTypeIds },
-        count: filtered.length,
-        appointments: filtered
-      });
+      const payload = buildFilteredExportJsonPayload(
+        filtered,
+        { from, to, status: statusFilter, typeIds: selectedTypeIds },
+        now
+      );
+      triggerJsonDownload(`${filename}.json`, payload);
     }
 
     showToast(`Exported ${filtered.length} appointment${filtered.length !== 1 ? 's' : ''}.`, 'success');
@@ -2878,6 +2907,19 @@ if (typeof module !== 'undefined') {
     escapeHtml,
     monthLabel,
     setActiveView,
-    state
+    state,
+    csvEscape,
+    buildCsvLines,
+    filterAppointmentsForExport,
+    buildFilteredExportFilename,
+    buildFilteredExportJsonPayload,
+    EXPORT_CSV_COLUMNS,
+    EXPORT_CSV_HEADERS,
+    OFFLINE_MUTATION_QUEUE_KEY,
+    loadOfflineMutationQueue,
+    saveOfflineMutationQueue,
+    enqueueOfflineMutation,
+    queueAwareMutation,
+    flushOfflineMutationQueue
   };
 }
