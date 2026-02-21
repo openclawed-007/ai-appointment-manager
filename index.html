@@ -22,7 +22,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="logo">
                 <div class="logo-icon" aria-hidden="true">
-                    <img src="/logo/complexlogo.png" alt="IntelliBook logo">
+                    <img src="/logo/simplelogo.png" alt="IntelliBook logo">
                 </div>
                 <span class="logo-text">IntelliBook</span>
             </div>
@@ -468,7 +468,8 @@
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
                                             <strong>Show client names in calendar</strong>
-                                            <small>When off, day previews show the service or appointment type name instead.</small>
+                                            <small>When off, day previews show the service or appointment type name
+                                                instead.</small>
                                         </div>
                                         <label class="toggle-switch">
                                             <input type="checkbox" id="settings-calendar-show-client-names" />
@@ -504,14 +505,16 @@
                                     <div class="export-panel-header">
                                         <div class="export-panel-title">
                                             <strong>Export Appointments</strong>
-                                            <span>Filter by date range, type, and status — then download as JSON or CSV.</span>
+                                            <span>Filter by date range, type, and status — then download as JSON or
+                                                CSV.</span>
                                         </div>
                                     </div>
                                     <div class="export-panel-body">
 
                                         <!-- Date range -->
                                         <div>
-                                            <p class="settings-sub-label" style="margin-bottom: var(--spacing-sm);">Date Range</p>
+                                            <p class="settings-sub-label" style="margin-bottom: var(--spacing-sm);">Date
+                                                Range</p>
                                             <div class="export-date-row">
                                                 <div class="form-group">
                                                     <label for="export-date-from">From</label>
@@ -529,11 +532,14 @@
                                             <div class="export-types-header">
                                                 <p class="settings-sub-label">Appointment Types</p>
                                                 <div class="export-types-actions">
-                                                    <button type="button" class="btn-text" id="export-types-select-all">All</button>
-                                                    <button type="button" class="btn-text" id="export-types-select-none">None</button>
+                                                    <button type="button" class="btn-text"
+                                                        id="export-types-select-all">All</button>
+                                                    <button type="button" class="btn-text"
+                                                        id="export-types-select-none">None</button>
                                                 </div>
                                             </div>
-                                            <div id="export-types-grid" class="export-types-grid" style="margin-top: var(--spacing-sm);">
+                                            <div id="export-types-grid" class="export-types-grid"
+                                                style="margin-top: var(--spacing-sm);">
                                                 <span class="export-types-empty">No appointment types found.</span>
                                             </div>
                                         </div>
@@ -579,12 +585,14 @@
 
                                 <!-- Utility actions -->
                                 <div>
-                                    <p class="settings-sub-label" style="margin-bottom: var(--spacing-md);">Backup &amp; Restore</p>
+                                    <p class="settings-sub-label" style="margin-bottom: var(--spacing-md);">Backup &amp;
+                                        Restore</p>
                                     <div class="settings-utility-list">
                                         <div class="settings-utility-item">
                                             <div class="settings-utility-copy">
                                                 <strong>Full Backup</strong>
-                                                <small>Download all appointments and types as a JSON backup file.</small>
+                                                <small>Download all appointments and types as a JSON backup
+                                                    file.</small>
                                             </div>
                                             <div class="settings-utility-action">
                                                 <button type="button" class="btn-secondary" id="btn-export-data">
@@ -595,7 +603,8 @@
                                         <div class="settings-utility-item">
                                             <div class="settings-utility-copy">
                                                 <strong>Restore from Backup</strong>
-                                                <small>Load a JSON backup. This replaces all current data and cannot be undone.</small>
+                                                <small>Load a JSON backup. This replaces all current data and cannot be
+                                                    undone.</small>
                                             </div>
                                             <div class="settings-utility-action">
                                                 <button type="button" class="btn-secondary" id="btn-import-data">
@@ -606,7 +615,8 @@
                                         <div class="settings-utility-item">
                                             <div class="settings-utility-copy">
                                                 <strong>Customer Booking Page</strong>
-                                                <small>Share this link with clients so they can book appointments directly.</small>
+                                                <small>Share this link with clients so they can book appointments
+                                                    directly.</small>
                                             </div>
                                             <div class="settings-utility-action">
                                                 <a class="btn-secondary" id="btn-public-booking-settings"
