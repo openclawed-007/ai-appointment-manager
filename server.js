@@ -21,7 +21,7 @@ const {
 } = require('./lib/db');
 
 const { fmtTime, buildBrandedEmailHtml, buildCancellationEmailHtml, sendEmail } = require('./lib/email');
-const { createAppointment, assertNoOverlap, parseTimeOrThrow } = require('./lib/appointments');
+const { createAppointment, assertNoOverlap, parseTimeOrThrow, dateLockKey } = require('./lib/appointments');
 const { createInsights } = require('./lib/insights');
 const { exportBusinessData, importBusinessData } = require('./lib/data');
 const {
@@ -42,6 +42,22 @@ const PORT = Number(process.env.PORT || 3000);
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 const app = express();
+
+function getMonthDateRange(monthValue = '') {
+  const value = String(monthValue || '').trim();
+  const match = value.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+
+  const start = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`;
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const end = `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}-01`;
+  return { start, end };
+}
 
 // Render/Neon deployments run behind a reverse proxy. Trust the first proxy hop
 // so express-rate-limit can read client IP from X-Forwarded-For safely.
@@ -739,6 +755,8 @@ app.delete('/api/types/:id', async (req, res) => {
 app.get('/api/appointments', async (req, res) => {
   const businessId = req.auth.businessId;
   const { date, q, status, month } = req.query;
+  const monthRange = month ? getMonthDateRange(month) : null;
+  if (month && !monthRange) return res.status(400).json({ error: 'month must be in YYYY-MM format' });
 
   if (!USE_POSTGRES) {
     let sql = `
@@ -750,7 +768,7 @@ app.get('/api/appointments', async (req, res) => {
     const params = [businessId];
 
     if (date) { sql += ' AND a.date = ?'; params.push(String(date)); }
-    if (month) { sql += ' AND a.date LIKE ?'; params.push(`${String(month)}%`); }
+    if (monthRange) { sql += ' AND a.date >= ? AND a.date < ?'; params.push(monthRange.start, monthRange.end); }
     if (status) { sql += ' AND a.status = ?'; params.push(String(status)); }
     if (q) {
       sql += ' AND (a.client_name LIKE ? OR a.client_email LIKE ? OR a.title LIKE ? OR t.name LIKE ?)';
@@ -774,7 +792,12 @@ app.get('/api/appointments', async (req, res) => {
   const params = [businessId];
 
   if (date) { params.push(String(date)); sql += ` AND a.date = $${params.length}`; }
-  if (month) { params.push(`${String(month)}%`); sql += ` AND a.date::text LIKE $${params.length}`; }
+  if (monthRange) {
+    params.push(monthRange.start);
+    sql += ` AND a.date >= $${params.length}`;
+    params.push(monthRange.end);
+    sql += ` AND a.date < $${params.length}`;
+  }
   if (status) { params.push(String(status)); sql += ` AND a.status = $${params.length}`; }
   if (q) {
     params.push(`%${q}%`);
@@ -924,46 +947,68 @@ app.put('/api/appointments/:id', async (req, res) => {
   const previousAppointment = rowToAppointment(previousRow);
 
   try {
-    await assertNoOverlap({
-      businessId,
-      date: String(date),
-      startMinutes: parseTimeOrThrow(time),
-      durationMinutes: resolvedDuration,
-      excludeId: id
-    });
+    const startMinutes = parseTimeOrThrow(time);
+    if (USE_POSTGRES) {
+      const tx = await getPgPool().connect();
+      try {
+        await tx.query('BEGIN');
+        await tx.query('SELECT pg_advisory_xact_lock($1, $2)', [Number(businessId), dateLockKey(date)]);
+        await assertNoOverlap({
+          businessId,
+          date: String(date),
+          startMinutes,
+          durationMinutes: resolvedDuration,
+          excludeId: id,
+          pgClient: tx
+        });
+        const up = await tx.query(
+          `UPDATE appointments
+           SET type_id = $1, client_name = $2, client_email = $3, date = $4, time = $5,
+               duration_minutes = $6, location = $7, notes = $8
+           WHERE id = $9 AND business_id = $10`,
+          [
+            selectedType?.id || null, clientName.trim(), clientEmail || null,
+            String(date), String(time), resolvedDuration,
+            location || selectedType?.location_mode || 'office',
+            notes || null, id, businessId
+          ]
+        );
+        if (!up.rowCount) {
+          await tx.query('ROLLBACK');
+          return res.status(404).json({ error: 'appointment not found' });
+        }
+        await tx.query('COMMIT');
+      } catch (error) {
+        try { await tx.query('ROLLBACK'); } catch { }
+        return res.status(400).json({ error: error.message });
+      } finally {
+        tx.release();
+      }
+    } else {
+      await assertNoOverlap({
+        businessId,
+        date: String(date),
+        startMinutes,
+        durationMinutes: resolvedDuration,
+        excludeId: id
+      });
+      const up = getSqlite()
+        .prepare(
+          `UPDATE appointments
+           SET type_id = ?, client_name = ?, client_email = ?, date = ?, time = ?,
+               duration_minutes = ?, location = ?, notes = ?
+           WHERE id = ? AND business_id = ?`
+        )
+        .run(
+          selectedType?.id || null, clientName.trim(), clientEmail || null,
+          String(date), String(time), resolvedDuration,
+          location || selectedType?.location_mode || 'office',
+          notes || null, id, businessId
+        );
+      if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
+    }
   } catch (error) {
     return res.status(400).json({ error: error.message });
-  }
-
-  if (USE_POSTGRES) {
-    const up = await getPgPool().query(
-      `UPDATE appointments
-       SET type_id = $1, client_name = $2, client_email = $3, date = $4, time = $5,
-           duration_minutes = $6, location = $7, notes = $8
-       WHERE id = $9 AND business_id = $10`,
-      [
-        selectedType?.id || null, clientName.trim(), clientEmail || null,
-        String(date), String(time), resolvedDuration,
-        location || selectedType?.location_mode || 'office',
-        notes || null, id, businessId
-      ]
-    );
-    if (!up.rowCount) return res.status(404).json({ error: 'appointment not found' });
-  } else {
-    const up = getSqlite()
-      .prepare(
-        `UPDATE appointments
-         SET type_id = ?, client_name = ?, client_email = ?, date = ?, time = ?,
-             duration_minutes = ?, location = ?, notes = ?
-         WHERE id = ? AND business_id = ?`
-      )
-      .run(
-        selectedType?.id || null, clientName.trim(), clientEmail || null,
-        String(date), String(time), resolvedDuration,
-        location || selectedType?.location_mode || 'office',
-        notes || null, id, businessId
-      );
-    if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
   }
 
   const row = await dbGet(

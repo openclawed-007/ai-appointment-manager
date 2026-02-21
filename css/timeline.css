@@ -91,6 +91,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
+}
+
+.appointment-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
 .appointment-type-tag {
@@ -133,6 +142,21 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     margin-top: -2px;
+}
+
+.appointment-day-label {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+    background: color-mix(in oklab, var(--gold) 16%, transparent);
+    border: 1px solid color-mix(in oklab, var(--gold) 30%, var(--border));
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    margin: 1px 0 4px;
 }
 
 .appointment-card-footer {

@@ -97,6 +97,32 @@
     z-index: 1;
 }
 
+/* Always-visible booking marker for days with appointments */
+.day-cell.has-event::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--gold);
+    box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px color-mix(in oklab, var(--gold) 35%, transparent);
+    pointer-events: none;
+}
+
+.day-cell.event-med::after {
+    width: 8px;
+    height: 8px;
+    background: var(--warning);
+}
+
+.day-cell.event-high::after {
+    width: 9px;
+    height: 9px;
+    background: var(--error);
+}
+
 .day-number {
     font-family: var(--font-display);
     font-size: 0.7rem;

@@ -146,6 +146,13 @@ function formatScheduleDate(dateStr) {
   return `${weekday} ${month} ${dayOrdinal(dt.getDate())}`;
 }
 
+function formatTimelineDayLabel(dateStr) {
+  const dt = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return dateStr;
+  const weekday = dt.toLocaleDateString('en-US', { weekday: 'long' });
+  return `${weekday} ${dayOrdinal(dt.getDate())}`;
+}
+
 function ensureDayMenu() {
   let menu = document.getElementById('calendar-day-menu');
   if (menu) return menu;
@@ -975,7 +982,7 @@ function bindHeaderButtons() {
   document.getElementById('btn-view-all')?.addEventListener('click', async (e) => {
     state.viewAll = !state.viewAll;
     e.currentTarget.textContent = state.viewAll ? 'Show Day' : 'View All';
-    await loadAppointmentsTable();
+    await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
   });
 
   document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
@@ -1398,11 +1405,13 @@ async function refreshCalendarDots() {
   });
 }
 
-function renderTimeline(appointments = []) {
+function renderTimeline(appointments = [], options = {}) {
   const root = document.getElementById('timeline-list');
   if (!root) return;
+  const emptyMessage = options.emptyMessage || 'No appointments for this day yet.';
+  const includeDate = Boolean(options.includeDate);
   if (!appointments.length) {
-    root.innerHTML = '<div class="empty-state">No appointments for this day yet.</div>';
+    root.innerHTML = `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
     return;
   }
 
@@ -1418,7 +1427,10 @@ function renderTimeline(appointments = []) {
         </div>
         <div class="appointment-card ${escapeHtml(a.typeClass || '')}" data-id="${a.id}">
           <div class="appointment-card-header">
-            <span class="appointment-type-tag">${escapeHtml(a.typeName)}</span>
+            <div class="appointment-header-meta">
+              <span class="appointment-type-tag">${escapeHtml(a.typeName)}</span>
+              ${includeDate ? `<span class="appointment-day-label">${escapeHtml(formatTimelineDayLabel(a.date))}</span>` : ''}
+            </div>
             <span class="status-badge ${statusClass}">${escapeHtml(a.status)}</span>
           </div>
           <div class="appointment-card-body">
@@ -1730,12 +1742,15 @@ async function loadTypes() {
 }
 
 async function loadDashboard(targetDate = state.selectedDate, options = {}) {
-  const { refreshDots = true } = options;
+  const { refreshDots = true, showSkeleton = true } = options;
   const today = localYmd();
+  const isTargetToday = targetDate === today;
 
-  // Show skeleton placeholders while data is loading
-  renderSkeleton(document.getElementById('timeline-list'), 3);
-  renderSkeleton(document.getElementById('insights-list'), 4);
+  if (showSkeleton) {
+    // Show skeleton placeholders while data is loading
+    renderSkeleton(document.getElementById('timeline-list'), 3);
+    renderSkeleton(document.getElementById('insights-list'), 4);
+  }
 
   // Fetch dashboard data + completed appointments in parallel.
   // The /api/dashboard endpoint already returns today's appointments.
@@ -1756,23 +1771,30 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     const status = String(a.status || '').toLowerCase();
     return status !== 'completed' && status !== 'cancelled';
   });
+  const allActiveAppointments = (upcomingResult?.appointments || [])
+    .filter((a) => {
+      const status = String(a.status || '').toLowerCase();
+      return status !== 'completed' && status !== 'cancelled';
+    })
+    .sort((a, b) => {
+      const aKey = `${a.date || ''} ${a.time || ''}`;
+      const bKey = `${b.date || ''} ${b.time || ''}`;
+      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+    });
 
   let activeAppointments = todayAppointments;
+  if (state.viewAll) {
+    activeAppointments = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= targetDate);
+    if (scheduleTitle) scheduleTitle.textContent = `Upcoming from ${formatScheduleDate(targetDate)}`;
+  } else if (scheduleTitle) {
+    scheduleTitle.textContent = isTargetToday
+      ? "Today's Schedule"
+      : `Schedule: ${formatScheduleDate(targetDate)}`;
+  }
 
-  if (todayAppointments.length) {
-    if (scheduleTitle) scheduleTitle.textContent = "Today's Schedule";
-  } else {
+  if (!state.viewAll && !todayAppointments.length && isTargetToday) {
     // Fall back to the next upcoming day from all appointments.
-    const upcomingFiltered = (upcomingResult?.appointments || [])
-      .filter((a) => {
-        const status = String(a.status || '').toLowerCase();
-        return status !== 'completed' && status !== 'cancelled' && typeof a.date === 'string' && a.date >= today;
-      })
-      .sort((a, b) => {
-        const aKey = `${a.date || ''} ${a.time || ''}`;
-        const bKey = `${b.date || ''} ${b.time || ''}`;
-        return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
-      });
+    const upcomingFiltered = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= today);
 
     const next = upcomingFiltered[0];
     if (next?.date && next.date > today) {
@@ -1797,7 +1819,10 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     });
 
   renderStats(stats);
-  renderTimeline(activeAppointments);
+  renderTimeline(activeAppointments, {
+    emptyMessage: state.viewAll ? 'No upcoming appointments from this day onward.' : 'No appointments for this day yet.',
+    includeDate: state.viewAll
+  });
   renderCompletedAppointments(completedAppointments);
   renderTypes(types);
   renderInsights(insights);
