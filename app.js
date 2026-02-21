@@ -1959,12 +1959,21 @@ async function loadSettings() {
   form.businessName.value = settings.business_name || '';
   form.ownerEmail.value = settings.owner_email || '';
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
-  if (settings.theme === 'dark' || settings.theme === 'light') {
-    document.documentElement.setAttribute('data-theme', settings.theme);
-    setStoredValue('theme', settings.theme);
-  }
+
+  // Apply theme from server; fall back to stored local preference
+  const resolvedTheme = settings.theme === 'dark' || settings.theme === 'light'
+    ? settings.theme
+    : (localStorage.getItem('theme') || 'dark');
+  document.documentElement.setAttribute('data-theme', resolvedTheme);
+  setStoredValue('theme', resolvedTheme);
+  syncSettingsThemeSelector(resolvedTheme);
+
+  // Calendar preview toggle
   const previewToggle = document.getElementById('settings-calendar-show-client-names');
   if (previewToggle) previewToggle.checked = Boolean(state.calendarShowClientNames);
+
+  // Populate the export type chips
+  populateExportTypeFilters();
 }
 
 function triggerJsonDownload(filename, data) {
@@ -2013,6 +2022,233 @@ async function importBusinessDataFromFile(file) {
     await loadSettings();
   } catch (error) {
     showToast(error.message || 'Invalid backup file.', 'error');
+  }
+}
+
+// ── Settings: theme selector sync ────────────────────────────────────────────
+
+function syncSettingsThemeSelector(theme) {
+  const darkOption = document.getElementById('theme-option-dark');
+  const lightOption = document.getElementById('theme-option-light');
+  const darkRadio = document.getElementById('settings-theme-dark');
+  const lightRadio = document.getElementById('settings-theme-light');
+  if (!darkOption || !lightOption) return;
+  if (theme === 'light') {
+    lightOption.classList.add('active');
+    darkOption.classList.remove('active');
+    if (lightRadio) lightRadio.checked = true;
+  } else {
+    darkOption.classList.add('active');
+    lightOption.classList.remove('active');
+    if (darkRadio) darkRadio.checked = true;
+  }
+}
+
+// ── Settings: export type chips ───────────────────────────────────────────────
+
+function populateExportTypeFilters() {
+  const grid = document.getElementById('export-types-grid');
+  if (!grid) return;
+  const types = state.types || [];
+  if (types.length === 0) {
+    grid.innerHTML = '<span class="export-types-empty">No appointment types found.</span>';
+    return;
+  }
+  grid.innerHTML = types.map((t) => {
+    // Extract a displayable solid colour from the gradient string stored in t.color
+    const swatchColour = extractSwatchColour(t.color);
+    return `
+      <label class="export-type-chip selected" data-type-id="${t.id}">
+        <input type="checkbox" value="${t.id}" checked aria-label="${escapeHtml(t.name)}" />
+        <span class="export-type-swatch" style="background:${swatchColour};"></span>
+        <span class="export-type-name">${escapeHtml(t.name)}</span>
+      </label>
+    `.trim();
+  }).join('');
+
+  // Toggle .selected class on click
+  grid.querySelectorAll('.export-type-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      chip.classList.toggle('selected', cb.checked);
+      updateExportSummary();
+    });
+  });
+
+  updateExportSummary();
+}
+
+function extractSwatchColour(colorStr) {
+  if (!colorStr) return 'var(--text-muted)';
+  // Handle css gradient strings — pull the first hex or rgb colour
+  const hexMatch = colorStr.match(/#[0-9a-fA-F]{3,6}/);
+  if (hexMatch) return hexMatch[0];
+  const rgbMatch = colorStr.match(/rgba?\([^)]+\)/);
+  if (rgbMatch) return rgbMatch[0];
+  // Plain named colour or custom property fallback
+  return colorStr;
+}
+
+// ── Settings: export summary preview ─────────────────────────────────────────
+
+function updateExportSummary() {
+  const summary = document.getElementById('export-summary');
+  if (!summary) return;
+  const from = (document.getElementById('export-date-from'))?.value || '';
+  const to = (document.getElementById('export-date-to'))?.value || '';
+  const statusFilter = (document.getElementById('export-status-filter'))?.value || '';
+  const selectedTypeIds = getSelectedExportTypeIds();
+  const format = getSelectedExportFormat();
+
+  const parts = [];
+  if (from && to) {
+    parts.push(`<strong>${from}</strong> to <strong>${to}</strong>`);
+  } else if (from) {
+    parts.push(`from <strong>${from}</strong>`);
+  } else if (to) {
+    parts.push(`up to <strong>${to}</strong>`);
+  } else {
+    parts.push('all dates');
+  }
+
+  const totalTypes = (state.types || []).length;
+  if (totalTypes > 0) {
+    if (selectedTypeIds.length === 0) {
+      parts.push('<strong>no types selected</strong>');
+    } else if (selectedTypeIds.length === totalTypes) {
+      parts.push('all types');
+    } else {
+      parts.push(`<strong>${selectedTypeIds.length}</strong> type${selectedTypeIds.length !== 1 ? 's' : ''}`);
+    }
+  }
+
+  if (statusFilter) {
+    parts.push(`status: <strong>${statusFilter}</strong>`);
+  }
+
+  parts.push(`format: <strong>${format.toUpperCase()}</strong>`);
+
+  summary.innerHTML = parts.join(' &middot; ');
+}
+
+function getSelectedExportTypeIds() {
+  const grid = document.getElementById('export-types-grid');
+  if (!grid) return [];
+  return Array.from(grid.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => Number(cb.value));
+}
+
+function getSelectedExportFormat() {
+  const active = document.querySelector('.format-toggle-btn.active');
+  return active?.dataset.format || 'json';
+}
+
+// ── CSV download helper ───────────────────────────────────────────────────────
+
+function triggerCsvDownload(filename, rows) {
+  if (!rows || rows.length === 0) {
+    showToast('No appointments matched your filters.', 'info');
+    return;
+  }
+
+  const CSV_COLUMNS = [
+    'id', 'typeName', 'clientName', 'clientEmail',
+    'date', 'time', 'durationMinutes', 'location',
+    'status', 'notes', 'source', 'createdAt'
+  ];
+
+  const CSV_HEADERS = [
+    'ID', 'Type', 'Client Name', 'Client Email',
+    'Date', 'Time', 'Duration (min)', 'Location',
+    'Status', 'Notes', 'Source', 'Created At'
+  ];
+
+  function csvEscape(val) {
+    if (val == null) return '';
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  }
+
+  const lines = [
+    CSV_HEADERS.map(csvEscape).join(','),
+    ...rows.map((row) => CSV_COLUMNS.map((col) => csvEscape(row[col])).join(','))
+  ];
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ── Filtered export ───────────────────────────────────────────────────────────
+
+async function runFilteredExport() {
+  const from = (document.getElementById('export-date-from'))?.value || '';
+  const to = (document.getElementById('export-date-to'))?.value || '';
+  const statusFilter = (document.getElementById('export-status-filter'))?.value || '';
+  const selectedTypeIds = getSelectedExportTypeIds();
+  const format = getSelectedExportFormat();
+
+  const btn = document.getElementById('btn-export-filtered');
+  if (btn) btn.disabled = true;
+
+  try {
+    // Fetch all appointments from the server
+    const { appointments: all } = await api('/api/appointments');
+
+    // Apply filters
+    let filtered = all;
+
+    if (from) {
+      filtered = filtered.filter((a) => a.date >= from);
+    }
+    if (to) {
+      filtered = filtered.filter((a) => a.date <= to);
+    }
+    if (statusFilter) {
+      filtered = filtered.filter((a) => a.status === statusFilter);
+    }
+
+    // Type filter — only apply if types exist and a selection has been made
+    const totalTypes = (state.types || []).length;
+    if (totalTypes > 0 && selectedTypeIds.length < totalTypes) {
+      filtered = filtered.filter((a) => a.typeId != null && selectedTypeIds.includes(Number(a.typeId)));
+    }
+
+    if (filtered.length === 0) {
+      showToast('No appointments matched the selected filters.', 'info');
+      return;
+    }
+
+    const slug = state.currentBusiness?.slug || 'business';
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `${slug}-export-${date}`;
+
+    if (format === 'csv') {
+      triggerCsvDownload(`${filename}.csv`, filtered);
+    } else {
+      triggerJsonDownload(`${filename}.json`, {
+        exportedAt: new Date().toISOString(),
+        filters: { from: from || null, to: to || null, status: statusFilter || null, typeIds: selectedTypeIds },
+        count: filtered.length,
+        appointments: filtered
+      });
+    }
+
+    showToast(`Exported ${filtered.length} appointment${filtered.length !== 1 ? 's' : ''}.`, 'success');
+  } catch (error) {
+    showToast(error.message || 'Export failed.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -2444,6 +2680,73 @@ function bindForms() {
     setStoredValue('calendarShowClientNames', checked);
     await refreshCalendarDots();
   });
+
+  // ── Settings: theme selector ──────────────────────────────────────────────
+  // Handle clicks on the card labels directly so the theme applies
+  // immediately — before the radio `change` event fires.
+  document.querySelectorAll('.theme-option').forEach((option) => {
+    option.addEventListener('click', async (e) => {
+      const radio = option.querySelector('input[type="radio"]');
+      if (!radio) return;
+      const chosen = radio.value;
+      if (chosen !== 'dark' && chosen !== 'light') return;
+
+      // Apply theme immediately, in the same synchronous frame as the click
+      document.documentElement.setAttribute('data-theme', chosen);
+      localStorage.setItem('theme', chosen);
+      syncSettingsThemeSelector(chosen);
+
+      if (!state.currentUser) return;
+      try {
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify({ theme: chosen }) });
+      } catch (_error) {
+        // Local preference already applied; server update is best-effort.
+      }
+    });
+  });
+
+  // ── Settings: filtered export ─────────────────────────────────────────────
+  document.getElementById('btn-export-filtered')?.addEventListener('click', () => {
+    void runFilteredExport();
+  });
+
+  // Live summary updates
+  ['export-date-from', 'export-date-to', 'export-status-filter'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', updateExportSummary);
+  });
+
+  // Format toggle buttons
+  document.querySelectorAll('.format-toggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.format-toggle-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateExportSummary();
+    });
+  });
+
+  // Select all / none type chips
+  document.getElementById('export-types-select-all')?.addEventListener('click', () => {
+    const grid = document.getElementById('export-types-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.export-type-chip').forEach((chip) => {
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = true;
+      chip.classList.add('selected');
+    });
+    updateExportSummary();
+  });
+
+  document.getElementById('export-types-select-none')?.addEventListener('click', () => {
+    const grid = document.getElementById('export-types-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.export-type-chip').forEach((chip) => {
+      const cb = chip.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = false;
+      chip.classList.remove('selected');
+    });
+    updateExportSummary();
+  });
+
   bindAppointmentFormEnhancements();
   updateAppointmentEditorUi(false);
 
@@ -2482,30 +2785,11 @@ function bindForms() {
   }
 }
 
-function bindThemeToggle() {
+function applyInitialTheme() {
   const saved = localStorage.getItem('theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const initial = saved || (prefersDark ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', initial);
-
-  const toggle = async () => {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    if (!state.currentUser) return;
-    try {
-      await api('/api/settings', {
-        method: 'PUT',
-        body: JSON.stringify({ theme: next })
-      });
-    } catch (_error) {
-      // Keep local preference applied even if server update fails.
-    }
-  };
-
-  document.getElementById('theme-toggle-desktop')?.addEventListener('click', () => { void toggle(); });
-  document.getElementById('theme-toggle-mobile')?.addEventListener('click', () => { void toggle(); });
 }
 
 async function init() {
@@ -2520,7 +2804,7 @@ async function init() {
   bindCalendarNav();
   bindKeyboard();
   bindForms();
-  bindThemeToggle();
+  applyInitialTheme();
   setupTimezoneSearch();
   setupTimezoneSearch('signup-timezone', 'signup-timezone-suggestions');
 

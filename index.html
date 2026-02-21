@@ -89,23 +89,7 @@
                     </svg>
                     <span class="notification-dot hidden" id="notification-dot-desktop" data-notification-dot></span>
                 </button>
-                <button class="theme-toggle" id="theme-toggle-desktop" type="button"
-                    aria-label="Toggle light/dark mode">
-                    <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5" />
-                        <line x1="12" y1="1" x2="12" y2="3" />
-                        <line x1="12" y1="21" x2="12" y2="23" />
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                        <line x1="1" y1="12" x2="3" y2="12" />
-                        <line x1="21" y1="12" x2="23" y2="12" />
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                    </svg>
-                    <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
-                </button>
+
             </div>
         </aside>
 
@@ -142,23 +126,7 @@
                         </svg>
                         <span class="notification-dot hidden" id="notification-dot-mobile" data-notification-dot></span>
                     </button>
-                    <button class="theme-toggle mobile-theme-toggle" id="theme-toggle-mobile" type="button"
-                        aria-label="Toggle light/dark mode">
-                        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5" />
-                            <line x1="12" y1="1" x2="12" y2="3" />
-                            <line x1="12" y1="21" x2="12" y2="23" />
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                            <line x1="1" y1="12" x2="3" y2="12" />
-                            <line x1="21" y1="12" x2="23" y2="12" />
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                        </svg>
-                        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                        </svg>
-                    </button>
+
                     <button class="btn-primary" id="btn-new-appointment" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19" />
@@ -393,47 +361,271 @@
                 <!-- ═══ Settings ═══ -->
                 <section class="app-view" data-view="settings">
                     <h1 class="sr-only">Settings</h1>
-                    <div class="card">
-                        <div class="card-header">
-                            <h2>Business Settings</h2>
+                    <div class="settings-page">
+
+                        <!-- ── Section 1: Business Profile ── -->
+                        <div class="settings-section">
+                            <div class="settings-section-header">
+                                <div class="settings-section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                                    </svg>
+                                </div>
+                                <div class="settings-section-title">
+                                    <h2>Business Profile</h2>
+                                    <p>Your business identity, contact details, and timezone.</p>
+                                </div>
+                            </div>
+                            <form id="settings-form">
+                                <div class="settings-section-body">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="settings-business-name">Business Name</label>
+                                            <input id="settings-business-name" name="businessName" required
+                                                placeholder="e.g. Apex Barber Studio" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="settings-owner-email">Owner Email</label>
+                                            <input id="settings-owner-email" name="ownerEmail" type="email"
+                                                placeholder="you@example.com" />
+                                        </div>
+                                    </div>
+                                    <div class="form-group timezone-group">
+                                        <label for="timezone-input">Timezone</label>
+                                        <input name="timezone" id="timezone-input" autocomplete="off"
+                                            value="America/Los_Angeles"
+                                            placeholder="Search timezone e.g. Europe/London" />
+                                        <div id="timezone-suggestions" class="timezone-suggestions hidden"
+                                            role="listbox" aria-label="Timezone suggestions"></div>
+                                    </div>
+                                </div>
+                                <div class="settings-section-actions">
+                                    <button type="submit" class="btn-primary">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                            <polyline points="17 21 17 13 7 13 7 21" />
+                                            <polyline points="7 3 7 8 15 8" />
+                                        </svg>
+                                        Save Profile
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                        <form class="modal-form" id="settings-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="settings-business-name">Business Name</label>
-                                    <input id="settings-business-name" name="businessName" required />
+
+                        <!-- ── Section 2: Appearance ── -->
+                        <div class="settings-section">
+                            <div class="settings-section-header">
+                                <div class="settings-section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="5" />
+                                        <line x1="12" y1="1" x2="12" y2="3" />
+                                        <line x1="12" y1="21" x2="12" y2="23" />
+                                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                                        <line x1="1" y1="12" x2="3" y2="12" />
+                                        <line x1="21" y1="12" x2="23" y2="12" />
+                                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                                    </svg>
                                 </div>
-                                <div class="form-group">
-                                    <label for="settings-owner-email">Owner Email</label>
-                                    <input id="settings-owner-email" name="ownerEmail" type="email" />
+                                <div class="settings-section-title">
+                                    <h2>Appearance</h2>
+                                    <p>Theme preference and calendar display options.</p>
                                 </div>
                             </div>
-                            <div class="form-group timezone-group">
-                                <label for="timezone-input">Timezone</label>
-                                <input name="timezone" id="timezone-input" autocomplete="off"
-                                    value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
-                                <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox"
-                                    aria-label="Timezone suggestions"></div>
+                            <div class="settings-section-body">
+
+                                <!-- Theme selector -->
+                                <div>
+                                    <p class="settings-sub-label">Interface Theme</p>
+                                </div>
+                                <div class="theme-selector" role="radiogroup" aria-label="Choose theme">
+                                    <label class="theme-option" id="theme-option-dark">
+                                        <input type="radio" name="settings-theme" value="dark"
+                                            id="settings-theme-dark" />
+                                        <div class="theme-preview theme-preview-dark">
+                                            <div class="theme-preview-bar"></div>
+                                            <div class="theme-preview-bar"></div>
+                                            <div class="theme-preview-bar"></div>
+                                        </div>
+                                        <span class="theme-option-label">Dark</span>
+                                    </label>
+                                    <label class="theme-option" id="theme-option-light">
+                                        <input type="radio" name="settings-theme" value="light"
+                                            id="settings-theme-light" />
+                                        <div class="theme-preview theme-preview-light">
+                                            <div class="theme-preview-bar"></div>
+                                            <div class="theme-preview-bar"></div>
+                                            <div class="theme-preview-bar"></div>
+                                        </div>
+                                        <span class="theme-option-label">Light</span>
+                                    </label>
+                                </div>
+
+                                <!-- Toggle list -->
+                                <div class="settings-toggle-list">
+                                    <div class="settings-toggle-item">
+                                        <div class="settings-toggle-copy">
+                                            <strong>Show client names in calendar</strong>
+                                            <small>When off, day previews show the service or appointment type name instead.</small>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="settings-calendar-show-client-names" />
+                                            <span class="toggle-switch-track">
+                                                <span class="toggle-switch-thumb"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+
                             </div>
-                            <div class="form-group settings-toggle-group">
-                                <label class="settings-toggle-row" for="settings-calendar-show-client-names">
-                                    <input id="settings-calendar-show-client-names" type="checkbox" />
-                                    <span>Show client names in calendar day previews</span>
-                                </label>
-                                <small class="settings-toggle-help">When off, day previews show service/type names.</small>
+                        </div>
+
+                        <!-- ── Section 3: Data & Exports ── -->
+                        <div class="settings-section">
+                            <div class="settings-section-header">
+                                <div class="settings-section-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="8 17 12 21 16 17" />
+                                        <line x1="12" y1="12" x2="12" y2="21" />
+                                        <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+                                    </svg>
+                                </div>
+                                <div class="settings-section-title">
+                                    <h2>Data &amp; Exports</h2>
+                                    <p>Export filtered appointment reports or manage full backups.</p>
+                                </div>
                             </div>
-                            <div class="form-actions">
-                                <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
-                                <button type="button" class="btn-secondary" id="btn-import-data">Load Data</button>
-                                <a class="btn-secondary settings-public-link" id="btn-public-booking-settings"
-                                    data-public-booking-link href="/book" target="_blank" rel="noopener">
-                                    Customer Booking Link
-                                </a>
-                                <button type="submit" class="btn-primary">Save Settings</button>
+                            <div class="settings-section-body">
+
+                                <!-- Filtered export panel -->
+                                <div class="export-panel">
+                                    <div class="export-panel-header">
+                                        <div class="export-panel-title">
+                                            <strong>Export Appointments</strong>
+                                            <span>Filter by date range, type, and status — then download as JSON or CSV.</span>
+                                        </div>
+                                    </div>
+                                    <div class="export-panel-body">
+
+                                        <!-- Date range -->
+                                        <div>
+                                            <p class="settings-sub-label" style="margin-bottom: var(--spacing-sm);">Date Range</p>
+                                            <div class="export-date-row">
+                                                <div class="form-group">
+                                                    <label for="export-date-from">From</label>
+                                                    <input type="date" id="export-date-from" />
+                                                </div>
+                                                <div class="form-group">
+                                                    <label for="export-date-to">To</label>
+                                                    <input type="date" id="export-date-to" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Appointment types -->
+                                        <div>
+                                            <div class="export-types-header">
+                                                <p class="settings-sub-label">Appointment Types</p>
+                                                <div class="export-types-actions">
+                                                    <button type="button" class="btn-text" id="export-types-select-all">All</button>
+                                                    <button type="button" class="btn-text" id="export-types-select-none">None</button>
+                                                </div>
+                                            </div>
+                                            <div id="export-types-grid" class="export-types-grid" style="margin-top: var(--spacing-sm);">
+                                                <span class="export-types-empty">No appointment types found.</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Status + format -->
+                                        <div class="export-options-row">
+                                            <div class="form-group">
+                                                <label for="export-status-filter">Status</label>
+                                                <select id="export-status-filter">
+                                                    <option value="">All statuses</option>
+                                                    <option value="confirmed">Confirmed</option>
+                                                    <option value="completed">Completed</option>
+                                                    <option value="pending">Pending</option>
+                                                    <option value="cancelled">Cancelled</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Export Format</label>
+                                                <div class="format-toggle">
+                                                    <button type="button" class="format-toggle-btn active"
+                                                        data-format="json">JSON</button>
+                                                    <button type="button" class="format-toggle-btn"
+                                                        data-format="csv">CSV</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    <div class="export-panel-footer">
+                                        <p class="export-summary-text" id="export-summary">
+                                            Select a date range and types to preview the export.
+                                        </p>
+                                        <button type="button" class="btn-primary" id="btn-export-filtered">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="8 17 12 21 16 17" />
+                                                <line x1="12" y1="12" x2="12" y2="21" />
+                                                <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+                                            </svg>
+                                            Download
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Utility actions -->
+                                <div>
+                                    <p class="settings-sub-label" style="margin-bottom: var(--spacing-md);">Backup &amp; Restore</p>
+                                    <div class="settings-utility-list">
+                                        <div class="settings-utility-item">
+                                            <div class="settings-utility-copy">
+                                                <strong>Full Backup</strong>
+                                                <small>Download all appointments and types as a JSON backup file.</small>
+                                            </div>
+                                            <div class="settings-utility-action">
+                                                <button type="button" class="btn-secondary" id="btn-export-data">
+                                                    Export JSON
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="settings-utility-item">
+                                            <div class="settings-utility-copy">
+                                                <strong>Restore from Backup</strong>
+                                                <small>Load a JSON backup. This replaces all current data and cannot be undone.</small>
+                                            </div>
+                                            <div class="settings-utility-action">
+                                                <button type="button" class="btn-secondary" id="btn-import-data">
+                                                    Load Backup
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="settings-utility-item">
+                                            <div class="settings-utility-copy">
+                                                <strong>Customer Booking Page</strong>
+                                                <small>Share this link with clients so they can book appointments directly.</small>
+                                            </div>
+                                            <div class="settings-utility-action">
+                                                <a class="btn-secondary" id="btn-public-booking-settings"
+                                                    data-public-booking-link href="/book" target="_blank"
+                                                    rel="noopener">
+                                                    Open Link
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
-                            <input id="import-data-file" type="file" accept="application/json,.json" hidden />
-                        </form>
+                        </div>
+
                     </div>
+
+                    <!-- Hidden file input for backup restore -->
+                    <input id="import-data-file" type="file" accept="application/json,.json" hidden />
                 </section>
 
             </div>
