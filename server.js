@@ -604,11 +604,25 @@ app.use('/api', async (req, res, next) => {
 // ── Settings routes ───────────────────────────────────────────────────────────
 
 app.get('/api/settings', async (req, res) => {
-  res.json({ settings: await getSettings(req.auth.businessId) });
+  const settings = (await getSettings(req.auth.businessId)) || {};
+  const userTheme = await dbGet(
+    'SELECT theme_preference FROM users WHERE id = ? AND business_id = ?',
+    'SELECT theme_preference FROM users WHERE id = $1 AND business_id = $2',
+    [req.auth.userId, req.auth.businessId]
+  );
+  res.json({
+    settings: {
+      ...settings,
+      theme: (userTheme?.theme_preference === 'dark' || userTheme?.theme_preference === 'light')
+        ? userTheme.theme_preference
+        : null
+    }
+  });
 });
 
 app.put('/api/settings', async (req, res) => {
   const { businessName, ownerEmail, timezone } = req.body || {};
+  const incomingTheme = req.body?.theme;
   const businessId = req.auth.businessId;
 
   await dbRun(
@@ -625,7 +639,29 @@ app.put('/api/settings', async (req, res) => {
     [businessName || null, ownerEmail || null, timezone || null, businessId]
   );
 
-  res.json({ settings: await getSettings(businessId) });
+  const normalizedTheme = incomingTheme === 'dark' || incomingTheme === 'light' ? incomingTheme : null;
+  if (normalizedTheme) {
+    await dbRun(
+      'UPDATE users SET theme_preference = ? WHERE id = ? AND business_id = ?',
+      'UPDATE users SET theme_preference = $1 WHERE id = $2 AND business_id = $3',
+      [normalizedTheme, req.auth.userId, businessId]
+    );
+  }
+
+  const settings = (await getSettings(businessId)) || {};
+  const userTheme = await dbGet(
+    'SELECT theme_preference FROM users WHERE id = ? AND business_id = ?',
+    'SELECT theme_preference FROM users WHERE id = $1 AND business_id = $2',
+    [req.auth.userId, businessId]
+  );
+  res.json({
+    settings: {
+      ...settings,
+      theme: (userTheme?.theme_preference === 'dark' || userTheme?.theme_preference === 'light')
+        ? userTheme.theme_preference
+        : null
+    }
+  });
 });
 
 // ── Data export/import ────────────────────────────────────────────────────────

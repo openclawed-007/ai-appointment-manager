@@ -34,6 +34,7 @@ const state = {
   cancelMenuDate: '',
   currentUser: null,
   currentBusiness: null,
+  calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
   authShellDismissed: false,
   queueSyncInProgress: false,
   calendarExpanded: getStoredBoolean('calendarExpanded'),
@@ -596,10 +597,16 @@ function toTime12(time24 = '09:00') {
 
 function toTimeCompact(time24 = '09:00') {
   const [h, m] = String(time24).split(':').map(Number);
-  const suffix = h >= 12 ? ' PM' : ' AM';
-  const hh = ((h + 11) % 12) + 1;
-  const mm = m === 0 ? '' : `:${String(m).padStart(2, '0')}`;
-  return `${hh}${mm}${suffix}`;
+  const hh = Number.isFinite(h) ? String(h).padStart(2, '0') : '09';
+  const mm = Number.isFinite(m) ? String(m).padStart(2, '0') : '00';
+  return `${hh}:${mm}`;
+}
+
+function getCalendarPreviewLabel(appointment = {}) {
+  if (state.calendarShowClientNames) {
+    return appointment.clientName || appointment.typeName || appointment.title || 'Appointment';
+  }
+  return appointment.typeName || appointment.title || appointment.clientName || 'Appointment';
 }
 
 function addMinutesToTime(time24 = '09:00', durationMinutes = 0) {
@@ -1394,7 +1401,7 @@ async function refreshCalendarDots() {
       preview.innerHTML = appts.slice(0, 3).map(a =>
         `<div class="cal-event" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
            <span class="cal-event-time">${toTimeCompact(a.time)}</span>
-           <span class="cal-event-name">${escapeHtml(a.clientName)}</span>
+           <span class="cal-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
          </div>`
       ).join('');
       if (count > 3) {
@@ -1952,6 +1959,12 @@ async function loadSettings() {
   form.businessName.value = settings.business_name || '';
   form.ownerEmail.value = settings.owner_email || '';
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
+  if (settings.theme === 'dark' || settings.theme === 'light') {
+    document.documentElement.setAttribute('data-theme', settings.theme);
+    setStoredValue('theme', settings.theme);
+  }
+  const previewToggle = document.getElementById('settings-calendar-show-client-names');
+  if (previewToggle) previewToggle.checked = Boolean(state.calendarShowClientNames);
 }
 
 function triggerJsonDownload(filename, data) {
@@ -2425,6 +2438,12 @@ function bindForms() {
     await importBusinessDataFromFile(file);
     if (input) input.value = '';
   });
+  document.getElementById('settings-calendar-show-client-names')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.currentTarget?.checked);
+    state.calendarShowClientNames = checked;
+    setStoredValue('calendarShowClientNames', checked);
+    await refreshCalendarDots();
+  });
   bindAppointmentFormEnhancements();
   updateAppointmentEditorUi(false);
 
@@ -2469,15 +2488,24 @@ function bindThemeToggle() {
   const initial = saved || (prefersDark ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', initial);
 
-  const toggle = () => {
+  const toggle = async () => {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
+    if (!state.currentUser) return;
+    try {
+      await api('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ theme: next })
+      });
+    } catch (_error) {
+      // Keep local preference applied even if server update fails.
+    }
   };
 
-  document.getElementById('theme-toggle-desktop')?.addEventListener('click', toggle);
-  document.getElementById('theme-toggle-mobile')?.addEventListener('click', toggle);
+  document.getElementById('theme-toggle-desktop')?.addEventListener('click', () => { void toggle(); });
+  document.getElementById('theme-toggle-mobile')?.addEventListener('click', () => { void toggle(); });
 }
 
 async function init() {

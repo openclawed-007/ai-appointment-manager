@@ -358,6 +358,7 @@
                                     <label for="type-location">Location Mode</label>
                                     <select id="type-location" name="locationMode">
                                         <option value="office">Office</option>
+                                        <option value="on-premises">On premises</option>
                                         <option value="virtual">Virtual</option>
                                         <option value="phone">Phone</option>
                                         <option value="hybrid" selected>Hybrid</option>
@@ -413,6 +414,13 @@
                                     value="America/Los_Angeles" placeholder="Search timezone e.g. Europe/London" />
                                 <div id="timezone-suggestions" class="timezone-suggestions hidden" role="listbox"
                                     aria-label="Timezone suggestions"></div>
+                            </div>
+                            <div class="form-group settings-toggle-group">
+                                <label class="settings-toggle-row" for="settings-calendar-show-client-names">
+                                    <input id="settings-calendar-show-client-names" type="checkbox" />
+                                    <span>Show client names in calendar day previews</span>
+                                </label>
+                                <small class="settings-toggle-help">When off, day previews show service/type names.</small>
                             </div>
                             <div class="form-actions">
                                 <button type="button" class="btn-secondary" id="btn-export-data">Export Data</button>
@@ -486,6 +494,10 @@
                                 <label class="radio-label">
                                     <input type="radio" name="location" value="office" checked>
                                     <span>Office</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="location" value="on-premises">
+                                    <span>On premises</span>
                                 </label>
                                 <label class="radio-label">
                                     <input type="radio" name="location" value="virtual">
