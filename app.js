@@ -570,7 +570,8 @@ function positionDayMenu(anchorEl, menu) {
   menu.classList.remove('hidden');
 
   const menuRect = menu.getBoundingClientRect();
-  let left = rect.left;
+  const isNarrowScreen = vw <= 768;
+  let left = isNarrowScreen ? (vw - menuRect.width) / 2 : rect.left;
   let top = rect.bottom + 8;
 
   if (left + menuRect.width > vw - margin) left = vw - menuRect.width - margin;
@@ -1175,10 +1176,14 @@ function getStoredViewPreference() {
 }
 
 function applyViewSelection(activeView) {
+  const isCalendarOnly = activeView === 'calendar';
+  const visibleView = isCalendarOnly ? 'dashboard' : activeView;
   const views = [...document.querySelectorAll('.app-view')];
   views.forEach((section) => {
-    section.classList.toggle('active', section.dataset.view === activeView);
+    section.classList.toggle('active', section.dataset.view === visibleView);
   });
+
+  document.body.classList.toggle('calendar-view-only', isCalendarOnly);
 
   document.querySelectorAll('.nav-item').forEach((n) => {
     n.classList.toggle('active', n.dataset.view === activeView);
@@ -1192,6 +1197,7 @@ function applyViewSelection(activeView) {
 function resolveView(view) {
   const views = [...document.querySelectorAll('.app-view')];
   const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
+  if (view === 'calendar' && availableViews.has('dashboard')) return 'calendar';
   const fallbackView = availableViews.has('dashboard') ? 'dashboard' : views[0]?.dataset.view;
   const activeView = availableViews.has(view) ? view : fallbackView;
   return activeView || null;
@@ -1227,6 +1233,7 @@ function setActiveView(view) {
 }
 
 function getActiveView() {
+  if (document.body.classList.contains('calendar-view-only')) return 'calendar';
   return document.querySelector('.app-view.active')?.dataset.view || 'dashboard';
 }
 
@@ -1610,15 +1617,84 @@ function roundToNextQuarterHour(now = new Date()) {
   return dt;
 }
 
+function timeToMinutes(value = '') {
+  if (!/^\d{2}:\d{2}$/.test(String(value))) return null;
+  const [h, m] = String(value).split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function minutesToTime(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function clampInt(value, min, max, fallback) {
+  const n = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(n)) return fallback;
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
+function syncTimeBuilderFromInput(form) {
+  const timeInput = form.querySelector('input[name="time"]');
+  const hourInput = form.querySelector('#appt-time-hour');
+  const minuteInput = form.querySelector('#appt-time-minute');
+  if (!timeInput || !hourInput || !minuteInput) return;
+
+  const mins = timeToMinutes(timeInput.value);
+  const safe = mins == null ? (9 * 60) : mins;
+  const hour24 = Math.floor(safe / 60);
+  const minute = safe % 60;
+  const meridiem = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = ((hour24 + 11) % 12) + 1;
+
+  hourInput.value = String(hour12);
+  minuteInput.value = String(minute).padStart(2, '0');
+
+  form.querySelectorAll('.time-meridiem-btn[data-meridiem]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.meridiem === meridiem);
+  });
+}
+
+function syncInputFromTimeBuilder(form) {
+  const timeInput = form.querySelector('input[name="time"]');
+  const hourInput = form.querySelector('#appt-time-hour');
+  const minuteInput = form.querySelector('#appt-time-minute');
+  const activeMeridiem = form.querySelector('.time-meridiem-btn.active')?.dataset.meridiem || 'AM';
+  if (!timeInput || !hourInput || !minuteInput) return;
+
+  const hour12 = clampInt(hourInput.value, 1, 12, 9);
+  const minute = clampInt(minuteInput.value, 0, 59, 0);
+  let hour24 = hour12 % 12;
+  if (activeMeridiem === 'PM') hour24 += 12;
+  timeInput.value = `${String(hour24).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function nextWeekendDate(from = new Date()) {
+  const dt = new Date(from);
+  dt.setHours(0, 0, 0, 0);
+  const day = dt.getDay();
+  const offset = day === 6 ? 0 : (6 - day + 7) % 7;
+  dt.setDate(dt.getDate() + offset);
+  return dt;
+}
+
 function setAppointmentDefaults() {
   const form = document.getElementById('appointment-form');
   if (!form) return;
 
   const dateInput = form.querySelector('input[name="date"]');
   const timeInput = form.querySelector('input[name="time"]');
+  const today = localYmd(new Date());
+
+  if (dateInput) dateInput.min = today;
+  if (timeInput) timeInput.step = 60;
 
   if (dateInput && !dateInput.value) {
-    dateInput.value = state.selectedDate || new Date().toISOString().slice(0, 10);
+    dateInput.value = state.selectedDate || today;
   }
 
   if (timeInput && !timeInput.value) {
@@ -1626,6 +1702,7 @@ function setAppointmentDefaults() {
     timeInput.value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
   }
 
+  syncTimeBuilderFromInput(form);
   updateAppointmentPreview();
 }
 
@@ -1636,34 +1713,95 @@ function bindAppointmentFormEnhancements() {
   const dateInput = form.querySelector('input[name="date"]');
   const timeInput = form.querySelector('input[name="time"]');
   const durationSelect = form.querySelector('select[name="durationMinutes"]');
+  const timeHourInput = form.querySelector('#appt-time-hour');
+  const timeMinuteInput = form.querySelector('#appt-time-minute');
+  const today = localYmd(new Date());
+
+  if (dateInput) dateInput.min = today;
+  if (timeInput) timeInput.step = 60;
 
   [dateInput, timeInput, durationSelect].forEach((el) => {
-    el?.addEventListener('input', updateAppointmentPreview);
-    el?.addEventListener('change', updateAppointmentPreview);
+    el?.addEventListener('input', () => {
+      if (el === timeInput) syncTimeBuilderFromInput(form);
+      updateAppointmentPreview();
+    });
+    el?.addEventListener('change', () => {
+      if (el === timeInput) syncTimeBuilderFromInput(form);
+      updateAppointmentPreview();
+    });
+  });
+
+  [timeHourInput, timeMinuteInput].forEach((input) => {
+    input?.addEventListener('input', () => {
+      syncInputFromTimeBuilder(form);
+      updateAppointmentPreview();
+    });
+    input?.addEventListener('change', () => {
+      syncInputFromTimeBuilder(form);
+      syncTimeBuilderFromInput(form);
+      updateAppointmentPreview();
+    });
+  });
+
+  form.querySelectorAll('.time-meridiem-btn[data-meridiem]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      form.querySelectorAll('.time-meridiem-btn[data-meridiem]').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      syncInputFromTimeBuilder(form);
+      updateAppointmentPreview();
+    });
   });
 
   form.querySelectorAll('.quick-pill[data-quick-date]').forEach((btn) => {
     btn.addEventListener('click', () => {
+      if (!dateInput) return;
       const now = new Date();
-      if (btn.dataset.quickDate === 'tomorrow') now.setDate(now.getDate() + 1);
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      if (dateInput) dateInput.value = `${yyyy}-${mm}-${dd}`;
+      const action = btn.dataset.quickDate;
+      if (action === 'tomorrow') now.setDate(now.getDate() + 1);
+      else if (action === 'next-week') now.setDate(now.getDate() + 7);
+      else if (action === 'weekend') {
+        const weekend = nextWeekendDate(now);
+        dateInput.value = localYmd(weekend);
+        syncTimeBuilderFromInput(form);
+        updateAppointmentPreview();
+        return;
+      }
+      dateInput.value = localYmd(now);
+      syncTimeBuilderFromInput(form);
       updateAppointmentPreview();
     });
   });
 
-  form.querySelectorAll('.quick-pill[data-quick-time]').forEach((btn) => {
+  form.querySelectorAll('.quick-pill[data-open-picker]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (btn.dataset.quickTime !== 'next-hour' || !timeInput) return;
-      const dt = roundToNextQuarterHour(new Date(Date.now() + 60 * 60 * 1000));
-      timeInput.value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-      updateAppointmentPreview();
+      const picker = dateInput;
+      if (!picker) return;
+      if (typeof picker.showPicker === 'function') {
+        picker.showPicker();
+      } else {
+        picker.focus();
+        picker.click();
+      }
     });
+  });
+
+  dateInput?.addEventListener('change', () => {
+    if (!timeInput || !dateInput?.value) return;
+    const selectedDate = dateInput.value;
+      if (selectedDate !== localYmd(new Date())) return;
+      if (!timeInput.value) return;
+      const now = roundToNextQuarterHour(new Date());
+      const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (timeInput.value < current) {
+        timeInput.value = current;
+      }
+      syncTimeBuilderFromInput(form);
+      updateAppointmentPreview();
   });
 
   setAppointmentDefaults();
+  syncTimeBuilderFromInput(form);
 }
 
 function renderStats(stats = {}) {

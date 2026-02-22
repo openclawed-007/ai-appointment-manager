@@ -280,7 +280,11 @@
 
     .appointment-modal {
         max-width: 100%;
-        max-height: 96vh;
+        max-height: 86vh;
+    }
+
+    .appointment-side .side-summary {
+        display: none;
     }
 
     .modal {
@@ -302,6 +306,14 @@
 
     .location-selector {
         flex-direction: column;
+    }
+
+    .time-builder-main {
+        grid-template-columns: 1fr auto 1fr;
+    }
+
+    .time-meridiem {
+        grid-column: 1 / -1;
     }
 
     .form-row {
@@ -365,7 +377,7 @@
 
     /* Menus + toasts */
     .day-menu {
-        width: calc(100vw - 16px);
+        width: min(360px, calc(100vw - 24px));
         max-height: 62vh;
         padding: 8px;
     }

@@ -114,9 +114,8 @@
     letter-spacing: 0.01em;
 }
 
-/* Hover glow per card */
 .stat-today:hover {
-    box-shadow: 0 6px 24px rgba(226, 168, 75, 0.15);
+    box-shadow: 0 6px 24px var(--gold-glow);
 }
 
 .stat-week:hover {
@@ -167,6 +166,60 @@
 
 .dashboard-grid.two-col {
     grid-template-columns: 1fr 1fr;
+}
+
+/* ── Calendar-only tab mode ── */
+body.calendar-view-only section.app-view[data-view='dashboard'].active .stats-grid,
+body.calendar-view-only section.app-view[data-view='dashboard'].active .completed-card,
+body.calendar-view-only section.app-view[data-view='dashboard'].active .dashboard-grid.two-col {
+    display: none;
+}
+
+body.calendar-view-only section.app-view[data-view='dashboard'].active .dashboard-grid {
+    grid-template-columns: 1fr;
+}
+
+body.calendar-view-only section.app-view[data-view='dashboard'].active .schedule-card {
+    display: none;
+}
+
+body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-card {
+    min-height: 70vh;
+}
+
+body.calendar-view-only section.app-view[data-view='dashboard'].active .day-cell {
+    min-height: 110px;
+}
+
+body.calendar-view-only #btn-calendar-expand {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-card {
+        min-height: auto;
+    }
+
+    body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-grid {
+        padding: 1px;
+        gap: 1px;
+        background: var(--border-strong);
+    }
+
+    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-header {
+        padding: 6px 0;
+        font-size: 0.56rem;
+    }
+
+    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-cell {
+        min-height: 64px;
+        aspect-ratio: auto;
+        padding: 4px;
+    }
+
+    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-events-preview {
+        display: none;
+    }
 }
 
 /* ── Cards ── */

@@ -346,6 +346,65 @@
     color: var(--gold);
 }
 
+.native-time-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.time-builder {
+    margin-top: 2px;
+    display: grid;
+    gap: 8px;
+}
+
+.time-builder-main {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.time-builder-main input {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    padding: 10px 8px;
+}
+
+.time-colon {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.time-meridiem {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.time-meridiem-btn {
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    padding: 10px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.time-meridiem-btn.active {
+    border-color: var(--gold);
+    background: var(--gold-dim);
+    color: var(--gold);
+}
+
 .form-actions {
     display: flex;
     gap: var(--spacing-md);
