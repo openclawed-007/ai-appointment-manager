@@ -50,3 +50,60 @@
     border-radius: var(--radius-full);
     border: 1px solid var(--border);
 }
+
+.types-helper {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.type-admin-card {
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.type-admin-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+.type-admin-card__identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.type-admin-card__identity .type-color {
+    width: 8px;
+    height: 42px;
+    border-radius: var(--radius-sm);
+}
+
+.type-admin-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.type-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.type-admin-card__actions {
+    justify-content: flex-end;
+}
