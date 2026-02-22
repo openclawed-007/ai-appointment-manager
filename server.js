@@ -21,7 +21,14 @@ const {
 } = require('./lib/db');
 
 const { fmtTime, buildBrandedEmailHtml, buildCancellationEmailHtml, sendEmail } = require('./lib/email');
-const { createAppointment, assertNoOverlap, parseTimeOrThrow, dateLockKey } = require('./lib/appointments');
+const {
+  createAppointment,
+  assertNoOverlap,
+  parseTimeOrThrow,
+  dateLockKey,
+  getAvailableSlots,
+  PUBLIC_SLOT_INTERVAL_MINUTES
+} = require('./lib/appointments');
 const { createInsights } = require('./lib/insights');
 const { exportBusinessData, importBusinessData } = require('./lib/data');
 const {
@@ -584,6 +591,7 @@ app.use('/api', async (req, res, next) => {
     req.path === '/health' ||
     req.path.startsWith('/auth/') ||
     req.path === '/public/bookings' ||
+    req.path === '/public/available-slots' ||
     (req.path === '/types' && req.method === 'GET' && req.query.businessSlug)
   ) {
     return next();
@@ -968,6 +976,44 @@ app.post('/api/public/bookings', async (req, res) => {
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/public/available-slots', async (req, res) => {
+  try {
+    const slug = String(req.query?.businessSlug || '').trim();
+    const date = String(req.query?.date || '').trim();
+    const typeId = Number(req.query?.typeId);
+
+    if (!slug) return res.status(400).json({ error: 'businessSlug is required.' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'date must be in YYYY-MM-DD format.' });
+    if (!Number.isFinite(typeId) || typeId <= 0) return res.status(400).json({ error: 'typeId is required.' });
+
+    const business = await getBusinessBySlug(slug);
+    if (!business) return res.status(404).json({ error: 'Business not found.' });
+
+    const type = await dbGet(
+      'SELECT id, duration_minutes FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
+      'SELECT id, duration_minutes FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
+      [typeId, Number(business.id)]
+    );
+    if (!type) return res.status(404).json({ error: 'Appointment type not found.' });
+
+    const durationMinutes = Number(type.duration_minutes || 45);
+    const availableSlots = await getAvailableSlots({
+      businessId: Number(business.id),
+      date,
+      durationMinutes
+    });
+
+    return res.json({
+      date,
+      durationMinutes,
+      slotIntervalMinutes: PUBLIC_SLOT_INTERVAL_MINUTES,
+      availableSlots
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 });
 

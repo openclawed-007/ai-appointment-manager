@@ -242,6 +242,60 @@ describe('API smoke', () => {
     expect(publicTypesA.body.types.some((t) => t.name === `Alpha Exclusive ${unique}`)).toBe(true);
   });
 
+  it('returns public available slots and excludes overlapping times', async () => {
+    const unique = Date.now();
+    const agent = request.agent(app);
+    const verified = await signupAndVerify(agent, {
+      businessName: `Slots ${unique}`,
+      name: 'Slots Owner',
+      email: `slots-${unique}@example.com`,
+      password: 'SlotsPass123!',
+      timezone: 'America/Los_Angeles'
+    });
+
+    const typeRes = await post(agent, '/api/types').send({
+      name: `Slots Type ${unique}`,
+      durationMinutes: 30,
+      priceCents: 3000,
+      locationMode: 'office'
+    });
+    expect(typeRes.statusCode).toBe(201);
+    const typeId = typeRes.body.type.id;
+
+    const createA = await post(agent, '/api/appointments').send({
+      typeId,
+      clientName: 'Booked A',
+      clientEmail: `booked-a-${unique}@example.com`,
+      date: '2026-06-12',
+      time: '09:00',
+      durationMinutes: 30,
+      location: 'office'
+    });
+    expect(createA.statusCode).toBe(201);
+
+    const createB = await post(agent, '/api/appointments').send({
+      typeId,
+      clientName: 'Booked B',
+      clientEmail: `booked-b-${unique}@example.com`,
+      date: '2026-06-12',
+      time: '10:00',
+      durationMinutes: 30,
+      location: 'office'
+    });
+    expect(createB.statusCode).toBe(201);
+
+    const slotsRes = await request(app).get(
+      `/api/public/available-slots?businessSlug=${encodeURIComponent(verified.business.slug)}&date=2026-06-12&typeId=${typeId}`
+    );
+    expect(slotsRes.statusCode).toBe(200);
+    expect(slotsRes.body.durationMinutes).toBe(30);
+    expect(Array.isArray(slotsRes.body.availableSlots)).toBe(true);
+    expect(slotsRes.body.availableSlots).not.toContain('09:00');
+    expect(slotsRes.body.availableSlots).not.toContain('10:00');
+    expect(slotsRes.body.availableSlots).toContain('09:30');
+    expect(slotsRes.body.availableSlots).toContain('10:30');
+  });
+
   it('rejects weak signup passwords', async () => {
     const weakRes = await request(app).post('/api/auth/signup').set(CSRF).send({
       businessName: `Weak Biz ${Date.now()}`,
