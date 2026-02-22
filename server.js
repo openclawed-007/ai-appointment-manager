@@ -621,7 +621,7 @@ app.get('/api/settings', async (req, res) => {
 });
 
 app.put('/api/settings', async (req, res) => {
-  const { businessName, ownerEmail, timezone } = req.body || {};
+  const { businessName, ownerEmail, timezone, notifyOwnerEmail } = req.body || {};
   const incomingTheme = req.body?.theme;
   const businessId = req.auth.businessId;
 
@@ -629,14 +629,26 @@ app.put('/api/settings', async (req, res) => {
     `UPDATE business_settings
      SET business_name = COALESCE(?, business_name),
          owner_email = COALESCE(?, owner_email),
-         timezone = COALESCE(?, timezone)
+         timezone = COALESCE(?, timezone),
+         notify_owner_email = COALESCE(?, notify_owner_email)
      WHERE business_id = ?`,
     `UPDATE business_settings
      SET business_name = COALESCE($1, business_name),
          owner_email = COALESCE($2, owner_email),
-         timezone = COALESCE($3, timezone)
-     WHERE business_id = $4`,
-    [businessName || null, ownerEmail || null, timezone || null, businessId]
+         timezone = COALESCE($3, timezone),
+         notify_owner_email = COALESCE($4, notify_owner_email)
+     WHERE business_id = $5`,
+    [
+      businessName || null,
+      ownerEmail || null,
+      timezone || null,
+      notifyOwnerEmail === undefined
+        ? null
+        : USE_POSTGRES
+          ? Boolean(notifyOwnerEmail)
+          : Number(Boolean(notifyOwnerEmail)),
+      businessId
+    ]
   );
 
   const normalizedTheme = incomingTheme === 'dark' || incomingTheme === 'light' ? incomingTheme : null;

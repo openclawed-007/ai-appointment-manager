@@ -2076,6 +2076,13 @@ async function loadSettings() {
   const previewToggle = document.getElementById('settings-calendar-show-client-names');
   if (previewToggle) previewToggle.checked = Boolean(state.calendarShowClientNames);
 
+  // Owner email notification toggle (server setting)
+  const notifyToggle = document.getElementById('settings-notify-owner-email');
+  if (notifyToggle) {
+    const val = settings.notify_owner_email;
+    notifyToggle.checked = (val === false || val === 0) ? false : true;
+  }
+
   // Populate the export type chips
   populateExportTypeFilters();
 }
@@ -2833,6 +2840,22 @@ function bindForms() {
     state.calendarShowClientNames = checked;
     setStoredValue('calendarShowClientNames', checked);
     await refreshCalendarDots();
+  });
+
+  // ── Settings: owner email notification toggle ─────────────────────────────
+  document.getElementById('settings-notify-owner-email')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.currentTarget?.checked);
+    try {
+      await api('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ notifyOwnerEmail: checked })
+      });
+      showToast(checked ? 'Owner notifications enabled' : 'Owner notifications disabled', 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+      // Revert the toggle on error
+      e.currentTarget.checked = !checked;
+    }
   });
 
   // ── Settings: theme selector ──────────────────────────────────────────────
