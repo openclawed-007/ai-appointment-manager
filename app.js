@@ -741,6 +741,13 @@ async function refreshAfterSync() {
   }
 }
 
+function swallowBackgroundAsyncError(error) {
+  if (!error) return;
+  // Offline/network transitions are expected for background refresh calls.
+  if (error.code === 'OFFLINE' || error.code === 'NETWORK') return;
+  console.error(error);
+}
+
 async function flushOfflineMutationQueue() {
   if (state.queueSyncInProgress) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -817,7 +824,7 @@ function bindNetworkState() {
           : 'You are offline. Cached pages stay available until connection returns.',
         isOnline ? 'success' : 'info'
       );
-      if (isOnline) void flushOfflineMutationQueue();
+      if (isOnline) void flushOfflineMutationQueue().catch(swallowBackgroundAsyncError);
     }
     initialized = true;
   };
@@ -935,7 +942,9 @@ function setActiveView(view) {
 
   const canAutoLoadAppointments =
     typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
-  if (activeView === 'appointments' && canAutoLoadAppointments) void loadAppointmentsTable();
+  if (activeView === 'appointments' && canAutoLoadAppointments) {
+    void loadAppointmentsTable().catch(swallowBackgroundAsyncError);
+  }
 }
 
 function getActiveView() {
@@ -1123,8 +1132,8 @@ function bindCalendarNav() {
 
     const selectedCell = dayCell;
     const selectedDate = state.selectedDate;
-    if (selectedCell) void openDayMenu(selectedCell, selectedDate);
-    void loadDashboard(selectedDate, { refreshDots: false });
+    if (selectedCell) void openDayMenu(selectedCell, selectedDate).catch(swallowBackgroundAsyncError);
+    void loadDashboard(selectedDate, { refreshDots: false }).catch(swallowBackgroundAsyncError);
   });
 }
 
@@ -2837,7 +2846,9 @@ function applyInitialTheme() {
 async function init() {
   await registerServiceWorker();
   bindNetworkState();
-  if (typeof navigator !== 'undefined' && navigator.onLine) void flushOfflineMutationQueue();
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    void flushOfflineMutationQueue().catch(swallowBackgroundAsyncError);
+  }
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
