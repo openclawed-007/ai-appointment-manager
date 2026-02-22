@@ -44,7 +44,10 @@ async function api(path, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const error = new Error(data.error || 'Request failed');
-    error.code = res.status;
+    // Service worker returns 503 + { error: 'Offline' } for API calls with no network.
+    error.code = res.status === 503 && data?.error === 'Offline'
+      ? 'OFFLINE'
+      : res.status;
     throw error;
   }
   return data;

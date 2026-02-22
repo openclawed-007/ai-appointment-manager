@@ -641,7 +641,10 @@ async function api(path, options = {}) {
   }
   if (!response.ok) {
     const error = new Error(body.error || `Request failed (${response.status})`);
-    error.code = response.status;
+    // Service worker returns 503 + { error: 'Offline' } for API calls with no network.
+    error.code = response.status === 503 && body?.error === 'Offline'
+      ? 'OFFLINE'
+      : response.status;
     throw error;
   }
   return body;
