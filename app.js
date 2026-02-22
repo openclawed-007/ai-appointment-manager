@@ -1209,6 +1209,11 @@ function bindCalendarNav() {
 
     const selectedCell = dayCell;
     const selectedDate = state.selectedDate;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      openNewAppointmentModalForDate(selectedDate);
+      showToast('Offline mode: creating appointment for selected date.', 'info');
+      return;
+    }
     if (selectedCell) void openDayMenu(selectedCell, selectedDate).catch(swallowBackgroundAsyncError);
     void loadDashboard(selectedDate, { refreshDots: false }).catch(swallowBackgroundAsyncError);
   });
@@ -2583,7 +2588,13 @@ async function ensureAuth() {
         hideAuthShell();
         return true;
       }
-      throw error;
+      // Offline without a cached auth snapshot: keep shell hidden so offline
+      // queueing/creation UX is still usable until connectivity returns.
+      state.currentUser = null;
+      state.currentBusiness = null;
+      updateAccountUi();
+      hideAuthShell();
+      return false;
     }
     state.currentUser = null;
     state.currentBusiness = null;
