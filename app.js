@@ -41,8 +41,13 @@ const state = {
   unreadNotifications: 0,
   authLoginChallengeToken: '',
   authLoginEmail: '',
-  authResendCooldownUntil: 0
+  authResendCooldownUntil: 0,
+  calendarDotsRequestId: 0
 };
+
+const CALENDAR_MONTH_CACHE_TTL_MS = 120000;
+const calendarMonthCache = new Map();
+const calendarMonthInFlight = new Map();
 
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
@@ -539,7 +544,7 @@ async function openDayMenu(anchorEl, date) {
           }
           await loadDashboard();
           await loadAppointmentsTable();
-          await refreshCalendarDots();
+          await refreshCalendarDots({ force: true });
           const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
           if (selectedCell && state.dayMenuDate === date) {
             await openDayMenu(selectedCell, date);
@@ -585,7 +590,7 @@ async function openDayMenu(anchorEl, date) {
           showToast('Appointment confirmed!', 'success');
           await loadDashboard();
           await loadAppointmentsTable();
-          await refreshCalendarDots();
+          await refreshCalendarDots({ force: true });
           const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
           if (selectedCell && state.dayMenuDate === date) {
             await openDayMenu(selectedCell, date);
@@ -978,7 +983,7 @@ async function cancelAppointmentById(appointmentId, date = '', cancellationReaso
     showToast('Appointment cancelled.', 'success');
     await loadDashboard();
     await loadAppointmentsTable();
-    await refreshCalendarDots();
+    await refreshCalendarDots({ force: true });
     if (date && state.dayMenuDate === date) {
       const selectedCell = document.querySelector(`.day-cell[data-day="${Number(date.slice(8, 10))}"]`);
       if (selectedCell) await openDayMenu(selectedCell, date);
@@ -1463,22 +1468,24 @@ function renderStats(stats = {}) {
   renderNotificationDots(state.unreadNotifications);
 }
 
-async function refreshCalendarDots() {
-  const yyyy = state.calendarDate.getFullYear();
-  const mm = String(state.calendarDate.getMonth() + 1).padStart(2, '0');
-  const monthParam = `${yyyy}-${mm}`;
+function toMonthParam(dateValue = new Date()) {
+  const yyyy = dateValue.getFullYear();
+  const mm = String(dateValue.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
+}
 
-  // Only fetch appointments for the visible calendar month rather than all appointments.
-  const { appointments: rawAppointments } = await api(`/api/appointments?month=${encodeURIComponent(monthParam)}`);
+function monthParamFromOffset(baseMonthParam, delta = 0) {
+  const [y, m] = String(baseMonthParam || '').split('-').map(Number);
+  const dt = new Date(Number(y), Number(m || 1) - 1, 1);
+  dt.setMonth(dt.getMonth() + Number(delta || 0));
+  return toMonthParam(dt);
+}
 
-  const monthAppointments = rawAppointments.filter((a) => {
-    const status = String(a.status || '').toLowerCase();
-    return status !== 'completed' && status !== 'cancelled';
-  });
+function renderCalendarDotsForMonth(monthAppointments = []) {
   const dayAppointments = new Map();
-
   monthAppointments.forEach((a) => {
-    const day = Number(a.date.slice(8, 10));
+    const day = Number(String(a.date || '').slice(8, 10));
+    if (!day) return;
     if (!dayAppointments.has(day)) dayAppointments.set(day, []);
     dayAppointments.get(day).push(a);
   });
@@ -1491,7 +1498,7 @@ async function refreshCalendarDots() {
     const labelParts = [`${count} booking${count === 1 ? '' : 's'}`];
 
     if (appts.length) {
-      labelParts.push(appts.map(a => a.typeName).filter(Boolean).join(', '));
+      labelParts.push(appts.map((a) => a.typeName).filter(Boolean).join(', '));
     }
 
     cell.classList.toggle('has-event', count > 0);
@@ -1502,7 +1509,7 @@ async function refreshCalendarDots() {
     cell.title = count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`;
 
     if (preview) {
-      preview.innerHTML = appts.slice(0, 3).map(a =>
+      preview.innerHTML = appts.slice(0, 3).map((a) =>
         `<div class="cal-event" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
            <span class="cal-event-time">${toTimeCompact(a.time)}</span>
            <span class="cal-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
@@ -1512,8 +1519,56 @@ async function refreshCalendarDots() {
         preview.innerHTML += `<div class="cal-event-more">+${count - 3} more</div>`;
       }
     }
-
   });
+}
+
+async function fetchCalendarMonth(monthParam, { force = false } = {}) {
+  const cached = calendarMonthCache.get(monthParam);
+  const isFresh = cached && (Date.now() - cached.fetchedAt < CALENDAR_MONTH_CACHE_TTL_MS);
+  if (!force && isFresh) return cached.appointments;
+
+  if (!force && calendarMonthInFlight.has(monthParam)) {
+    return calendarMonthInFlight.get(monthParam);
+  }
+
+  const req = (async () => {
+    const { appointments } = await api(`/api/calendar/month?month=${encodeURIComponent(monthParam)}`);
+    const safe = Array.isArray(appointments) ? appointments : [];
+    calendarMonthCache.set(monthParam, { appointments: safe, fetchedAt: Date.now() });
+    return safe;
+  })();
+
+  calendarMonthInFlight.set(monthParam, req);
+  try {
+    return await req;
+  } finally {
+    calendarMonthInFlight.delete(monthParam);
+  }
+}
+
+function prefetchAdjacentCalendarMonths(monthParam) {
+  const adjacent = [monthParamFromOffset(monthParam, -1), monthParamFromOffset(monthParam, 1)];
+  adjacent.forEach((m) => {
+    if (calendarMonthCache.has(m) || calendarMonthInFlight.has(m)) return;
+    void fetchCalendarMonth(m).catch(swallowBackgroundAsyncError);
+  });
+}
+
+async function refreshCalendarDots(options = {}) {
+  const { force = false } = options;
+  const monthParam = toMonthParam(state.calendarDate);
+  const requestId = ++state.calendarDotsRequestId;
+
+  const cached = calendarMonthCache.get(monthParam);
+  if (!force && cached?.appointments) {
+    renderCalendarDotsForMonth(cached.appointments);
+  }
+
+  const monthAppointments = await fetchCalendarMonth(monthParam, { force });
+  if (requestId !== state.calendarDotsRequestId) return;
+
+  renderCalendarDotsForMonth(monthAppointments);
+  prefetchAdjacentCalendarMonths(monthParam);
 }
 
 function renderTimeline(appointments = [], options = {}) {
@@ -1809,7 +1864,7 @@ function renderAppointmentsTable(appointments = []) {
         showToast('Appointment confirmed!', 'success');
         await loadAppointmentsTable();
         await loadDashboard();
-        await refreshCalendarDots();
+        await refreshCalendarDots({ force: true });
       } catch (error) {
         showToast(error.message, 'error');
         btn.disabled = false;
@@ -2001,7 +2056,7 @@ async function submitAppointment(e) {
     closeModal('new-appointment');
     await loadDashboard();
     await loadAppointmentsTable();
-    await refreshCalendarDots();
+    await refreshCalendarDots({ force: true });
     if (wasEditing) showToast('Appointment updated.', 'success');
   } catch (error) {
     showToast(error.message, 'error');

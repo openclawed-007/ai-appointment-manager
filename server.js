@@ -800,6 +800,74 @@ app.delete('/api/types/:id', async (req, res) => {
 
 // ── Appointments routes ───────────────────────────────────────────────────────
 
+app.get('/api/calendar/month', async (req, res) => {
+  const businessId = req.auth.businessId;
+  const { month } = req.query;
+  const monthRange = month ? getMonthDateRange(month) : null;
+  if (!monthRange) return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+
+  if (!USE_POSTGRES) {
+    const rows = getSqlite().prepare(
+      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title,
+              COALESCE(t.name, a.title, 'Appointment') AS type_name,
+              t.color AS type_color
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.business_id = ?
+         AND a.date >= ?
+         AND a.date < ?
+         AND a.status != 'completed'
+         AND a.status != 'cancelled'
+       ORDER BY a.date ASC, a.time ASC`
+    ).all(businessId, monthRange.start, monthRange.end);
+
+    return res.json({
+      appointments: rows.map((r) => ({
+        id: Number(r.id),
+        date: r.date,
+        time: String(r.time || '').slice(0, 5),
+        durationMinutes: Number(r.duration_minutes || 45),
+        status: r.status,
+        clientName: r.client_name,
+        title: r.title || r.type_name || 'Appointment',
+        typeName: r.type_name || 'Appointment',
+        color: r.type_color || null
+      }))
+    });
+  }
+
+  const rows = (
+    await getPgPool().query(
+      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title,
+              COALESCE(t.name, a.title, 'Appointment') AS type_name,
+              t.color AS type_color
+       FROM appointments a
+       LEFT JOIN appointment_types t ON t.id = a.type_id
+       WHERE a.business_id = $1
+         AND a.date >= $2
+         AND a.date < $3
+         AND a.status != 'completed'
+         AND a.status != 'cancelled'
+       ORDER BY a.date ASC, a.time ASC`,
+      [businessId, monthRange.start, monthRange.end]
+    )
+  ).rows;
+
+  return res.json({
+    appointments: rows.map((r) => ({
+      id: Number(r.id),
+      date: typeof r.date === 'string' ? r.date.slice(0, 10) : r.date?.toISOString?.().slice(0, 10),
+      time: typeof r.time === 'string' ? r.time.slice(0, 5) : '09:00',
+      durationMinutes: Number(r.duration_minutes || 45),
+      status: r.status,
+      clientName: r.client_name,
+      title: r.title || r.type_name || 'Appointment',
+      typeName: r.type_name || 'Appointment',
+      color: r.type_color || null
+    }))
+  });
+});
+
 app.get('/api/appointments', async (req, res) => {
   const businessId = req.auth.businessId;
   const { date, q, status, month } = req.query;
