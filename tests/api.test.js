@@ -262,6 +262,21 @@ describe('API smoke', () => {
     expect(typeRes.statusCode).toBe(201);
     const typeId = typeRes.body.type.id;
 
+    const hoursRes = await put(agent, '/api/settings').send({
+      openTime: '10:00',
+      closeTime: '14:00',
+      businessHours: {
+        mon: { closed: false, openTime: '10:00', closeTime: '14:00' },
+        tue: { closed: false, openTime: '10:00', closeTime: '14:00' },
+        wed: { closed: false, openTime: '10:00', closeTime: '14:00' },
+        thu: { closed: false, openTime: '10:00', closeTime: '14:00' },
+        fri: { closed: false, openTime: '10:00', closeTime: '14:00' },
+        sat: { closed: false, openTime: '08:00', closeTime: '16:00' },
+        sun: { closed: true, openTime: '10:00', closeTime: '14:00' }
+      }
+    });
+    expect(hoursRes.statusCode).toBe(200);
+
     const createA = await post(agent, '/api/appointments').send({
       typeId,
       clientName: 'Booked A',
@@ -289,11 +304,23 @@ describe('API smoke', () => {
     );
     expect(slotsRes.statusCode).toBe(200);
     expect(slotsRes.body.durationMinutes).toBe(30);
+    expect(slotsRes.body.openTime).toBe('10:00');
+    expect(slotsRes.body.closeTime).toBe('14:00');
     expect(Array.isArray(slotsRes.body.availableSlots)).toBe(true);
     expect(slotsRes.body.availableSlots).not.toContain('09:00');
+    expect(slotsRes.body.availableSlots).not.toContain('09:30');
     expect(slotsRes.body.availableSlots).not.toContain('10:00');
-    expect(slotsRes.body.availableSlots).toContain('09:30');
     expect(slotsRes.body.availableSlots).toContain('10:30');
+    expect(slotsRes.body.availableSlots).toContain('13:30');
+    expect(slotsRes.body.availableSlots).not.toContain('14:00');
+
+    const closedDayRes = await request(app).get(
+      `/api/public/available-slots?businessSlug=${encodeURIComponent(verified.business.slug)}&date=2026-06-14&typeId=${typeId}`
+    );
+    expect(closedDayRes.statusCode).toBe(200);
+    expect(closedDayRes.body.dayKey).toBe('sun');
+    expect(closedDayRes.body.closed).toBe(true);
+    expect(closedDayRes.body.availableSlots).toEqual([]);
   });
 
   it('rejects weak signup passwords', async () => {

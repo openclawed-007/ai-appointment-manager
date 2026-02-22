@@ -446,6 +446,11 @@
         padding: var(--spacing-lg);
     }
 
+    .booking-hours-display {
+        font-size: 0.72rem;
+        padding: 4px 10px;
+    }
+
     .booking-form {
         padding: var(--spacing-lg);
     }

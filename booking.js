@@ -9,6 +9,7 @@ const slotsHint = document.getElementById('booking-slots-hint');
 const slotPeriodsContainer = document.getElementById('booking-slot-periods');
 const slotMoreButton = document.getElementById('booking-slots-more');
 const dateReadable = document.getElementById('booking-date-readable');
+const bookingHoursDisplay = document.getElementById('booking-hours-display');
 const form = document.getElementById('public-booking-form');
 
 let types = [];
@@ -212,6 +213,31 @@ function toTime12(time24 = '09:00') {
   return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
+function dayLabelFromKey(dayKey = '') {
+  const labels = {
+    mon: 'Monday',
+    tue: 'Tuesday',
+    wed: 'Wednesday',
+    thu: 'Thursday',
+    fri: 'Friday',
+    sat: 'Saturday',
+    sun: 'Sunday'
+  };
+  return labels[String(dayKey || '').toLowerCase()] || 'Selected day';
+}
+
+function setBookingHours({ openTime, closeTime, dayKey, closed = false }) {
+  if (!bookingHoursDisplay) return;
+  if (closed) {
+    bookingHoursDisplay.textContent = `${dayLabelFromKey(dayKey)}: Closed`;
+  } else {
+    const openLabel = toTime12(String(openTime || '09:00').slice(0, 5));
+    const closeLabel = toTime12(String(closeTime || '18:00').slice(0, 5));
+    bookingHoursDisplay.textContent = `${dayLabelFromKey(dayKey)} hours: ${openLabel} - ${closeLabel}`;
+  }
+  bookingHoursDisplay.classList.remove('hidden');
+}
+
 function humanizeLocation(value = '') {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'office') return 'In person';
@@ -362,16 +388,26 @@ async function loadAvailableSlots() {
     });
     const result = await api(`/api/public/available-slots?${params.toString()}`);
     if (requestId !== slotsRequestSeq) return;
+    setBookingHours({
+      openTime: result.openTime,
+      closeTime: result.closeTime,
+      dayKey: result.dayKey,
+      closed: Boolean(result.closed)
+    });
 
     const slots = Array.isArray(result.availableSlots) ? result.availableSlots : [];
     availableSlotsState = slots;
     showAllSlotsInPeriod = false;
     ensureUsableSlotPeriod();
     const previous = String(timeInput?.value || '').slice(0, 5);
-    renderAvailableSlotsView();
+    renderAvailableSlotsView(result.closed ? 'Business is closed on this day.' : 'No open times for this date. Try another day.');
     if (previous && slots.includes(previous)) setSelectedSlot(previous);
     else setSelectedSlot('');
-    setSlotsHint(slots.length ? 'Select a time slot.' : 'No slots left for this day.');
+    if (result.closed) {
+      setSlotsHint('Business is closed on this day.');
+    } else {
+      setSlotsHint(slots.length ? 'Select a time slot.' : 'No slots left for this day.');
+    }
   } catch (error) {
     if (requestId !== slotsRequestSeq) return;
     setSelectedSlot('');

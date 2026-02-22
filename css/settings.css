@@ -150,6 +150,177 @@
     line-height: 1.4;
 }
 
+/* ── Modern Business Hours UI ── */
+.business-hours-group {
+    margin-top: var(--spacing-sm);
+}
+
+.bh-header-modern {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bh-header-modern label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text);
+    margin: 0;
+}
+
+.bh-quick-actions {
+    display: flex;
+    gap: 6px;
+    background: var(--bg-input);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+.bh-quick-btn {
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-radius: calc(var(--radius-md) - 2px);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.bh-quick-btn:hover {
+    background: var(--bg-surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.bh-custom-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bh-custom-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 10px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.bh-custom-row:hover {
+    border-color: var(--border-strong);
+}
+
+.bh-custom-row.is-closed,
+.bh-custom-row:has(.bh-closed-checkbox:checked) {
+    opacity: 0.7;
+    background: var(--bg-surface);
+}
+
+.bh-day-toggle {
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.bh-closed-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.bh-day-badge {
+    width: 44px;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all var(--transition-fast);
+    /* Open State */
+    background: var(--gold-dim);
+    color: var(--gold);
+    border: 1px solid rgba(226, 168, 75, 0.2);
+}
+
+.bh-day-toggle:hover .bh-day-badge {
+    filter: brightness(1.1);
+}
+
+.bh-closed-checkbox:checked+.bh-day-badge {
+    /* Closed State */
+    background: var(--bg-input);
+    color: var(--text-muted);
+    border: 1px solid var(--border-strong);
+}
+
+.bh-time-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    transition: opacity var(--transition-fast);
+}
+
+.bh-closed-checkbox:checked~.bh-time-section {
+    display: none;
+}
+
+.bh-time-wrap {
+    position: relative;
+    max-width: 130px;
+}
+
+.bh-time-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--text);
+    transition: all var(--transition-fast);
+}
+
+.bh-time-input:focus {
+    border-color: var(--gold);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--gold-dim);
+}
+
+.bh-time-sep {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.bh-closed-msg {
+    display: none;
+    flex: 1;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-style: italic;
+    padding: 0 10px;
+}
+
+.bh-closed-checkbox:checked~.bh-closed-msg {
+    display: block;
+}
+
 
 /* ── Custom toggle switch ── */
 .toggle-switch {
@@ -671,6 +842,26 @@
     .export-panel-footer {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .business-hours-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 10px;
+    }
+
+    .business-hours-day-wrap {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .business-hours-closed-pill {
+        justify-self: start;
+    }
+
+    .business-hours-time-fields {
+        grid-template-columns: 1fr 1fr;
     }
 
 }

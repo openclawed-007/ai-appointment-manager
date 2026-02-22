@@ -27,7 +27,9 @@ const {
   parseTimeOrThrow,
   dateLockKey,
   getAvailableSlots,
-  PUBLIC_SLOT_INTERVAL_MINUTES
+  PUBLIC_SLOT_INTERVAL_MINUTES,
+  DEFAULT_PUBLIC_BOOKING_OPEN_TIME,
+  DEFAULT_PUBLIC_BOOKING_CLOSE_TIME
 } = require('./lib/appointments');
 const { createInsights } = require('./lib/insights');
 const { exportBusinessData, importBusinessData } = require('./lib/data');
@@ -64,6 +66,57 @@ function getMonthDateRange(monthValue = '') {
   const nextMonth = month === 12 ? 1 : month + 1;
   const end = `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}-01`;
   return { start, end };
+}
+
+const BUSINESS_HOURS_DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function defaultBusinessHours(openTime = DEFAULT_PUBLIC_BOOKING_OPEN_TIME, closeTime = DEFAULT_PUBLIC_BOOKING_CLOSE_TIME) {
+  return BUSINESS_HOURS_DAY_KEYS.reduce((acc, day) => {
+    acc[day] = { closed: false, openTime, closeTime };
+    return acc;
+  }, {});
+}
+
+function normalizeBusinessHours(input, fallbackOpen = DEFAULT_PUBLIC_BOOKING_OPEN_TIME, fallbackClose = DEFAULT_PUBLIC_BOOKING_CLOSE_TIME) {
+  const base = defaultBusinessHours(fallbackOpen, fallbackClose);
+  if (!input || typeof input !== 'object') return base;
+  const normalized = {};
+  for (const day of BUSINESS_HOURS_DAY_KEYS) {
+    const raw = input[day] && typeof input[day] === 'object' ? input[day] : {};
+    const closed = Boolean(raw.closed);
+    const openTime = String(raw.openTime || fallbackOpen).slice(0, 5);
+    const closeTime = String(raw.closeTime || fallbackClose).slice(0, 5);
+    if (!closed) {
+      const openMinutes = parseTimeOrThrow(openTime);
+      const closeMinutes = parseTimeOrThrow(closeTime);
+      if (closeMinutes <= openMinutes) {
+        throw new Error(`Close time must be later than open time for ${day.toUpperCase()}.`);
+      }
+    }
+    normalized[day] = { closed, openTime, closeTime };
+  }
+  return normalized;
+}
+
+function parseBusinessHoursJson(value, fallbackOpen, fallbackClose) {
+  if (!value) return defaultBusinessHours(fallbackOpen, fallbackClose);
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return normalizeBusinessHours(parsed, fallbackOpen, fallbackClose);
+  } catch (_error) {
+    return defaultBusinessHours(fallbackOpen, fallbackClose);
+  }
+}
+
+function resolveBusinessHoursForDate(settings = {}, isoDate = '') {
+  const fallbackOpen = String(settings.open_time || DEFAULT_PUBLIC_BOOKING_OPEN_TIME).slice(0, 5);
+  const fallbackClose = String(settings.close_time || DEFAULT_PUBLIC_BOOKING_CLOSE_TIME).slice(0, 5);
+  const businessHours = parseBusinessHoursJson(settings.business_hours_json, fallbackOpen, fallbackClose);
+  const dateObj = new Date(`${String(isoDate || '').slice(0, 10)}T00:00:00Z`);
+  const dayIndex = Number.isFinite(dateObj.getTime()) ? dateObj.getUTCDay() : 1;
+  const dayKey = BUSINESS_HOURS_DAY_KEYS[dayIndex] || 'mon';
+  const forDay = businessHours[dayKey] || { closed: false, openTime: fallbackOpen, closeTime: fallbackClose };
+  return { dayKey, ...forDay, businessHours };
 }
 
 // Render/Neon deployments run behind a reverse proxy. Trust the first proxy hop
@@ -613,6 +666,11 @@ app.use('/api', async (req, res, next) => {
 
 app.get('/api/settings', async (req, res) => {
   const settings = (await getSettings(req.auth.businessId)) || {};
+  const businessHours = parseBusinessHoursJson(
+    settings.business_hours_json,
+    String(settings.open_time || DEFAULT_PUBLIC_BOOKING_OPEN_TIME).slice(0, 5),
+    String(settings.close_time || DEFAULT_PUBLIC_BOOKING_CLOSE_TIME).slice(0, 5)
+  );
   const userPrefs = await dbGet(
     'SELECT theme_preference, accent_color FROM users WHERE id = ? AND business_id = ?',
     'SELECT theme_preference, accent_color FROM users WHERE id = $1 AND business_id = $2',
@@ -621,6 +679,7 @@ app.get('/api/settings', async (req, res) => {
   res.json({
     settings: {
       ...settings,
+      businessHours,
       theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
         ? userPrefs.theme_preference
         : null,
@@ -630,34 +689,89 @@ app.get('/api/settings', async (req, res) => {
 });
 
 app.put('/api/settings', async (req, res) => {
-  const { businessName, ownerEmail, timezone, notifyOwnerEmail } = req.body || {};
+  const { businessName, ownerEmail, timezone, notifyOwnerEmail, openTime, closeTime, businessHours } = req.body || {};
   const incomingTheme = req.body?.theme;
   const incomingAccent = req.body?.accentColor;
   const businessId = req.auth.businessId;
+  const currentSettings = (await getSettings(businessId)) || {};
+  const business = await getBusinessById(businessId);
+  const normalizedOpenTime = openTime == null || openTime === '' ? null : String(openTime).slice(0, 5);
+  const normalizedCloseTime = closeTime == null || closeTime === '' ? null : String(closeTime).slice(0, 5);
+  let normalizedBusinessHours = null;
+  try {
+    if (normalizedOpenTime) parseTimeOrThrow(normalizedOpenTime);
+    if (normalizedCloseTime) parseTimeOrThrow(normalizedCloseTime);
+    if (normalizedOpenTime && normalizedCloseTime) {
+      const openMinutes = parseTimeOrThrow(normalizedOpenTime);
+      const closeMinutes = parseTimeOrThrow(normalizedCloseTime);
+      if (closeMinutes <= openMinutes) {
+        return res.status(400).json({ error: 'Close time must be later than open time.' });
+      }
+    }
+    normalizedBusinessHours = businessHours == null
+      ? null
+      : normalizeBusinessHours(
+        businessHours,
+        normalizedOpenTime || DEFAULT_PUBLIC_BOOKING_OPEN_TIME,
+        normalizedCloseTime || DEFAULT_PUBLIC_BOOKING_CLOSE_TIME
+      );
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const nextBusinessName = String(
+    businessName ??
+    currentSettings.business_name ??
+    business?.name ??
+    'IntelliBook'
+  ).trim() || 'IntelliBook';
+  const nextOwnerEmail = ownerEmail ?? currentSettings.owner_email ?? business?.owner_email ?? null;
+  const nextTimezone = timezone ?? currentSettings.timezone ?? business?.timezone ?? 'America/Los_Angeles';
+  const nextNotifyOwnerEmail = notifyOwnerEmail === undefined
+    ? currentSettings.notify_owner_email
+    : notifyOwnerEmail;
+  const nextOpenTime = normalizedOpenTime
+    || String(currentSettings.open_time || DEFAULT_PUBLIC_BOOKING_OPEN_TIME).slice(0, 5);
+  const nextCloseTime = normalizedCloseTime
+    || String(currentSettings.close_time || DEFAULT_PUBLIC_BOOKING_CLOSE_TIME).slice(0, 5);
+  const nextBusinessHoursJson = normalizedBusinessHours
+    ? JSON.stringify(normalizedBusinessHours)
+    : (currentSettings.business_hours_json || null);
 
   await dbRun(
-    `UPDATE business_settings
-     SET business_name = COALESCE(?, business_name),
-         owner_email = COALESCE(?, owner_email),
-         timezone = COALESCE(?, timezone),
-         notify_owner_email = COALESCE(?, notify_owner_email)
-     WHERE business_id = ?`,
-    `UPDATE business_settings
-     SET business_name = COALESCE($1, business_name),
-         owner_email = COALESCE($2, owner_email),
-         timezone = COALESCE($3, timezone),
-         notify_owner_email = COALESCE($4, notify_owner_email)
-     WHERE business_id = $5`,
+    `INSERT INTO business_settings
+       (business_id, business_name, owner_email, timezone, notify_owner_email, open_time, close_time, business_hours_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(business_id) DO UPDATE SET
+       business_name = excluded.business_name,
+       owner_email = excluded.owner_email,
+       timezone = excluded.timezone,
+       notify_owner_email = excluded.notify_owner_email,
+       open_time = excluded.open_time,
+       close_time = excluded.close_time,
+       business_hours_json = excluded.business_hours_json`,
+    `INSERT INTO business_settings
+       (business_id, business_name, owner_email, timezone, notify_owner_email, open_time, close_time, business_hours_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (business_id) DO UPDATE SET
+       business_name = EXCLUDED.business_name,
+       owner_email = EXCLUDED.owner_email,
+       timezone = EXCLUDED.timezone,
+       notify_owner_email = EXCLUDED.notify_owner_email,
+       open_time = EXCLUDED.open_time,
+       close_time = EXCLUDED.close_time,
+       business_hours_json = EXCLUDED.business_hours_json`,
     [
-      businessName || null,
-      ownerEmail || null,
-      timezone || null,
-      notifyOwnerEmail === undefined
-        ? null
-        : USE_POSTGRES
-          ? Boolean(notifyOwnerEmail)
-          : Number(Boolean(notifyOwnerEmail)),
-      businessId
+      businessId,
+      nextBusinessName,
+      nextOwnerEmail,
+      nextTimezone,
+      USE_POSTGRES
+        ? Boolean(nextNotifyOwnerEmail == null ? true : nextNotifyOwnerEmail)
+        : Number(Boolean(nextNotifyOwnerEmail == null ? true : nextNotifyOwnerEmail)),
+      nextOpenTime,
+      nextCloseTime,
+      nextBusinessHoursJson
     ]
   );
 
@@ -680,6 +794,11 @@ app.put('/api/settings', async (req, res) => {
   }
 
   const settings = (await getSettings(businessId)) || {};
+  const responseBusinessHours = parseBusinessHoursJson(
+    settings.business_hours_json,
+    String(settings.open_time || DEFAULT_PUBLIC_BOOKING_OPEN_TIME).slice(0, 5),
+    String(settings.close_time || DEFAULT_PUBLIC_BOOKING_CLOSE_TIME).slice(0, 5)
+  );
   const userPrefs = await dbGet(
     'SELECT theme_preference, accent_color FROM users WHERE id = ? AND business_id = ?',
     'SELECT theme_preference, accent_color FROM users WHERE id = $1 AND business_id = $2',
@@ -688,6 +807,7 @@ app.put('/api/settings', async (req, res) => {
   res.json({
     settings: {
       ...settings,
+      businessHours: responseBusinessHours,
       theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
         ? userPrefs.theme_preference
         : null,
@@ -972,7 +1092,42 @@ app.post('/api/public/bookings', async (req, res) => {
     if (!slug) return res.status(400).json({ error: 'businessSlug is required for public bookings.' });
     const business = await getBusinessBySlug(slug);
     if (!business) return res.status(404).json({ error: 'Business not found.' });
-    const result = await createAppointment({ ...req.body, businessId: business.id, source: 'public' });
+
+    const requestedTypeId = Number(req.body?.typeId);
+    if (!Number.isFinite(requestedTypeId) || requestedTypeId <= 0) {
+      return res.status(400).json({ error: 'typeId is required for public bookings.' });
+    }
+    const type = await dbGet(
+      'SELECT id, duration_minutes, location_mode FROM appointment_types WHERE id = ? AND business_id = ? AND active = 1',
+      'SELECT id, duration_minutes, location_mode FROM appointment_types WHERE id = $1 AND business_id = $2 AND active = TRUE',
+      [requestedTypeId, Number(business.id)]
+    );
+    if (!type) return res.status(404).json({ error: 'Appointment type not found.' });
+
+    const enforcedDurationMinutes = Number(type.duration_minutes || 45);
+    const enforcedLocation = String(type.location_mode || 'office');
+    const settings = (await getSettings(Number(business.id))) || {};
+    const hoursForDate = resolveBusinessHoursForDate(settings, String(req.body?.date || ''));
+    if (hoursForDate.closed) {
+      return res.status(400).json({ error: `Business is closed on ${hoursForDate.dayKey.toUpperCase()}.` });
+    }
+    const openTime = hoursForDate.openTime;
+    const closeTime = hoursForDate.closeTime;
+    const requestedTime = String(req.body?.time || '').slice(0, 5);
+    const startMinutes = parseTimeOrThrow(requestedTime);
+    const endMinutes = startMinutes + enforcedDurationMinutes;
+    const openMinutes = parseTimeOrThrow(openTime);
+    const closeMinutes = parseTimeOrThrow(closeTime);
+    if (startMinutes < openMinutes || endMinutes > closeMinutes) {
+      return res.status(400).json({ error: `Selected time is outside business hours (${fmtTime(openTime)}-${fmtTime(closeTime)}).` });
+    }
+    const result = await createAppointment({
+      ...req.body,
+      durationMinutes: enforcedDurationMinutes,
+      location: enforcedLocation,
+      businessId: business.id,
+      source: 'public'
+    });
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -999,17 +1154,29 @@ app.get('/api/public/available-slots', async (req, res) => {
     );
     if (!type) return res.status(404).json({ error: 'Appointment type not found.' });
 
+    const settings = (await getSettings(Number(business.id))) || {};
+    const hoursForDate = resolveBusinessHoursForDate(settings, date);
+    const openTime = hoursForDate.openTime;
+    const closeTime = hoursForDate.closeTime;
     const durationMinutes = Number(type.duration_minutes || 45);
-    const availableSlots = await getAvailableSlots({
-      businessId: Number(business.id),
-      date,
-      durationMinutes
-    });
+    const availableSlots = hoursForDate.closed
+      ? []
+      : await getAvailableSlots({
+        businessId: Number(business.id),
+        date,
+        durationMinutes,
+        openTime,
+        closeTime
+      });
 
     return res.json({
       date,
       durationMinutes,
       slotIntervalMinutes: PUBLIC_SLOT_INTERVAL_MINUTES,
+      dayKey: hoursForDate.dayKey,
+      closed: Boolean(hoursForDate.closed),
+      openTime,
+      closeTime,
       availableSlots
     });
   } catch (error) {

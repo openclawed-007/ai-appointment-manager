@@ -87,6 +87,8 @@ describe('Settings API', () => {
     expect(res.body.settings).toHaveProperty('business_name');
     expect(res.body.settings).toHaveProperty('owner_email');
     expect(res.body.settings).toHaveProperty('timezone');
+    expect(res.body.settings).toHaveProperty('open_time');
+    expect(res.body.settings).toHaveProperty('close_time');
   });
 
   it('PUT /api/settings updates business_name and returns updated settings', async () => {
@@ -106,6 +108,49 @@ describe('Settings API', () => {
     const res = await put(agent, '/api/settings').send({ timezone: 'Europe/London' });
     expect(res.statusCode).toBe(200);
     expect(res.body.settings.timezone).toBe('Europe/London');
+  });
+
+  it('PUT /api/settings updates business open and close hours', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const res = await put(agent, '/api/settings').send({ openTime: '08:30', closeTime: '19:15' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.settings.open_time).toBe('08:30');
+    expect(res.body.settings.close_time).toBe('19:15');
+    expect(res.body.settings.businessHours).toBeTruthy();
+    expect(res.body.settings.businessHours.mon.openTime).toBe('08:30');
+  });
+
+  it('PUT /api/settings persists per-day business hours', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const payload = {
+      businessHours: {
+        mon: { closed: false, openTime: '09:00', closeTime: '18:00' },
+        tue: { closed: false, openTime: '09:00', closeTime: '18:00' },
+        wed: { closed: false, openTime: '09:00', closeTime: '18:00' },
+        thu: { closed: false, openTime: '09:00', closeTime: '18:00' },
+        fri: { closed: false, openTime: '09:00', closeTime: '19:00' },
+        sat: { closed: false, openTime: '08:00', closeTime: '16:00' },
+        sun: { closed: true, openTime: '09:00', closeTime: '18:00' }
+      }
+    };
+    const res = await put(agent, '/api/settings').send(payload);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.settings.businessHours.fri.closeTime).toBe('19:00');
+    expect(res.body.settings.businessHours.sat.openTime).toBe('08:00');
+    expect(res.body.settings.businessHours.sun.closed).toBe(true);
+  });
+
+  it('PUT /api/settings rejects close time before open time', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const res = await put(agent, '/api/settings').send({ openTime: '18:00', closeTime: '09:00' });
+    expect(res.statusCode).toBe(400);
+    expect(String(res.body.error || '')).toContain('Close time');
   });
 
   it('PUT /api/settings accepts and persists theme preference', async () => {
@@ -156,6 +201,45 @@ describe('Settings API', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.settings.business_name).toBe('New Name Only');
     expect(res.body.settings.timezone).toBe('America/Chicago');
+  });
+
+  it('PUT /api/settings creates settings row when missing and persists business hours', async () => {
+    const agent = request.agent(app);
+    const auth = await loginAndVerify(agent);
+    const businessId = Number(auth?.user?.businessId || auth?.business?.id || 1);
+
+    const { dbRun } = require('../lib/db');
+    await dbRun(
+      'DELETE FROM business_settings WHERE business_id = ?',
+      'DELETE FROM business_settings WHERE business_id = $1',
+      [businessId]
+    );
+
+    const payload = {
+      openTime: '08:00',
+      closeTime: '17:00',
+      businessHours: {
+        mon: { closed: false, openTime: '08:00', closeTime: '17:00' },
+        tue: { closed: false, openTime: '08:00', closeTime: '17:00' },
+        wed: { closed: false, openTime: '08:00', closeTime: '17:00' },
+        thu: { closed: false, openTime: '08:00', closeTime: '17:00' },
+        fri: { closed: false, openTime: '09:00', closeTime: '19:00' },
+        sat: { closed: true, openTime: '08:00', closeTime: '17:00' },
+        sun: { closed: true, openTime: '08:00', closeTime: '17:00' }
+      }
+    };
+
+    const save = await put(agent, '/api/settings').send(payload);
+    expect(save.statusCode).toBe(200);
+    expect(save.body.settings.open_time).toBe('08:00');
+    expect(save.body.settings.close_time).toBe('17:00');
+    expect(save.body.settings.businessHours.fri.closeTime).toBe('19:00');
+    expect(save.body.settings.businessHours.sat.closed).toBe(true);
+
+    const fresh = await agent.get('/api/settings');
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.body.settings.businessHours.fri.closeTime).toBe('19:00');
+    expect(fresh.body.settings.businessHours.sat.closed).toBe(true);
   });
 });
 
@@ -606,11 +690,13 @@ describe('index.html — settings page structure', () => {
     expect(document.getElementById('settings-form')).not.toBeNull();
   });
 
-  it('Business Profile form has businessName, ownerEmail, and timezone fields', () => {
+  it('Business Profile form has businessName, ownerEmail, timezone, and business-hours fields', () => {
     const form = document.getElementById('settings-form');
     expect(form.querySelector('[name="businessName"]')).not.toBeNull();
     expect(form.querySelector('[name="ownerEmail"]')).not.toBeNull();
     expect(form.querySelector('[name="timezone"]')).not.toBeNull();
+    expect(form.querySelector('[name="openTime"]')).not.toBeNull();
+    expect(form.querySelector('[name="closeTime"]')).not.toBeNull();
   });
 
   it('timezone autocomplete container is present', () => {

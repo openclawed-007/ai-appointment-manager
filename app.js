@@ -54,6 +54,7 @@ const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
 const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
+const BUSINESS_HOURS_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 function normalizeAccentColor(value) {
   const color = String(value || '').trim();
@@ -71,6 +72,69 @@ function applyAccentColor(color) {
     document.body.classList.add(`theme-color-${normalized}`);
   }
   return normalized;
+}
+
+function buildDefaultBusinessHours(openTime = '09:00', closeTime = '18:00') {
+  return BUSINESS_HOURS_DAYS.reduce((acc, day) => {
+    acc[day] = { closed: false, openTime, closeTime };
+    return acc;
+  }, {});
+}
+
+function normalizeBusinessHoursInput(input, fallbackOpen = '09:00', fallbackClose = '18:00') {
+  const defaults = buildDefaultBusinessHours(fallbackOpen, fallbackClose);
+  if (!input || typeof input !== 'object') return defaults;
+  return BUSINESS_HOURS_DAYS.reduce((acc, day) => {
+    const value = input[day] && typeof input[day] === 'object' ? input[day] : {};
+    acc[day] = {
+      closed: Boolean(value.closed),
+      openTime: String(value.openTime || fallbackOpen).slice(0, 5),
+      closeTime: String(value.closeTime || fallbackClose).slice(0, 5)
+    };
+    return acc;
+  }, {});
+}
+
+function setBusinessHoursRowClosedState(dayKey, closed) {
+  const row = document.querySelector(`.business-hours-row[data-day-key="${dayKey}"]`);
+  row?.classList.toggle('is-closed', Boolean(closed));
+}
+
+function applyBusinessHoursToForm(hours, fallbackOpen = '09:00', fallbackClose = '18:00') {
+  const normalized = normalizeBusinessHoursInput(hours, fallbackOpen, fallbackClose);
+  BUSINESS_HOURS_DAYS.forEach((day) => {
+    const closedInput = document.getElementById(`settings-hours-${day}-closed`);
+    const openInput = document.getElementById(`settings-hours-${day}-open`);
+    const closeInput = document.getElementById(`settings-hours-${day}-close`);
+    if (closedInput) closedInput.checked = Boolean(normalized[day].closed);
+    if (openInput) openInput.value = normalized[day].openTime;
+    if (closeInput) closeInput.value = normalized[day].closeTime;
+    setBusinessHoursRowClosedState(day, normalized[day].closed);
+  });
+}
+
+function setBusinessHoursDayValues(day, values) {
+  const closedInput = document.getElementById(`settings-hours-${day}-closed`);
+  const openInput = document.getElementById(`settings-hours-${day}-open`);
+  const closeInput = document.getElementById(`settings-hours-${day}-close`);
+  if (closedInput) closedInput.checked = Boolean(values.closed);
+  if (openInput) openInput.value = String(values.openTime || '09:00').slice(0, 5);
+  if (closeInput) closeInput.value = String(values.closeTime || '18:00').slice(0, 5);
+  setBusinessHoursRowClosedState(day, Boolean(values.closed));
+}
+
+function collectBusinessHoursFromForm({ validate = true } = {}) {
+  const result = {};
+  for (const day of BUSINESS_HOURS_DAYS) {
+    const closed = Boolean(document.getElementById(`settings-hours-${day}-closed`)?.checked);
+    const openTime = String(document.getElementById(`settings-hours-${day}-open`)?.value || '09:00').slice(0, 5);
+    const closeTime = String(document.getElementById(`settings-hours-${day}-close`)?.value || '18:00').slice(0, 5);
+    if (validate && !closed && openTime >= closeTime) {
+      throw new Error(`Close time must be later than open time for ${day.toUpperCase()}.`);
+    }
+    result[day] = { closed, openTime, closeTime };
+  }
+  return result;
 }
 
 function normalizeMobileNavMode(mode) {
@@ -2563,8 +2627,9 @@ async function submitType(e) {
 
 async function submitSettings(e) {
   e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.currentTarget).entries());
   try {
+    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    data.businessHours = collectBusinessHoursFromForm();
     const result = await queueAwareMutation('/api/settings', { method: 'PUT', body: JSON.stringify(data) }, {
       allowOfflineQueue: true,
       description: 'Settings update'
@@ -2583,6 +2648,9 @@ async function loadSettings() {
   form.businessName.value = settings.business_name || '';
   form.ownerEmail.value = settings.owner_email || '';
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
+  if (form.openTime) form.openTime.value = String(settings.open_time || '09:00').slice(0, 5);
+  if (form.closeTime) form.closeTime.value = String(settings.close_time || '18:00').slice(0, 5);
+  applyBusinessHoursToForm(settings.businessHours, form.openTime?.value || '09:00', form.closeTime?.value || '18:00');
 
   // Apply theme from server; fall back to stored local preference
   const resolvedTheme = settings.theme === 'dark' || settings.theme === 'light'
@@ -3383,6 +3451,50 @@ function bindForms() {
   document.getElementById('settings-mobile-nav-bottom-tabs')?.addEventListener('change', (e) => {
     const nextMode = applyMobileNavMode(e.currentTarget?.checked ? 'bottom' : 'sidebar');
     showToast(nextMode === 'bottom' ? 'Bottom tabs enabled on mobile' : 'Sidebar menu enabled on mobile', 'success');
+  });
+
+  BUSINESS_HOURS_DAYS.forEach((day) => {
+    document.getElementById(`settings-hours-${day}-closed`)?.addEventListener('change', (e) => {
+      setBusinessHoursRowClosedState(day, Boolean(e.currentTarget?.checked));
+    });
+  });
+
+  document.querySelectorAll('[data-hours-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.hoursAction;
+      const hours = collectBusinessHoursFromForm({ validate: false });
+      if (action === 'copy-mon-weekdays') {
+        const source = hours.mon || { closed: false, openTime: '09:00', closeTime: '18:00' };
+        ['tue', 'wed', 'thu', 'fri'].forEach((day) => setBusinessHoursDayValues(day, source));
+      } else if (action === 'set-weekend-closed') {
+        setBusinessHoursDayValues('sat', { ...hours.sat, closed: true });
+        setBusinessHoursDayValues('sun', { ...hours.sun, closed: true });
+      } else if (action === 'reset-default') {
+        BUSINESS_HOURS_DAYS.forEach((day) => setBusinessHoursDayValues(day, { closed: false, openTime: '09:00', closeTime: '18:00' }));
+      }
+    });
+  });
+
+  document.getElementById('settings-open-time')?.addEventListener('change', (e) => {
+    const value = String(e.currentTarget?.value || '').slice(0, 5);
+    if (!value) return;
+    BUSINESS_HOURS_DAYS.forEach((day) => {
+      const openInput = document.getElementById(`settings-hours-${day}-open`);
+      if (openInput && !document.getElementById(`settings-hours-${day}-closed`)?.checked) {
+        openInput.value = value;
+      }
+    });
+  });
+
+  document.getElementById('settings-close-time')?.addEventListener('change', (e) => {
+    const value = String(e.currentTarget?.value || '').slice(0, 5);
+    if (!value) return;
+    BUSINESS_HOURS_DAYS.forEach((day) => {
+      const closeInput = document.getElementById(`settings-hours-${day}-close`);
+      if (closeInput && !document.getElementById(`settings-hours-${day}-closed`)?.checked) {
+        closeInput.value = value;
+      }
+    });
   });
 
   // ── Settings: owner email notification toggle ─────────────────────────────

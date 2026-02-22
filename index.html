@@ -424,6 +424,173 @@
                                         <div id="timezone-suggestions" class="timezone-suggestions hidden"
                                             role="listbox" aria-label="Timezone suggestions"></div>
                                     </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="settings-open-time">Open Time</label>
+                                            <input id="settings-open-time" name="openTime" type="time" value="09:00"
+                                                required />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="settings-close-time">Close Time</label>
+                                            <input id="settings-close-time" name="closeTime" type="time" value="18:00"
+                                                required />
+                                        </div>
+                                    </div>
+                                    <div class="form-group business-hours-group">
+                                        <div class="bh-header-modern">
+                                            <label>Weekly Business Hours</label>
+                                            <div class="bh-quick-actions">
+                                                <button type="button" class="bh-quick-btn"
+                                                    data-hours-action="copy-mon-weekdays" title="Copy to Monday-Friday">
+                                                    Mon to M-F
+                                                </button>
+                                                <button type="button" class="bh-quick-btn"
+                                                    data-hours-action="set-weekend-closed"
+                                                    title="Set Sat & Sun as Closed">
+                                                    Close Weekends
+                                                </button>
+                                                <button type="button" class="bh-quick-btn"
+                                                    data-hours-action="reset-default" title="Reset all to 9:00 - 18:00">
+                                                    Reset
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="bh-custom-grid" id="business-hours-grid">
+                                            <div class="business-hours-row bh-custom-row" data-day-key="mon">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-mon-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Mon</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-mon-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-mon-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Mondays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="tue">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-tue-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Tue</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-tue-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-tue-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Tuesdays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="wed">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-wed-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Wed</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-wed-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-wed-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Wednesdays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="thu">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-thu-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Thu</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-thu-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-thu-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Thursdays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="fri">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-fri-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Fri</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-fri-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-fri-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Fridays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="sat">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-sat-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Sat</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-sat-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-sat-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Saturdays</div>
+                                            </div>
+                                            <div class="business-hours-row bh-custom-row" data-day-key="sun">
+                                                <label class="bh-day-toggle" title="Toggle Open/Closed">
+                                                    <input type="checkbox" id="settings-hours-sun-closed"
+                                                        class="bh-closed-checkbox" />
+                                                    <div class="bh-day-badge">Sun</div>
+                                                </label>
+                                                <div class="bh-time-section">
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-sun-open" type="time" value="09:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                    <span class="bh-time-sep">-</span>
+                                                    <div class="bh-time-wrap">
+                                                        <input id="settings-hours-sun-close" type="time" value="18:00"
+                                                            class="bh-time-input" />
+                                                    </div>
+                                                </div>
+                                                <div class="bh-closed-msg">Closed on Sundays</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="settings-section-actions">
                                     <button type="submit" class="btn-primary">
@@ -521,7 +688,8 @@
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
                                             <strong>Mobile navigation style</strong>
-                                            <small>Enabled: <span id="settings-mobile-nav-mode-label">Bottom Tabs</span></small>
+                                            <small>Enabled: <span id="settings-mobile-nav-mode-label">Bottom
+                                                    Tabs</span></small>
                                         </div>
                                         <label class="toggle-switch">
                                             <input type="checkbox" id="settings-mobile-nav-bottom-tabs" />
@@ -855,15 +1023,19 @@
                                 <input id="appt-date" type="date" name="date" required>
                                 <div class="quick-actions">
                                     <button type="button" class="quick-pill" data-quick-date="today">Today</button>
-                                    <button type="button" class="quick-pill" data-quick-date="tomorrow">Tomorrow</button>
-                                    <button type="button" class="quick-pill" data-quick-date="next-week">Next Week</button>
+                                    <button type="button" class="quick-pill"
+                                        data-quick-date="tomorrow">Tomorrow</button>
+                                    <button type="button" class="quick-pill" data-quick-date="next-week">Next
+                                        Week</button>
                                     <button type="button" class="quick-pill" data-quick-date="weekend">Weekend</button>
-                                    <button type="button" class="quick-pill" data-open-picker="date">Open Date Picker</button>
+                                    <button type="button" class="quick-pill" data-open-picker="date">Open Date
+                                        Picker</button>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label for="appt-time">Time</label>
-                                <input id="appt-time" class="native-time-input" type="time" name="time" step="60" required>
+                                <input id="appt-time" class="native-time-input" type="time" name="time" step="60"
+                                    required>
                                 <div class="time-builder" id="custom-time-builder" aria-label="Custom time selector">
                                     <div class="time-builder-main">
                                         <input id="appt-time-hour" type="number" min="1" max="12" value="9"

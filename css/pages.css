@@ -181,6 +181,16 @@
     margin: 2px 0 0;
 }
 
+.booking-hours-display {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    padding: 4px 12px;
+}
+
 .booking-form {
     max-height: none;
 }
