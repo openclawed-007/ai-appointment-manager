@@ -117,6 +117,12 @@
                     </div>
                 </div>
                 <div class="header-right">
+                    <div class="connection-indicator is-online" id="connection-indicator" role="status" aria-live="polite"
+                        aria-label="Connection online">
+                        <span class="connection-dot" aria-hidden="true"></span>
+                        <span class="connection-label" id="connection-label">Online</span>
+                        <span class="connection-queue hidden" id="connection-queue">0 pending</span>
+                    </div>
                     <span class="account-chip hidden" id="account-chip"></span>
                     <button class="icon-btn mobile-notification-btn" id="btn-notifications" data-notification-button
                         type="button" aria-label="Notifications">

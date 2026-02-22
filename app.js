@@ -699,6 +699,7 @@ function loadOfflineMutationQueue() {
 
 function saveOfflineMutationQueue(queue) {
   localStorage.setItem(OFFLINE_MUTATION_QUEUE_KEY, JSON.stringify(queue));
+  renderConnectionIndicator();
 }
 
 function enqueueOfflineMutation(item) {
@@ -817,6 +818,7 @@ function bindNetworkState() {
     const isOnline = navigator.onLine;
     const changed = initialized && state.apiOnline !== isOnline;
     state.apiOnline = isOnline;
+    renderConnectionIndicator();
     if (changed) {
       showToast(
         isOnline
@@ -843,6 +845,32 @@ function showToast(message, type = 'info') {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 220);
   }, 2400);
+}
+
+function renderConnectionIndicator() {
+  const root = document.getElementById('connection-indicator');
+  if (!root) return;
+  const label = document.getElementById('connection-label');
+  const queue = document.getElementById('connection-queue');
+  const pending = loadOfflineMutationQueue().length;
+  const online = Boolean(state.apiOnline);
+
+  root.classList.toggle('is-online', online);
+  root.classList.toggle('is-offline', !online);
+  root.classList.toggle('has-pending', pending > 0);
+
+  if (label) label.textContent = online ? 'Online' : 'Offline';
+  if (queue) {
+    if (pending > 0) {
+      queue.classList.remove('hidden');
+      queue.textContent = `${pending} pending`;
+    } else {
+      queue.classList.add('hidden');
+    }
+  }
+
+  const pendingSuffix = pending > 0 ? `, ${pending} pending` : '';
+  root.setAttribute('aria-label', `Connection ${online ? 'online' : 'offline'}${pendingSuffix}`);
 }
 
 /**

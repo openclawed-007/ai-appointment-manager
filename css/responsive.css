@@ -60,6 +60,20 @@
         margin-left: auto;
     }
 
+    .connection-indicator {
+        padding: 5px 8px;
+        gap: 6px;
+    }
+
+    .connection-label {
+        font-size: 0.7rem;
+    }
+
+    .connection-queue {
+        font-size: 0.62rem;
+        padding: 1px 5px;
+    }
+
     .header-search input {
         padding: 9px 12px 9px 36px;
         font-size: 0.82rem;
@@ -114,6 +128,11 @@
         gap: 6px;
         margin-left: auto;
         flex-shrink: 0;
+    }
+
+    .connection-indicator {
+        padding: 4px 7px;
+        gap: 5px;
     }
 
     .header-center {
@@ -362,6 +381,12 @@
         left: 12px;
         bottom: 24px;
         max-width: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .connection-label {
+        display: none;
     }
 }
 
