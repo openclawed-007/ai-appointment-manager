@@ -1257,6 +1257,27 @@ function bindNavigation() {
 }
 
 function bindHeaderButtons() {
+  const sidebar = document.getElementById('sidebar');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  const menuBtn = document.getElementById('btn-mobile-menu');
+  const mobileSidebarQuery = window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse) and (max-width: 1024px)');
+
+  const setSidebarOpen = (open) => {
+    if (!sidebar) return;
+    const shouldOpen = Boolean(open);
+    sidebar.classList.toggle('mobile-open', shouldOpen);
+    document.body.classList.toggle('sidebar-open', shouldOpen);
+    if (sidebarBackdrop) {
+      sidebarBackdrop.classList.toggle('visible', shouldOpen);
+      sidebarBackdrop.hidden = !shouldOpen;
+    }
+    if (menuBtn) {
+      menuBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    }
+  };
+
+  const closeSidebar = () => setSidebarOpen(false);
+
   document.getElementById('btn-new-appointment')?.addEventListener('click', () => {
     state.editingAppointmentId = null;
     updateAppointmentEditorUi(false);
@@ -1276,29 +1297,39 @@ function bindHeaderButtons() {
     });
   });
 
-  document.getElementById('btn-mobile-menu')?.addEventListener('click', () => {
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-      sidebar.classList.toggle('mobile-open');
-    }
+  menuBtn?.addEventListener('click', () => {
+    if (!mobileSidebarQuery.matches) return;
+    setSidebarOpen(!sidebar?.classList.contains('mobile-open'));
   });
 
+  sidebarBackdrop?.addEventListener('click', closeSidebar);
+
   document.addEventListener('click', (e) => {
-    const sidebar = document.querySelector('.sidebar');
-    const menuBtn = document.getElementById('btn-mobile-menu');
     if (sidebar?.classList.contains('mobile-open')) {
       if (!sidebar.contains(e.target) && !menuBtn?.contains(e.target)) {
-        sidebar.classList.remove('mobile-open');
+        closeSidebar();
       }
     }
   });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar?.classList.contains('mobile-open')) {
+      closeSidebar();
+    }
+  });
+
+  const handleSidebarMediaChange = (event) => {
+    if (!event.matches) closeSidebar();
+  };
+  if (typeof mobileSidebarQuery.addEventListener === 'function') {
+    mobileSidebarQuery.addEventListener('change', handleSidebarMediaChange);
+  } else if (typeof mobileSidebarQuery.addListener === 'function') {
+    mobileSidebarQuery.addListener(handleSidebarMediaChange);
+  }
 
   document.querySelectorAll('.nav-item').forEach((item) => {
     item.addEventListener('click', () => {
-      const sidebar = document.querySelector('.sidebar');
-      if (sidebar?.classList.contains('mobile-open')) {
-        sidebar.classList.remove('mobile-open');
-      }
+      if (sidebar?.classList.contains('mobile-open')) closeSidebar();
     });
   });
 
@@ -3231,6 +3262,11 @@ function bindAuthUi() {
   const handleAuthAction = async (e) => {
     if (e) e.preventDefault();
     document.getElementById('sidebar')?.classList.remove('mobile-open');
+    document.getElementById('sidebar-backdrop')?.classList.remove('visible');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    if (sidebarBackdrop) sidebarBackdrop.hidden = true;
+    document.body.classList.remove('sidebar-open');
+    document.getElementById('btn-mobile-menu')?.setAttribute('aria-expanded', 'false');
     if (!state.currentUser) {
       state.authShellDismissed = false;
       setAuthTab('login');
