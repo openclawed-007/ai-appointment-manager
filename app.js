@@ -32,6 +32,7 @@ const state = {
   emailMenuAppointmentId: null,
   cancelMenuAppointmentId: null,
   cancelMenuDate: '',
+  notificationMenuAnchorEl: null,
   currentUser: null,
   currentBusiness: null,
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
@@ -211,6 +212,147 @@ function closeDayMenu() {
   menu.innerHTML = '';
   state.dayMenuDate = null;
   state.dayMenuAnchorEl = null;
+}
+
+function ensureNotificationsMenu() {
+  let menu = document.getElementById('notifications-menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'notifications-menu';
+  menu.className = 'notifications-menu hidden';
+  menu.setAttribute('role', 'dialog');
+  menu.setAttribute('aria-modal', 'false');
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function closeNotificationsMenu() {
+  const menu = document.getElementById('notifications-menu');
+  if (!menu) return;
+  menu.classList.add('hidden');
+  menu.innerHTML = '';
+  state.notificationMenuAnchorEl = null;
+}
+
+function positionNotificationsMenu(anchorEl, menu) {
+  if (!anchorEl || !menu) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const margin = 10;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  menu.classList.remove('hidden');
+
+  const menuRect = menu.getBoundingClientRect();
+  let left = rect.right - menuRect.width;
+  let top = rect.bottom + 8;
+
+  if (left + menuRect.width > vw - margin) left = vw - menuRect.width - margin;
+  if (left < margin) left = margin;
+
+  if (top + menuRect.height > vh - margin) top = rect.top - menuRect.height - 8;
+  if (top < margin) top = margin;
+
+  menu.style.left = `${Math.round(left)}px`;
+  menu.style.top = `${Math.round(top)}px`;
+}
+
+async function openNotificationsMenu(anchorEl) {
+  const menu = ensureNotificationsMenu();
+  state.notificationMenuAnchorEl = anchorEl;
+  menu.innerHTML = '<div class="day-menu-loading">Loading notifications…</div>';
+  positionNotificationsMenu(anchorEl, menu);
+
+  try {
+    const payload = await api('/api/notifications');
+    const summary = payload?.summary || {};
+    const pending = Array.isArray(payload?.pending) ? payload.pending : [];
+
+    const pendingItems = pending.length
+      ? pending
+        .map((item) => `
+          <button type="button" class="notification-item" data-notification-open-date="${escapeHtml(item.date || '')}">
+            <div class="notification-item-title">${escapeHtml(item.clientName || 'Client')} · ${escapeHtml(item.typeName || 'Appointment')}</div>
+            <div class="notification-item-meta">${escapeHtml(item.date || '')} · ${escapeHtml(toTime12(item.time || '09:00'))}</div>
+          </button>
+        `)
+        .join('')
+      : '<div class="notification-empty">No pending appointments right now.</div>';
+
+    menu.innerHTML = `
+      <div class="notifications-header">
+        <h3>Notifications</h3>
+        <button type="button" class="notifications-close" aria-label="Close notifications">×</button>
+      </div>
+      <div class="notifications-summary-grid">
+        <div class="notification-summary-card">
+          <span class="notification-summary-label">Pending</span>
+          <strong>${Number(summary.pending || 0)}</strong>
+        </div>
+        <div class="notification-summary-card">
+          <span class="notification-summary-label">Today</span>
+          <strong>${Number(summary.today || 0)}</strong>
+        </div>
+        <div class="notification-summary-card">
+          <span class="notification-summary-label">This Week</span>
+          <strong>${Number(summary.week || 0)}</strong>
+        </div>
+      </div>
+      <div class="notifications-section">
+        <div class="notifications-section-title">Pending appointments</div>
+        <div class="notifications-list">${pendingItems}</div>
+      </div>
+      <div class="notifications-actions">
+        <button type="button" class="btn-secondary" id="notifications-open-dashboard">Open Dashboard</button>
+        <button type="button" class="btn-primary" id="notifications-open-appointments">Review Appointments</button>
+      </div>
+    `;
+
+    positionNotificationsMenu(anchorEl, menu);
+
+    menu.querySelector('.notifications-close')?.addEventListener('click', closeNotificationsMenu);
+    menu.querySelector('#notifications-open-dashboard')?.addEventListener('click', async () => {
+      closeNotificationsMenu();
+      setActiveView('dashboard');
+      await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
+    });
+    menu.querySelector('#notifications-open-appointments')?.addEventListener('click', async () => {
+      closeNotificationsMenu();
+      setActiveView('appointments');
+      await loadAppointmentsTable();
+    });
+
+    menu.querySelectorAll('[data-notification-open-date]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const date = String(btn.dataset.notificationOpenDate || '');
+        if (!date) return;
+        closeNotificationsMenu();
+        state.selectedDate = date;
+        const dt = new Date(`${date}T00:00:00`);
+        if (!Number.isNaN(dt.getTime())) {
+          state.calendarDate = new Date(dt.getFullYear(), dt.getMonth(), 1);
+          const monthLabelNode = document.querySelector('.current-month');
+          if (monthLabelNode) monthLabelNode.textContent = monthLabel(state.calendarDate);
+          renderCalendarGrid();
+          await refreshCalendarDots();
+        }
+        setActiveView('dashboard');
+        await loadDashboard(date, { refreshDots: false, showSkeleton: false });
+      });
+    });
+  } catch (error) {
+    menu.innerHTML = `
+      <div class="notifications-header">
+        <h3>Notifications</h3>
+        <button type="button" class="notifications-close" aria-label="Close notifications">×</button>
+      </div>
+      <div class="notification-empty">${escapeHtml(error.message || 'Could not load notifications.')}</div>
+    `;
+    positionNotificationsMenu(anchorEl, menu);
+    menu.querySelector('.notifications-close')?.addEventListener('click', closeNotificationsMenu);
+  }
 }
 
 function ensureEmailComposerMenu() {
@@ -632,6 +774,17 @@ function repositionDayMenuIfOpen() {
   positionDayMenu(anchorEl, menu);
 }
 
+function repositionNotificationsMenuIfOpen() {
+  const menu = document.getElementById('notifications-menu');
+  if (!menu || menu.classList.contains('hidden')) return;
+  const anchorEl = state.notificationMenuAnchorEl;
+  if (!anchorEl || !document.contains(anchorEl)) {
+    closeNotificationsMenu();
+    return;
+  }
+  positionNotificationsMenu(anchorEl, menu);
+}
+
 function toMoney(cents = 0) {
   return cents > 0 ? `£${(cents / 100).toFixed(0)}` : 'Free';
 }
@@ -993,13 +1146,49 @@ async function cancelAppointmentById(appointmentId, date = '', cancellationReaso
   }
 }
 
-function setActiveView(view) {
-  if (!view) return;
+function getStoredViewPreference() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const value = localStorage.getItem('currentView');
+    return value ? String(value) : null;
+  } catch (_error) {
+    return null;
+  }
+}
 
+function applyViewSelection(activeView) {
+  const views = [...document.querySelectorAll('.app-view')];
+  views.forEach((section) => {
+    section.classList.toggle('active', section.dataset.view === activeView);
+  });
+
+  document.querySelectorAll('.nav-item').forEach((n) => {
+    n.classList.toggle('active', n.dataset.view === activeView);
+  });
+
+  document.querySelectorAll('.mobile-nav-item').forEach((n) => {
+    n.classList.toggle('active', n.dataset.view === activeView);
+  });
+}
+
+function resolveView(view) {
   const views = [...document.querySelectorAll('.app-view')];
   const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
   const fallbackView = availableViews.has('dashboard') ? 'dashboard' : views[0]?.dataset.view;
   const activeView = availableViews.has(view) ? view : fallbackView;
+  return activeView || null;
+}
+
+function applyInitialViewPreference(view) {
+  const activeView = resolveView(view);
+  if (!activeView) return null;
+  applyViewSelection(activeView);
+  return activeView;
+}
+
+function setActiveView(view) {
+  if (!view) return;
+  const activeView = resolveView(view);
   if (!activeView) return;
 
   if (typeof localStorage !== 'undefined') {
@@ -1010,17 +1199,7 @@ function setActiveView(view) {
     }
   }
 
-  document.querySelectorAll('.nav-item').forEach((n) => {
-    n.classList.toggle('active', n.dataset.view === activeView);
-  });
-
-  document.querySelectorAll('.mobile-nav-item').forEach((n) => {
-    n.classList.toggle('active', n.dataset.view === activeView);
-  });
-
-  views.forEach((section) => {
-    section.classList.toggle('active', section.dataset.view === activeView);
-  });
+  applyViewSelection(activeView);
 
   const canAutoLoadAppointments =
     typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
@@ -1059,8 +1238,16 @@ function bindHeaderButtons() {
     openModal('new-appointment');
   });
   document.querySelectorAll('[data-notification-button]').forEach((button) => {
-    button.addEventListener('click', () => {
-      showToast('No new notifications right now.', 'info');
+    button.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const menu = document.getElementById('notifications-menu');
+      const isOpen = menu && !menu.classList.contains('hidden');
+      if (isOpen && state.notificationMenuAnchorEl === button) {
+        closeNotificationsMenu();
+        return;
+      }
+      await openNotificationsMenu(button);
     });
   });
 
@@ -1250,6 +1437,7 @@ function bindKeyboard() {
         closeDayMenu();
         closeEmailComposerMenu();
         closeCancelReasonMenu();
+        closeNotificationsMenu();
       }
     }
 
@@ -2923,11 +3111,15 @@ function bindForms() {
   document.getElementById('settings-notify-owner-email')?.addEventListener('change', async (e) => {
     const checked = Boolean(e.currentTarget?.checked);
     try {
-      await api('/api/settings', {
+      const result = await queueAwareMutation('/api/settings', {
         method: 'PUT',
         body: JSON.stringify({ notifyOwnerEmail: checked })
+      }, {
+        allowOfflineQueue: true,
+        description: 'Owner notification preference update'
       });
-      showToast(checked ? 'Owner notifications enabled' : 'Owner notifications disabled', 'success');
+      if (result.queued) return;
+      showToast(checked ? 'Owner booking notifications enabled' : 'Owner booking notifications disabled', 'success');
     } catch (error) {
       showToast(error.message, 'error');
       // Revert the toggle on error
@@ -3053,9 +3245,11 @@ async function init() {
   if (typeof navigator !== 'undefined' && navigator.onLine) {
     void flushOfflineMutationQueue().catch(swallowBackgroundAsyncError);
   }
+  const preferredView = getStoredViewPreference();
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
+  applyInitialViewPreference(preferredView);
   bindHeaderButtons();
   bindModalControls();
   bindCalendarNav();
@@ -3069,15 +3263,25 @@ async function init() {
   if (todayInput) todayInput.value = state.selectedDate;
 
   document.addEventListener('click', (event) => {
-    const menu = document.getElementById('calendar-day-menu');
-    if (!menu || menu.classList.contains('hidden')) return;
-    const clickedInMenu = event.target.closest('#calendar-day-menu');
-    const clickedOnDay = event.target.closest('.day-cell[data-day]');
-    if (!clickedInMenu && !clickedOnDay) closeDayMenu();
+    const dayMenu = document.getElementById('calendar-day-menu');
+    if (dayMenu && !dayMenu.classList.contains('hidden')) {
+      const clickedInMenu = event.target.closest('#calendar-day-menu');
+      const clickedOnDay = event.target.closest('.day-cell[data-day]');
+      if (!clickedInMenu && !clickedOnDay) closeDayMenu();
+    }
+
+    const notificationsMenu = document.getElementById('notifications-menu');
+    if (notificationsMenu && !notificationsMenu.classList.contains('hidden')) {
+      const clickedInNotifications = event.target.closest('#notifications-menu');
+      const clickedNotificationButton = event.target.closest('[data-notification-button]');
+      if (!clickedInNotifications && !clickedNotificationButton) closeNotificationsMenu();
+    }
   });
 
   window.addEventListener('resize', repositionDayMenuIfOpen);
+  window.addEventListener('resize', repositionNotificationsMenuIfOpen);
   window.addEventListener('scroll', repositionDayMenuIfOpen, true);
+  window.addEventListener('scroll', repositionNotificationsMenuIfOpen, true);
 
   try {
     const authed = await ensureAuth();
@@ -3092,15 +3296,7 @@ async function init() {
     await flushOfflineMutationQueue();
     state.apiOnline = true;
 
-    let savedView = null;
-    if (typeof localStorage !== 'undefined') {
-      try {
-        savedView = localStorage.getItem('currentView');
-      } catch (_error) {
-        savedView = null;
-      }
-    }
-    if (savedView) setActiveView(savedView);
+    if (preferredView) setActiveView(preferredView);
   } catch (error) {
     if (error?.code === 'OFFLINE') {
       state.apiOnline = false;

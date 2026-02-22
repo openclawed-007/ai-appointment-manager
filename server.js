@@ -1251,6 +1251,77 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
   res.json({ appointment });
 });
 
+// ── Notifications route ───────────────────────────────────────────────────────
+
+app.get('/api/notifications', async (req, res) => {
+  const businessId = req.auth.businessId;
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (USE_POSTGRES) {
+    const [todayQ, weekQ, pendingQ, pendingItemsQ] = await Promise.all([
+      getPgPool().query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date = $2', [businessId, today]),
+      getPgPool().query(
+        "SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date BETWEEN $2::date AND ($2::date + INTERVAL '6 day')",
+        [businessId, today]
+      ),
+      getPgPool().query("SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'", [businessId]),
+      getPgPool().query(
+        `SELECT a.id, a.date, a.time, a.client_name, COALESCE(t.name, a.title, 'Appointment') AS type_name
+         FROM appointments a
+         LEFT JOIN appointment_types t ON t.id = a.type_id
+         WHERE a.business_id = $1 AND a.status = 'pending'
+         ORDER BY a.date ASC, a.time ASC
+         LIMIT 6`,
+        [businessId]
+      )
+    ]);
+
+    return res.json({
+      summary: {
+        today: Number(todayQ.rows[0]?.c || 0),
+        week: Number(weekQ.rows[0]?.c || 0),
+        pending: Number(pendingQ.rows[0]?.c || 0)
+      },
+      pending: pendingItemsQ.rows.map((r) => ({
+        id: Number(r.id),
+        date: typeof r.date === 'string' ? r.date.slice(0, 10) : r.date?.toISOString?.().slice(0, 10),
+        time: typeof r.time === 'string' ? r.time.slice(0, 5) : '09:00',
+        clientName: r.client_name,
+        typeName: r.type_name || 'Appointment'
+      }))
+    });
+  }
+
+  const todayCount = getSqlite().prepare('SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date = ?').get(businessId, today).c;
+  const weekCount = getSqlite()
+    .prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date BETWEEN date(?) AND date(?, '+6 day')")
+    .get(businessId, today, today).c;
+  const pendingCount = getSqlite().prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'").get(businessId).c;
+  const pendingRows = getSqlite().prepare(
+    `SELECT a.id, a.date, a.time, a.client_name, COALESCE(t.name, a.title, 'Appointment') AS type_name
+     FROM appointments a
+     LEFT JOIN appointment_types t ON t.id = a.type_id
+     WHERE a.business_id = ? AND a.status = 'pending'
+     ORDER BY a.date ASC, a.time ASC
+     LIMIT 6`
+  ).all(businessId);
+
+  return res.json({
+    summary: {
+      today: Number(todayCount || 0),
+      week: Number(weekCount || 0),
+      pending: Number(pendingCount || 0)
+    },
+    pending: pendingRows.map((r) => ({
+      id: Number(r.id),
+      date: r.date,
+      time: String(r.time || '').slice(0, 5),
+      clientName: r.client_name,
+      typeName: r.type_name || 'Appointment'
+    }))
+  });
+});
+
 // ── Dashboard route ───────────────────────────────────────────────────────────
 
 app.get('/api/dashboard', async (req, res) => {
