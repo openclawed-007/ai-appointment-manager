@@ -246,7 +246,7 @@
 
 .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 24px rgba(226, 168, 75, 0.3);
+    box-shadow: 0 6px 24px var(--gold-glow);
 }
 
 .btn-primary:active {
