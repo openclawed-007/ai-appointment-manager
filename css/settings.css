@@ -307,6 +307,72 @@
     color: var(--gold);
 }
 
+/* ── Accent Color selector ── */
+.accent-color-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.accent-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.accent-option:hover {
+    background: var(--bg-hover);
+}
+
+.accent-option:has(input:checked) {
+    border-color: var(--text-secondary);
+    background: var(--bg-raised);
+}
+
+.accent-option input[type='radio'] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.accent-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] .accent-swatch {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.swatch-green {
+    background: #10b981;
+}
+
+.swatch-blue {
+    background: #3b82f6;
+}
+
+.swatch-red {
+    background: #ef4444;
+}
+
+.swatch-purple {
+    background: #9333ea;
+}
+
+.swatch-amber {
+    background: #f59e0b;
+}
+
 /* ── Export panel (data section) ── */
 .export-panel {
     background: var(--bg-raised);

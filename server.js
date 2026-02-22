@@ -605,17 +605,18 @@ app.use('/api', async (req, res, next) => {
 
 app.get('/api/settings', async (req, res) => {
   const settings = (await getSettings(req.auth.businessId)) || {};
-  const userTheme = await dbGet(
-    'SELECT theme_preference FROM users WHERE id = ? AND business_id = ?',
-    'SELECT theme_preference FROM users WHERE id = $1 AND business_id = $2',
+  const userPrefs = await dbGet(
+    'SELECT theme_preference, accent_color FROM users WHERE id = ? AND business_id = ?',
+    'SELECT theme_preference, accent_color FROM users WHERE id = $1 AND business_id = $2',
     [req.auth.userId, req.auth.businessId]
   );
   res.json({
     settings: {
       ...settings,
-      theme: (userTheme?.theme_preference === 'dark' || userTheme?.theme_preference === 'light')
-        ? userTheme.theme_preference
-        : null
+      theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
+        ? userPrefs.theme_preference
+        : null,
+      accentColor: userPrefs?.accent_color || 'green'
     }
   });
 });
@@ -623,6 +624,7 @@ app.get('/api/settings', async (req, res) => {
 app.put('/api/settings', async (req, res) => {
   const { businessName, ownerEmail, timezone, notifyOwnerEmail } = req.body || {};
   const incomingTheme = req.body?.theme;
+  const incomingAccent = req.body?.accentColor;
   const businessId = req.auth.businessId;
 
   await dbRun(
@@ -652,26 +654,36 @@ app.put('/api/settings', async (req, res) => {
   );
 
   const normalizedTheme = incomingTheme === 'dark' || incomingTheme === 'light' ? incomingTheme : null;
-  if (normalizedTheme) {
+  const VALID_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
+  const normalizedAccent = VALID_COLORS.includes(incomingAccent) ? incomingAccent : null;
+
+  if (normalizedTheme || normalizedAccent) {
     await dbRun(
-      'UPDATE users SET theme_preference = ? WHERE id = ? AND business_id = ?',
-      'UPDATE users SET theme_preference = $1 WHERE id = $2 AND business_id = $3',
-      [normalizedTheme, req.auth.userId, businessId]
+      `UPDATE users
+       SET theme_preference = COALESCE(?, theme_preference),
+           accent_color = COALESCE(?, accent_color)
+       WHERE id = ? AND business_id = ?`,
+      `UPDATE users
+       SET theme_preference = COALESCE($1, theme_preference),
+           accent_color = COALESCE($2, accent_color)
+       WHERE id = $3 AND business_id = $4`,
+      [normalizedTheme, normalizedAccent, req.auth.userId, businessId]
     );
   }
 
   const settings = (await getSettings(businessId)) || {};
-  const userTheme = await dbGet(
-    'SELECT theme_preference FROM users WHERE id = ? AND business_id = ?',
-    'SELECT theme_preference FROM users WHERE id = $1 AND business_id = $2',
+  const userPrefs = await dbGet(
+    'SELECT theme_preference, accent_color FROM users WHERE id = ? AND business_id = ?',
+    'SELECT theme_preference, accent_color FROM users WHERE id = $1 AND business_id = $2',
     [req.auth.userId, businessId]
   );
   res.json({
     settings: {
       ...settings,
-      theme: (userTheme?.theme_preference === 'dark' || userTheme?.theme_preference === 'light')
-        ? userTheme.theme_preference
-        : null
+      theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
+        ? userPrefs.theme_preference
+        : null,
+      accentColor: userPrefs?.accent_color || 'green'
     }
   });
 });

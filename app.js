@@ -52,6 +52,25 @@ const calendarMonthInFlight = new Map();
 
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
+const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
+
+function normalizeAccentColor(value) {
+  const color = String(value || '').trim();
+  return ACCENT_COLORS.includes(color) ? color : 'green';
+}
+
+function applyAccentColor(color) {
+  const normalized = normalizeAccentColor(color);
+  ACCENT_COLORS.forEach((accent) => {
+    if (accent !== 'green') {
+      document.body.classList.remove(`theme-color-${accent}`);
+    }
+  });
+  if (normalized !== 'green') {
+    document.body.classList.add(`theme-color-${normalized}`);
+  }
+  return normalized;
+}
 
 function loadAuthSnapshot() {
   try {
@@ -1114,9 +1133,8 @@ function showConfirm(title, body) {
 /** Render a skeleton placeholder inside an element while content is loading. */
 function renderSkeleton(el, lines = 3) {
   if (!el) return;
-  el.innerHTML = `<div class="skeleton-card">${
-    Array.from({ length: lines }, () => '<div class="skeleton skeleton-line"></div>').join('')
-  }</div>`;
+  el.innerHTML = `<div class="skeleton-card">${Array.from({ length: lines }, () => '<div class="skeleton skeleton-line"></div>').join('')
+    }</div>`;
 }
 
 async function cancelAppointmentById(appointmentId, date = '', cancellationReason = '') {
@@ -1898,7 +1916,13 @@ function renderTypes(types = []) {
               <div class="type-color" style="background:${escapeHtml(t.color)}"></div>
               <div class="type-info">
                 <h4>${escapeHtml(t.name)}</h4>
-                <p>${t.durationMinutes} min • ${toMoney(t.priceCents)} • ${escapeHtml(t.locationMode)}</p>
+                <p>
+                  <span>${t.durationMinutes} min</span>
+                  <span class="divider">•</span>
+                  <span>${toMoney(t.priceCents)}</span>
+                  <span class="divider">•</span>
+                  <span>${escapeHtml(t.locationMode)}</span>
+                </p>
               </div>
               <span class="type-count">${t.bookingCount || 0}</span>
             </div>`
@@ -1923,11 +1947,19 @@ function renderTypes(types = []) {
                 <span class="pill">Active</span>
               </div>
               <div class="type-admin-card__meta">
-                <span class="type-meta-item">📍 ${escapeHtml(t.locationMode)}</span>
-                <span class="type-meta-item">📅 ${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}</span>
+                <span class="type-meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  ${escapeHtml(t.locationMode)}
+                </span>
+                <span class="type-meta-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  ${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}
+                </span>
               </div>
-              <div class="row-actions type-admin-card__actions">
-                <button class="btn-secondary btn-delete-type" type="button">Delete</button>
+              <div class="type-admin-card__actions">
+                <button class="btn-delete-type" type="button" aria-label="Delete Type">
+                  <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
               </div>
             </div>`
         )
@@ -2342,7 +2374,13 @@ async function loadSettings() {
     : (localStorage.getItem('theme') || 'dark');
   document.documentElement.setAttribute('data-theme', resolvedTheme);
   setStoredValue('theme', resolvedTheme);
-  syncSettingsThemeSelector(resolvedTheme);
+
+  // Apply accent color from server; fall back to stored local preference
+  const resolvedAccent = normalizeAccentColor(settings.accentColor || localStorage.getItem('accentColor'));
+  applyAccentColor(resolvedAccent);
+  setStoredValue('accentColor', resolvedAccent);
+
+  syncSettingsThemeSelector();
 
   // Calendar preview toggle
   const previewToggle = document.getElementById('settings-calendar-show-client-names');
@@ -2410,21 +2448,23 @@ async function importBusinessDataFromFile(file) {
 
 // ── Settings: theme selector sync ────────────────────────────────────────────
 
-function syncSettingsThemeSelector(theme) {
-  const darkOption = document.getElementById('theme-option-dark');
-  const lightOption = document.getElementById('theme-option-light');
-  const darkRadio = document.getElementById('settings-theme-dark');
-  const lightRadio = document.getElementById('settings-theme-light');
-  if (!darkOption || !lightOption) return;
-  if (theme === 'light') {
-    lightOption.classList.add('active');
-    darkOption.classList.remove('active');
-    if (lightRadio) lightRadio.checked = true;
-  } else {
-    darkOption.classList.add('active');
-    lightOption.classList.remove('active');
-    if (darkRadio) darkRadio.checked = true;
-  }
+function syncSettingsThemeSelector() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  const themeRadios = document.querySelectorAll('input[name="settings-theme"]');
+  themeRadios.forEach((r) => {
+    r.checked = r.value === currentTheme;
+    const parent = r.closest('.theme-option');
+    if (parent) {
+      if (r.checked) parent.classList.add('active');
+      else parent.classList.remove('active');
+    }
+  });
+
+  const savedColor = normalizeAccentColor(localStorage.getItem('accentColor'));
+  const colorRadios = document.querySelectorAll('input[name="settings-accent"]');
+  colorRadios.forEach((r) => {
+    r.checked = r.value === savedColor;
+  });
 }
 
 // ── Settings: export type chips ───────────────────────────────────────────────
@@ -3147,11 +3187,31 @@ function bindForms() {
       // Apply theme immediately, in the same synchronous frame as the click
       document.documentElement.setAttribute('data-theme', chosen);
       localStorage.setItem('theme', chosen);
-      syncSettingsThemeSelector(chosen);
+      syncSettingsThemeSelector();
 
       if (!state.currentUser) return;
       try {
         await api('/api/settings', { method: 'PUT', body: JSON.stringify({ theme: chosen }) });
+      } catch (_error) {
+        // Local preference already applied; server update is best-effort.
+      }
+    });
+  });
+
+  // ── Settings: accent color selector ───────────────────────────────────────
+  document.querySelectorAll('.accent-option').forEach((option) => {
+    option.addEventListener('click', async () => {
+      const radio = option.querySelector('input[type="radio"]');
+      if (!radio) return;
+      const chosenColor = normalizeAccentColor(radio.value);
+      applyAccentColor(chosenColor);
+
+      localStorage.setItem('accentColor', chosenColor);
+      syncSettingsThemeSelector();
+
+      if (!state.currentUser) return;
+      try {
+        await api('/api/settings', { method: 'PUT', body: JSON.stringify({ accentColor: chosenColor }) });
       } catch (_error) {
         // Local preference already applied; server update is best-effort.
       }
@@ -3243,6 +3303,8 @@ function applyInitialTheme() {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const initial = saved || (prefersDark ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', initial);
+
+  applyAccentColor(localStorage.getItem('accentColor'));
 }
 
 async function init() {

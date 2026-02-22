@@ -7,10 +7,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
-    --gold: #e2a84b;
-    --gold-light: #f0c97d;
-    --gold-dim: rgba(226, 168, 75, 0.12);
-    --gold-glow: rgba(226, 168, 75, 0.25);
+    --gold: #10b981;
+    --gold-light: #34d399;
+    --gold-dim: rgba(16, 185, 129, 0.12);
+    --gold-glow: rgba(16, 185, 129, 0.25);
 
     --bg-base: #111114;
     --bg-surface: #1a1a1f;
@@ -26,20 +26,20 @@
     --text-muted: #5a5854;
     --text-inverse: #111114;
 
-    --success: #5cb87a;
-    --warning: #e2a84b;
-    --error: #d4564e;
-    --info: #5b9bd5;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
 
-    --gradient-gold: linear-gradient(135deg, #e2a84b 0%, #c4863a 100%);
+    --gradient-gold: linear-gradient(135deg, #10b981 0%, #059669 100%);
     --gradient-surface: linear-gradient(180deg, #1e1e24 0%, #1a1a1f 100%);
-    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(226, 168, 75, 0.06) 0%, transparent 60%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.06) 0%, transparent 60%);
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.6);
     --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.7);
-    --shadow-gold: 0 4px 20px rgba(226, 168, 75, 0.2);
+    --shadow-gold: 0 4px 20px rgba(16, 185, 129, 0.2);
 
     --radius-sm: 6px;
     --radius-md: 10px;
@@ -63,6 +63,48 @@
     --font-display: 'Outfit', system-ui, sans-serif;
     --font-body: 'Outfit', system-ui, sans-serif;
     --font-accent: 'Crimson Pro', Georgia, serif;
+}
+
+/* ── Dynamic Accent Themes (Dark Mode) ── */
+body.theme-color-blue {
+    --gold: #3b82f6;
+    /* True Blue */
+    --gold-light: #60a5fa;
+    --gold-dim: rgba(59, 130, 246, 0.12);
+    --gold-glow: rgba(59, 130, 246, 0.25);
+    --gradient-gold: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 60%);
+    --shadow-gold: 0 4px 20px rgba(59, 130, 246, 0.2);
+}
+
+body.theme-color-red {
+    --gold: #ef4444;
+    --gold-light: #f87171;
+    --gold-dim: rgba(239, 68, 68, 0.12);
+    --gold-glow: rgba(239, 68, 68, 0.25);
+    --gradient-gold: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(239, 68, 68, 0.06) 0%, transparent 60%);
+    --shadow-gold: 0 4px 20px rgba(239, 68, 68, 0.2);
+}
+
+body.theme-color-purple {
+    --gold: #9333ea;
+    --gold-light: #a855f7;
+    --gold-dim: rgba(147, 51, 234, 0.12);
+    --gold-glow: rgba(147, 51, 234, 0.25);
+    --gradient-gold: linear-gradient(135deg, #9333ea 0%, #6b21a8 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(147, 51, 234, 0.06) 0%, transparent 60%);
+    --shadow-gold: 0 4px 20px rgba(147, 51, 234, 0.2);
+}
+
+body.theme-color-amber {
+    --gold: #f59e0b;
+    --gold-light: #fbbf24;
+    --gold-dim: rgba(245, 158, 11, 0.12);
+    --gold-glow: rgba(245, 158, 11, 0.25);
+    --gradient-gold: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+    --gradient-glow: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 60%);
+    --shadow-gold: 0 4px 20px rgba(245, 158, 11, 0.2);
 }
 
 /* ── Reset ── */

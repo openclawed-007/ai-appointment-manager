@@ -117,8 +117,8 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="connection-indicator is-online" id="connection-indicator" role="status" aria-live="polite"
-                        aria-label="Connection online">
+                    <div class="connection-indicator is-online" id="connection-indicator" role="status"
+                        aria-live="polite" aria-label="Connection online">
                         <span class="connection-dot" aria-hidden="true"></span>
                         <span class="connection-label" id="connection-label">Online</span>
                         <span class="connection-queue hidden" id="connection-queue">0 pending</span>
@@ -348,7 +348,8 @@
                             <div class="card-header">
                                 <h2>Current Types</h2>
                             </div>
-                            <p class="types-helper">Review active services, bookings count, and remove outdated entries.</p>
+                            <p class="types-helper">Review active services, bookings count, and remove outdated entries.
+                            </p>
                             <div class="appointment-types-list" id="type-admin-list"></div>
                         </div>
                     </div>
@@ -471,6 +472,34 @@
                                     </label>
                                 </div>
 
+                                <!-- Accent Color selector -->
+                                <div style="margin-top: var(--spacing-md)">
+                                    <p class="settings-sub-label">Accent Color</p>
+                                </div>
+                                <div class="accent-color-selector" role="radiogroup" aria-label="Choose accent color"
+                                    id="accent-color-group">
+                                    <label class="accent-option" aria-label="Green theme">
+                                        <input type="radio" name="settings-accent" value="green" checked />
+                                        <span class="accent-swatch swatch-green"></span>
+                                    </label>
+                                    <label class="accent-option" aria-label="Blue theme">
+                                        <input type="radio" name="settings-accent" value="blue" />
+                                        <span class="accent-swatch swatch-blue"></span>
+                                    </label>
+                                    <label class="accent-option" aria-label="Red theme">
+                                        <input type="radio" name="settings-accent" value="red" />
+                                        <span class="accent-swatch swatch-red"></span>
+                                    </label>
+                                    <label class="accent-option" aria-label="Purple theme">
+                                        <input type="radio" name="settings-accent" value="purple" />
+                                        <span class="accent-swatch swatch-purple"></span>
+                                    </label>
+                                    <label class="accent-option" aria-label="Amber theme">
+                                        <input type="radio" name="settings-accent" value="amber" />
+                                        <span class="accent-swatch swatch-amber"></span>
+                                    </label>
+                                </div>
+
                                 <!-- Toggle list -->
                                 <div class="settings-toggle-list">
                                     <div class="settings-toggle-item">
@@ -489,10 +518,12 @@
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
                                             <strong>Email owner on new bookings</strong>
-                                            <small>Send an email notification to the owner email when a new appointment is booked.</small>
+                                            <small>Send an email notification to the owner email when a new appointment
+                                                is booked.</small>
                                         </div>
                                         <label class="toggle-switch">
-                                            <input type="checkbox" id="settings-notify-owner-email" name="notifyOwnerEmail" />
+                                            <input type="checkbox" id="settings-notify-owner-email"
+                                                name="notifyOwnerEmail" />
                                             <span class="toggle-switch-track">
                                                 <span class="toggle-switch-thumb"></span>
                                             </span>
