@@ -778,8 +778,24 @@ async function refreshAfterSync() {
 function swallowBackgroundAsyncError(error) {
   if (!error) return;
   // Offline/network transitions are expected for background refresh calls.
-  if (error.code === 'OFFLINE' || error.code === 'NETWORK') return;
+  if (isConnectivityError(error)) return;
   console.error(error);
+}
+
+function isConnectivityError(error) {
+  if (!error) return false;
+  if (error.code === 'OFFLINE' || error.code === 'NETWORK') return true;
+  const message = String(error.message || '');
+  return message === 'Offline' || message.includes('offline');
+}
+
+function bindGlobalAsyncErrorGuards() {
+  if (typeof window === 'undefined') return;
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    if (!isConnectivityError(reason)) return;
+    event.preventDefault();
+  });
 }
 
 async function flushOfflineMutationQueue() {
@@ -2920,6 +2936,7 @@ function applyInitialTheme() {
 }
 
 async function init() {
+  bindGlobalAsyncErrorGuards();
   await registerServiceWorker();
   bindNetworkState();
   if (typeof navigator !== 'undefined' && navigator.onLine) {
