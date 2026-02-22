@@ -384,6 +384,17 @@ function positionDayMenu(anchorEl, menu) {
   menu.style.top = `${Math.round(top)}px`;
 }
 
+function openNewAppointmentModalForDate(date) {
+  state.editingAppointmentId = null;
+  updateAppointmentEditorUi(false);
+  closeDayMenu();
+  openModal('new-appointment');
+  const form = document.getElementById('appointment-form');
+  const dateInput = form?.querySelector('input[name="date"]');
+  if (dateInput && date) dateInput.value = date;
+  updateAppointmentPreview();
+}
+
 async function openDayMenu(anchorEl, date) {
   const menu = ensureDayMenu();
   state.dayMenuDate = date;
@@ -439,14 +450,7 @@ async function openDayMenu(anchorEl, date) {
 
     menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
     menu.querySelector('.day-menu-add')?.addEventListener('click', () => {
-      state.editingAppointmentId = null;
-      updateAppointmentEditorUi(false);
-      closeDayMenu();
-      openModal('new-appointment');
-      const form = document.getElementById('appointment-form');
-      const dateInput = form?.querySelector('input[name="date"]');
-      if (dateInput) dateInput.value = date;
-      updateAppointmentPreview();
+      openNewAppointmentModalForDate(date);
     });
 
     menu.querySelectorAll('.day-menu-show-actions').forEach((btn) => {
@@ -567,9 +571,15 @@ async function openDayMenu(anchorEl, date) {
         <h3>${escapeHtml(formatMenuDate(date))}</h3>
         <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
       </div>
-      <div class="day-menu-empty">Could not load this day. Try again.</div>
+      <div class="day-menu-actions">
+        <button type="button" class="btn-primary day-menu-add-offline">Add Appointment</button>
+      </div>
+      <div class="day-menu-empty">Could not load this day while offline. You can still add an appointment.</div>
     `;
     menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
+    menu.querySelector('.day-menu-add-offline')?.addEventListener('click', () => {
+      openNewAppointmentModalForDate(date);
+    });
   }
 }
 
