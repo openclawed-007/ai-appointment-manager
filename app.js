@@ -1481,6 +1481,19 @@ function monthParamFromOffset(baseMonthParam, delta = 0) {
   return toMonthParam(dt);
 }
 
+function showCalendarDotsLoadingState() {
+  document.querySelectorAll('.day-cell:not(.empty)').forEach((cell) => {
+    const preview = cell.querySelector('.day-events-preview');
+    cell.classList.add('calendar-loading');
+    if (preview) {
+      preview.innerHTML = `
+        <div class="cal-event-skeleton"></div>
+        <div class="cal-event-skeleton"></div>
+      `;
+    }
+  });
+}
+
 function renderCalendarDotsForMonth(monthAppointments = []) {
   const dayAppointments = new Map();
   monthAppointments.forEach((a) => {
@@ -1495,6 +1508,7 @@ function renderCalendarDotsForMonth(monthAppointments = []) {
     const appts = dayAppointments.get(day) || [];
     const count = appts.length;
     const preview = cell.querySelector('.day-events-preview');
+    cell.classList.remove('calendar-loading');
     const labelParts = [`${count} booking${count === 1 ? '' : 's'}`];
 
     if (appts.length) {
@@ -1562,13 +1576,21 @@ async function refreshCalendarDots(options = {}) {
   const cached = calendarMonthCache.get(monthParam);
   if (!force && cached?.appointments) {
     renderCalendarDotsForMonth(cached.appointments);
+  } else {
+    showCalendarDotsLoadingState();
   }
 
-  const monthAppointments = await fetchCalendarMonth(monthParam, { force });
-  if (requestId !== state.calendarDotsRequestId) return;
+  try {
+    const monthAppointments = await fetchCalendarMonth(monthParam, { force });
+    if (requestId !== state.calendarDotsRequestId) return;
 
-  renderCalendarDotsForMonth(monthAppointments);
-  prefetchAdjacentCalendarMonths(monthParam);
+    renderCalendarDotsForMonth(monthAppointments);
+    prefetchAdjacentCalendarMonths(monthParam);
+  } catch (error) {
+    if (requestId !== state.calendarDotsRequestId) return;
+    renderCalendarDotsForMonth([]);
+    throw error;
+  }
 }
 
 function renderTimeline(appointments = [], options = {}) {
