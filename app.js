@@ -1911,15 +1911,22 @@ function renderTypes(types = []) {
       : types
         .map(
           (t) => `
-            <div class="data-row" data-type-id="${t.id}">
-              <div>
-                <strong>${escapeHtml(t.name)}</strong>
-                <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
+            <div class="type-admin-card" data-type-id="${t.id}">
+              <div class="type-admin-card__head">
+                <div class="type-admin-card__identity">
+                  <span class="type-color" style="background:${escapeHtml(t.color)}"></span>
+                  <div>
+                    <strong>${escapeHtml(t.name)}</strong>
+                    <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
+                  </div>
+                </div>
+                <span class="pill">Active</span>
               </div>
-              <div>${escapeHtml(t.locationMode)}</div>
-              <div>${t.bookingCount || 0} bookings</div>
-              <div><span class="pill">Active</span></div>
-              <div class="row-actions">
+              <div class="type-admin-card__meta">
+                <span class="type-meta-item">📍 ${escapeHtml(t.locationMode)}</span>
+                <span class="type-meta-item">📅 ${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}</span>
+              </div>
+              <div class="row-actions type-admin-card__actions">
                 <button class="btn-secondary btn-delete-type" type="button">Delete</button>
               </div>
             </div>`
@@ -1932,7 +1939,7 @@ function renderTypes(types = []) {
 
     adminRoot.querySelectorAll('.btn-delete-type').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const typeId = btn.closest('.data-row')?.dataset.typeId;
+        const typeId = btn.closest('.type-admin-card')?.dataset.typeId;
         if (!typeId) return;
 
         const ok = await showConfirm('Delete Appointment Type', 'Existing bookings remain, but this type will no longer be selectable.');
