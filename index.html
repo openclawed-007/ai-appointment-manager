@@ -520,6 +520,18 @@
                                 <div class="settings-toggle-list">
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
+                                            <strong>Mobile navigation style</strong>
+                                            <small>Enabled: <span id="settings-mobile-nav-mode-label">Bottom Tabs</span></small>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="settings-mobile-nav-bottom-tabs" />
+                                            <span class="toggle-switch-track">
+                                                <span class="toggle-switch-thumb"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-toggle-item">
+                                        <div class="settings-toggle-copy">
                                             <strong>Show client names in calendar</strong>
                                             <small>When off, day previews show the service or appointment type name
                                                 instead.</small>
@@ -707,6 +719,55 @@
 
             </div>
         </main>
+
+        <nav class="mobile-nav" aria-label="Mobile Navigation">
+            <a href="#" class="mobile-nav-item active" data-view="dashboard" aria-label="Dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span>Home</span>
+            </a>
+            <a href="#" class="mobile-nav-item" data-view="appointments" aria-label="Appointments">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span>Appts</span>
+            </a>
+            <a href="#" class="mobile-nav-item" data-view="calendar" aria-label="Calendar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <line x1="8" y1="14" x2="8" y2="14" />
+                    <line x1="12" y1="14" x2="12" y2="14" />
+                    <line x1="16" y1="14" x2="16" y2="14" />
+                </svg>
+                <span>Calendar</span>
+            </a>
+            <a href="#" class="mobile-nav-item" data-view="types" aria-label="Types and Services">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                </svg>
+                <span>Types</span>
+            </a>
+            <a href="#" class="mobile-nav-item" data-view="settings" aria-label="Settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+                <span>Settings</span>
+            </a>
+        </nav>
     </div>
 
     <!-- Modal: New/Edit Appointment -->

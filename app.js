@@ -53,6 +53,7 @@ const calendarMonthInFlight = new Map();
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
+const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
 
 function normalizeAccentColor(value) {
   const color = String(value || '').trim();
@@ -69,6 +70,49 @@ function applyAccentColor(color) {
   if (normalized !== 'green') {
     document.body.classList.add(`theme-color-${normalized}`);
   }
+  return normalized;
+}
+
+function normalizeMobileNavMode(mode) {
+  return mode === 'sidebar' ? 'sidebar' : 'bottom';
+}
+
+function getStoredMobileNavMode() {
+  if (typeof localStorage === 'undefined') return 'bottom';
+  try {
+    return normalizeMobileNavMode(localStorage.getItem(MOBILE_NAV_MODE_KEY));
+  } catch (_error) {
+    return 'bottom';
+  }
+}
+
+function applyMobileNavMode(mode, { persist = true } = {}) {
+  const normalized = normalizeMobileNavMode(mode);
+  const useBottomTabs = normalized === 'bottom';
+  document.body.classList.toggle('mobile-nav-mode-bottom', useBottomTabs);
+  document.body.classList.toggle('mobile-nav-mode-sidebar', !useBottomTabs);
+  if (persist) setStoredValue(MOBILE_NAV_MODE_KEY, normalized);
+
+  const navModeToggle = document.getElementById('settings-mobile-nav-bottom-tabs');
+  if (navModeToggle && navModeToggle.checked !== useBottomTabs) {
+    navModeToggle.checked = useBottomTabs;
+  }
+  const navModeLabel = document.getElementById('settings-mobile-nav-mode-label');
+  if (navModeLabel) {
+    navModeLabel.textContent = useBottomTabs ? 'Bottom Tabs' : 'Sidebar Menu';
+  }
+
+  if (useBottomTabs) {
+    document.getElementById('sidebar')?.classList.remove('mobile-open');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    if (sidebarBackdrop) {
+      sidebarBackdrop.classList.remove('visible');
+      sidebarBackdrop.hidden = true;
+    }
+    document.body.classList.remove('sidebar-open');
+    document.getElementById('btn-mobile-menu')?.setAttribute('aria-expanded', 'false');
+  }
+
   return normalized;
 }
 
@@ -1247,7 +1291,8 @@ function bindNavigation() {
   });
 
   document.querySelectorAll('.mobile-nav-item').forEach((item) => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
       const targetView = item.dataset.view || 'dashboard';
       setActiveView(targetView);
     });
@@ -1264,6 +1309,7 @@ function bindHeaderButtons() {
 
   const setSidebarOpen = (open) => {
     if (!sidebar) return;
+    if (open && document.body.classList.contains('mobile-nav-mode-bottom')) return;
     const shouldOpen = Boolean(open);
     sidebar.classList.toggle('mobile-open', shouldOpen);
     document.body.classList.toggle('sidebar-open', shouldOpen);
@@ -1299,6 +1345,7 @@ function bindHeaderButtons() {
 
   menuBtn?.addEventListener('click', () => {
     if (!mobileSidebarQuery.matches) return;
+    if (document.body.classList.contains('mobile-nav-mode-bottom')) return;
     setSidebarOpen(!sidebar?.classList.contains('mobile-open'));
   });
 
@@ -2564,6 +2611,11 @@ async function loadSettings() {
 
   // Populate the export type chips
   populateExportTypeFilters();
+
+  const navModeToggle = document.getElementById('settings-mobile-nav-bottom-tabs');
+  if (navModeToggle) {
+    navModeToggle.checked = getStoredMobileNavMode() === 'bottom';
+  }
 }
 
 function triggerJsonDownload(filename, data) {
@@ -3328,6 +3380,11 @@ function bindForms() {
     await refreshCalendarDots();
   });
 
+  document.getElementById('settings-mobile-nav-bottom-tabs')?.addEventListener('change', (e) => {
+    const nextMode = applyMobileNavMode(e.currentTarget?.checked ? 'bottom' : 'sidebar');
+    showToast(nextMode === 'bottom' ? 'Bottom tabs enabled on mobile' : 'Sidebar menu enabled on mobile', 'success');
+  });
+
   // ── Settings: owner email notification toggle ─────────────────────────────
   document.getElementById('settings-notify-owner-email')?.addEventListener('change', async (e) => {
     const checked = Boolean(e.currentTarget?.checked);
@@ -3492,6 +3549,7 @@ async function init() {
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
+  applyMobileNavMode(getStoredMobileNavMode(), { persist: false });
   applyInitialViewPreference(preferredView);
   bindHeaderButtons();
   bindModalControls();

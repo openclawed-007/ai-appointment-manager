@@ -114,6 +114,11 @@
     /* ── Mobile Header: clean 2-row bar ── */
     .mobile-menu-btn,
     .icon-btn.mobile-menu-btn {
+        display: none;
+    }
+
+    body.mobile-nav-mode-sidebar .mobile-menu-btn,
+    body.mobile-nav-mode-sidebar .icon-btn.mobile-menu-btn {
         display: flex;
     }
 
@@ -219,6 +224,11 @@
     /* ── Content adjustments ── */
     .content-wrapper {
         padding: var(--spacing-md);
+        padding-bottom: var(--spacing-md);
+    }
+
+    body.mobile-nav-mode-bottom .content-wrapper {
+        padding-bottom: calc(102px + env(safe-area-inset-bottom, 0px));
     }
 
     .stats-grid {
@@ -386,9 +396,12 @@
         justify-content: center;
     }
 
-    /* ── Mobile Bottom Nav (disabled) ── */
     .mobile-nav {
         display: none;
+    }
+
+    body.mobile-nav-mode-bottom .mobile-nav {
+        display: grid;
     }
 
     /* Menus + toasts */
@@ -449,7 +462,19 @@
         margin-left: 0;
     }
 
+    .content-wrapper {
+        padding-bottom: var(--spacing-md);
+    }
+
+    body.mobile-nav-mode-bottom .content-wrapper {
+        padding-bottom: calc(102px + env(safe-area-inset-bottom, 0px));
+    }
+
     .mobile-nav {
         display: none;
+    }
+
+    body.mobile-nav-mode-bottom .mobile-nav {
+        display: grid;
     }
 }

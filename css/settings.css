@@ -150,6 +150,7 @@
     line-height: 1.4;
 }
 
+
 /* ── Custom toggle switch ── */
 .toggle-switch {
     position: relative;
@@ -671,4 +672,5 @@
         flex-direction: column;
         align-items: flex-start;
     }
+
 }
