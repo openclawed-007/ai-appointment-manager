@@ -45,6 +45,39 @@ const state = {
 };
 
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
+const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
+
+function loadAuthSnapshot() {
+  try {
+    const raw = localStorage.getItem(AUTH_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed.user || !parsed.business) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function saveAuthSnapshot(user, business) {
+  try {
+    if (!user || !business) {
+      localStorage.removeItem(AUTH_SNAPSHOT_KEY);
+      return;
+    }
+    localStorage.setItem(
+      AUTH_SNAPSHOT_KEY,
+      JSON.stringify({
+        user,
+        business,
+        updatedAt: new Date().toISOString()
+      })
+    );
+  } catch (_error) {
+    // Ignore storage failures.
+  }
+}
 
 function getFocusableElements(container) {
   if (!container) return [];
@@ -2519,14 +2552,26 @@ async function ensureAuth() {
     const me = await api('/api/auth/me');
     state.currentUser = me.user || null;
     state.currentBusiness = me.business || null;
+    saveAuthSnapshot(state.currentUser, state.currentBusiness);
     state.authShellDismissed = false;
     updateAccountUi();
     hideAuthShell();
     return true;
   } catch (error) {
-    if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') throw error;
+    if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') {
+      const snapshot = loadAuthSnapshot();
+      if (snapshot?.user && snapshot?.business) {
+        state.currentUser = snapshot.user;
+        state.currentBusiness = snapshot.business;
+        updateAccountUi();
+        hideAuthShell();
+        return true;
+      }
+      throw error;
+    }
     state.currentUser = null;
     state.currentBusiness = null;
+    saveAuthSnapshot(null, null);
     updateAccountUi();
     showAuthShell();
     return false;
@@ -2543,6 +2588,7 @@ function bindAuthUi() {
       const result = await api('/api/auth/dev-login', { method: 'POST' });
       state.currentUser = result.user || null;
       state.currentBusiness = result.business || null;
+      saveAuthSnapshot(state.currentUser, state.currentBusiness);
       state.authShellDismissed = false;
       updateAccountUi();
       hideAuthShell();
@@ -2618,6 +2664,7 @@ function bindAuthUi() {
       });
       state.currentUser = verified.user || null;
       state.currentBusiness = verified.business || null;
+      saveAuthSnapshot(state.currentUser, state.currentBusiness);
       state.authShellDismissed = false;
       updateAccountUi();
       hideAuthShell();
@@ -2713,6 +2760,7 @@ function bindAuthUi() {
     }
     state.currentUser = null;
     state.currentBusiness = null;
+    saveAuthSnapshot(null, null);
     updateAccountUi();
     showAuthShell();
   };
@@ -2928,7 +2976,7 @@ async function init() {
   } catch (error) {
     if (error?.code === 'OFFLINE') {
       state.apiOnline = false;
-      showToast('You are offline. Reconnect to load account and appointment data.', 'info');
+      showToast('You are offline. Reconnect to load the latest appointment data.', 'info');
       return;
     }
     if (error?.code === 'NETWORK') {
