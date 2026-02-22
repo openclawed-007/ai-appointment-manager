@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'intellischedule-static-v4';
-const RUNTIME_CACHE = 'intellischedule-runtime-v3';
+const STATIC_CACHE = 'intellischedule-static-v5';
+const RUNTIME_CACHE = 'intellischedule-runtime-v4';
 
 const APP_SHELL = [
   '/',
@@ -42,6 +42,15 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+async function matchCached(request) {
+  const runtime = await caches.open(RUNTIME_CACHE);
+  const runtimeHit = await runtime.match(request);
+  if (runtimeHit) return runtimeHit;
+
+  const statik = await caches.open(STATIC_CACHE);
+  return statik.match(request);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -71,7 +80,9 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           const pageFallback = url.pathname.startsWith('/book') ? '/booking.html' : '/index.html';
-          return (await caches.match(request)) || (await caches.match(pageFallback)) || (await caches.match('/index.html'));
+          return (await matchCached(request))
+            || (await matchCached(pageFallback))
+            || (await matchCached('/index.html'));
         })
     );
     return;
@@ -85,10 +96,10 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(async () => {
-        const cached = await caches.match(request);
+        const cached = await matchCached(request);
         if (cached) return cached;
         if (url.pathname === '/favicon.ico') {
-          return (await caches.match('/favicon.ico')) || new Response('', { status: 204 });
+          return (await matchCached('/favicon.ico')) || new Response('', { status: 204 });
         }
         return new Response('', { status: 503 });
       })
