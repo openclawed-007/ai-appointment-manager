@@ -163,6 +163,11 @@
     display: none;
 }
 
+.mobile-auth-btn,
+.icon-btn.mobile-auth-btn {
+    display: none;
+}
+
 .header-action-btn {
     display: inline-flex;
     align-items: center;

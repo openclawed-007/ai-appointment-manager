@@ -195,6 +195,18 @@
         height: 34px;
     }
 
+    .mobile-auth-btn,
+    .icon-btn.mobile-auth-btn {
+        display: none;
+        width: 34px;
+        height: 34px;
+    }
+
+    body.mobile-nav-mode-bottom .mobile-auth-btn,
+    body.mobile-nav-mode-bottom .icon-btn.mobile-auth-btn {
+        display: flex;
+    }
+
     /* New appointment button — icon only */
     #btn-new-appointment {
         padding: 8px 12px;
@@ -278,10 +290,6 @@
     .calendar-grid.google-like {
         padding: 0;
         gap: 1px;
-    }
-
-    .calendar-view-selector {
-        margin-left: auto;
     }
 
     .timeline,

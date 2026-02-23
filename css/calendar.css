@@ -6,17 +6,32 @@
 .calendar-nav {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+}
+
+.calendar-nav-main {
+    display: inline-grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 5px;
+    border-radius: 12px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
 }
 
 .current-month {
     font-family: var(--font-display);
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     color: var(--text);
-    min-width: 130px;
+    min-width: 140px;
     text-align: center;
+    letter-spacing: 0.01em;
 }
 
 .calendar-view-selector {
@@ -46,6 +61,60 @@
 .calendar-view-btn.active {
     background: var(--gold-dim);
     color: var(--gold);
+}
+
+@media (max-width: 768px) {
+    .calendar-nav {
+        align-items: center;
+        gap: 6px;
+    }
+
+    .calendar-nav-main {
+        width: auto;
+        padding: 2px 4px;
+        gap: 6px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--bg-raised);
+    }
+
+    .calendar-view-selector {
+        width: auto;
+        justify-content: center;
+    }
+
+    .calendar-view-btn {
+        flex: 0 0 auto;
+        text-align: center;
+        padding: 5px 9px;
+        font-size: 0.7rem;
+    }
+
+    .current-month {
+        font-size: 0.86rem;
+        min-width: 0;
+        flex: 1;
+        text-align: center;
+        letter-spacing: 0;
+    }
+
+    .calendar-nav-main .icon-btn.small {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        padding: 0;
+    }
+
+    .calendar-nav-main .icon-btn.small svg {
+        width: 15px;
+        height: 15px;
+    }
+}
+
+@media (max-width: 420px) {
+    .current-month {
+        font-size: 0.8rem;
+    }
 }
 
 .calendar-grid {

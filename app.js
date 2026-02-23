@@ -3866,6 +3866,7 @@ function updateAccountUi() {
     }
   });
   const sidebarAuth = document.getElementById('nav-logout-sidebar');
+  const mobileAuthBtn = document.getElementById('btn-logout-mobile');
 
   const logoutSvg = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3894,6 +3895,13 @@ function updateAccountUi() {
     } else {
       sidebarAuth.insertAdjacentHTML('afterbegin', svg.trim());
     }
+  }
+
+  if (mobileAuthBtn) {
+    const isSignedIn = Boolean(state.currentUser);
+    mobileAuthBtn.setAttribute('aria-label', isSignedIn ? 'Logout' : 'Sign In');
+    mobileAuthBtn.setAttribute('title', isSignedIn ? 'Logout' : 'Sign In');
+    mobileAuthBtn.innerHTML = (isSignedIn ? logoutSvg : loginSvg).trim();
   }
 }
 
@@ -4213,6 +4221,7 @@ function bindAuthUi() {
 
   document.getElementById('btn-logout')?.addEventListener('click', handleAuthAction);
   document.getElementById('nav-logout-sidebar')?.addEventListener('click', handleAuthAction);
+  document.getElementById('btn-logout-mobile')?.addEventListener('click', handleAuthAction);
 
   document.getElementById('btn-close-auth-shell')?.addEventListener('click', () => {
     hideAuthShell(true);
