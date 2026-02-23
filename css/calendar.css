@@ -221,3 +221,185 @@
     .cal-event-time { font-size: 0.9rem; }
     .cal-event-more { font-size: 0.9rem; }
 }
+
+/* Google-style week layout */
+.calendar-grid.google-like {
+    grid-template-columns: 72px repeat(7, minmax(120px, 1fr));
+    gap: 1px;
+    padding: 0;
+    overflow: auto;
+    max-height: min(68vh, 720px);
+}
+
+.week-grid-corner {
+    background: var(--bg-base);
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 4;
+}
+
+.week-day-header {
+    background: var(--bg-surface);
+    border: 0;
+    color: var(--text);
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.week-day-header:hover {
+    background: var(--bg-hover);
+}
+
+.week-day-header.today {
+    background: color-mix(in oklab, var(--gold-dim) 70%, var(--bg-surface));
+}
+
+.week-day-header.selected {
+    box-shadow: inset 0 0 0 1px var(--gold);
+}
+
+.week-day-name {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.week-day-num {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.week-time-label {
+    background: var(--bg-base);
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 8px 6px;
+    text-align: right;
+    border-right: 1px solid var(--border);
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+
+.week-slot {
+    border: 0;
+    background: var(--bg-surface);
+    min-height: 54px;
+    text-align: left;
+    padding: 4px;
+    cursor: pointer;
+    transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.week-slot:hover {
+    background: var(--bg-hover);
+}
+
+.week-slot.today {
+    background: color-mix(in oklab, var(--gold-dim) 45%, var(--bg-surface));
+}
+
+.week-slot.selected-day {
+    background: var(--bg-surface);
+}
+
+.week-slot-content {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 44px;
+}
+
+.week-event-chip {
+    display: grid;
+    gap: 2px;
+    font-size: 0.66rem;
+    padding: 6px 7px 6px 11px;
+    border-radius: 10px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    box-shadow:
+        inset 0 1px 0 color-mix(in oklab, var(--text) 6%, transparent),
+        0 2px 6px rgba(0, 0, 0, 0.16);
+    min-height: 34px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.week-event-chip:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in oklab, var(--gold) 26%, var(--border-strong));
+    box-shadow:
+        inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent),
+        0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.week-event-chip::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--gold);
+    box-shadow: 0 0 10px color-mix(in oklab, var(--gold) 45%, transparent);
+}
+
+.week-event-time {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.week-event-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+}
+
+.week-event-more {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.week-slot-skeleton {
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg,
+            color-mix(in oklab, var(--text-muted) 18%, transparent) 25%,
+            color-mix(in oklab, var(--text-muted) 34%, transparent) 45%,
+            color-mix(in oklab, var(--text-muted) 18%, transparent) 70%);
+    background-size: 220% 100%;
+    animation: calendar-skeleton-shimmer 1.1s linear infinite;
+}
+
+@media (max-width: 980px) {
+    .calendar-grid.google-like {
+        grid-template-columns: 62px repeat(7, minmax(105px, 1fr));
+    }
+
+    .week-slot {
+        min-height: 48px;
+    }
+}

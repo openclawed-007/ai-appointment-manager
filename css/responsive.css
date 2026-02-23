@@ -275,6 +275,11 @@
         gap: 4px;
     }
 
+    .calendar-grid.google-like {
+        padding: 0;
+        gap: 1px;
+    }
+
     .timeline,
     .appointment-types-list,
     .insights-list {
@@ -409,6 +414,17 @@
         width: min(360px, calc(100vw - 24px));
         max-height: 62vh;
         padding: 8px;
+    }
+
+    .quick-create-menu {
+        width: min(360px, calc(100vw - 24px));
+        max-height: 62vh;
+        padding: 8px;
+    }
+
+    .quick-create-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
     }
 
     .email-menu {

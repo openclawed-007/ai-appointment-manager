@@ -26,6 +26,10 @@ const state = {
   lastFocusedElement: null,
   dayMenuDate: null,
   dayMenuAnchorEl: null,
+  quickCreateDate: '',
+  quickCreateTime: '',
+  quickCreateAppointmentId: null,
+  quickCreateAnchorEl: null,
   editingAppointmentId: null,
   searchOriginView: null,
   searchActive: false,
@@ -36,6 +40,7 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
+  calendarGoogleLikeView: getStoredBoolean('calendarGoogleLikeView'),
   authShellDismissed: false,
   queueSyncInProgress: false,
   calendarExpanded: getStoredBoolean('calendarExpanded'),
@@ -43,7 +48,8 @@ const state = {
   authLoginChallengeToken: '',
   authLoginEmail: '',
   authResendCooldownUntil: 0,
-  calendarDotsRequestId: 0
+  calendarDotsRequestId: 0,
+  calendarWeekRequestId: 0
 };
 
 const CALENDAR_MONTH_CACHE_TTL_MS = 120000;
@@ -296,6 +302,45 @@ function localYmd(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+function parseYmd(dateStr) {
+  const dt = new Date(`${dateStr}T00:00:00`);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function getWeekStart(dateValue = new Date()) {
+  const dt = new Date(dateValue);
+  dt.setHours(0, 0, 0, 0);
+  dt.setDate(dt.getDate() - dt.getDay());
+  return dt;
+}
+
+function addDays(dateValue, days = 0) {
+  const dt = new Date(dateValue);
+  dt.setDate(dt.getDate() + Number(days || 0));
+  return dt;
+}
+
+function getVisibleWeekDates(baseDate = state.calendarDate) {
+  const start = getWeekStart(baseDate);
+  return Array.from({ length: 7 }, (_, idx) => localYmd(addDays(start, idx)));
+}
+
+function getCalendarHeaderLabel() {
+  if (!state.calendarGoogleLikeView) return monthLabel(state.calendarDate);
+  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const start = parseYmd(weekDates[0]);
+  const end = parseYmd(weekDates[6]);
+  if (!start || !end) return monthLabel(state.calendarDate);
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) {
+    const month = start.toLocaleDateString('en-US', { month: 'short' });
+    return `${month} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`;
+  }
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${startLabel} - ${endLabel}`;
+}
+
 function dayOrdinal(day) {
   const v = Number(day);
   if (v % 100 >= 11 && v % 100 <= 13) return `${v}th`;
@@ -339,6 +384,211 @@ function closeDayMenu() {
   menu.innerHTML = '';
   state.dayMenuDate = null;
   state.dayMenuAnchorEl = null;
+}
+
+function ensureQuickCreateMenu() {
+  let menu = document.getElementById('calendar-quick-create-menu');
+  if (menu) return menu;
+  menu = document.createElement('div');
+  menu.id = 'calendar-quick-create-menu';
+  menu.className = 'quick-create-menu hidden';
+  menu.setAttribute('role', 'dialog');
+  menu.setAttribute('aria-modal', 'false');
+  document.body.appendChild(menu);
+  return menu;
+}
+
+function closeQuickCreateMenu() {
+  const menu = document.getElementById('calendar-quick-create-menu');
+  if (!menu) return;
+  menu.classList.add('hidden');
+  menu.innerHTML = '';
+  state.quickCreateDate = '';
+  state.quickCreateTime = '';
+  state.quickCreateAppointmentId = null;
+  state.quickCreateAnchorEl = null;
+}
+
+function renderQuickCreateDurationOptions(selectedDuration = 45) {
+  const options = [15, 30, 45, 60, 90];
+  const unique = Array.from(new Set([Number(selectedDuration || 45), ...options]));
+  unique.sort((a, b) => a - b);
+  return unique
+    .map((mins) => `<option value="${mins}" ${Number(mins) === Number(selectedDuration) ? 'selected' : ''}>${mins} min</option>`)
+    .join('');
+}
+
+async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
+  if (!anchorEl || !date || !time) return;
+  closeDayMenu();
+
+  const menu = ensureQuickCreateMenu();
+  state.quickCreateAnchorEl = anchorEl;
+  const resolvedDate = String(appointment?.date || date);
+  const resolvedTime = String(appointment?.time || time).slice(0, 5);
+  state.quickCreateDate = resolvedDate;
+  state.quickCreateTime = resolvedTime;
+  state.quickCreateAppointmentId = appointment?.id != null ? Number(appointment.id) : null;
+
+  const defaultType = state.types.find((t) => Number(t.id) === Number(appointment?.typeId || state.selectedTypeId)) || state.types[0] || null;
+  const defaultTypeId = defaultType ? Number(defaultType.id) : '';
+  const defaultDuration = Number(appointment?.durationMinutes || defaultType?.durationMinutes || 45);
+  const defaultLocation = String(appointment?.location || 'office');
+  const defaultClientName = String(appointment?.clientName || '');
+  const isEditing = state.quickCreateAppointmentId != null;
+  const typeOptions = state.types.length
+    ? state.types.map((t) =>
+      `<option value="${Number(t.id)}" data-duration="${Number(t.durationMinutes || 45)}" ${Number(t.id) === defaultTypeId ? 'selected' : ''}>${escapeHtml(t.name)} (${Number(t.durationMinutes || 45)}m)</option>`
+    ).join('')
+    : '<option value="">No appointment types</option>';
+
+  menu.innerHTML = `
+    <div class="quick-create-header">
+      <h3>${isEditing ? 'Edit Appointment' : 'Quick Add'}</h3>
+      <button type="button" class="quick-create-close" aria-label="Close quick add">×</button>
+    </div>
+    <div class="quick-create-meta">
+      <span>${escapeHtml(formatMenuDate(resolvedDate))}</span>
+      <span>${escapeHtml(toTime12(resolvedTime))}</span>
+    </div>
+    <form class="quick-create-form">
+      <div class="form-group">
+        <label for="quick-create-client">What is this for?</label>
+        <input id="quick-create-client" name="clientName" type="text" required placeholder="Client or appointment title" value="${escapeHtml(defaultClientName)}" />
+      </div>
+      <div class="quick-create-grid">
+        <div class="form-group">
+          <label for="quick-create-type">Type</label>
+          <select id="quick-create-type" name="typeId" ${state.types.length ? '' : 'disabled'}>${typeOptions}</select>
+        </div>
+        <div class="form-group">
+          <label for="quick-create-time">Time</label>
+          <input id="quick-create-time" name="time" type="time" step="60" required value="${escapeHtml(resolvedTime)}" />
+        </div>
+      </div>
+      <div class="quick-create-grid">
+        <div class="form-group">
+          <label for="quick-create-duration">Duration</label>
+          <select id="quick-create-duration" name="durationMinutes">${renderQuickCreateDurationOptions(defaultDuration)}</select>
+        </div>
+        <div class="form-group">
+          <label for="quick-create-location">Location</label>
+          <select id="quick-create-location" name="location">
+            <option value="office" ${defaultLocation === 'office' ? 'selected' : ''}>Office</option>
+            <option value="on-premises" ${defaultLocation === 'on-premises' ? 'selected' : ''}>On premises</option>
+            <option value="virtual" ${defaultLocation === 'virtual' ? 'selected' : ''}>Virtual</option>
+            <option value="phone" ${defaultLocation === 'phone' ? 'selected' : ''}>Phone</option>
+          </select>
+        </div>
+      </div>
+      <div class="quick-create-actions">
+        ${isEditing ? '<button type="button" class="btn-secondary quick-create-delete">Delete</button>' : ''}
+        <button type="button" class="btn-secondary quick-create-cancel">Cancel</button>
+        <button type="submit" class="btn-primary quick-create-submit">${isEditing ? 'Save' : 'Create'}</button>
+      </div>
+    </form>
+  `;
+
+  positionDayMenu(anchorEl, menu);
+
+  menu.querySelector('.quick-create-close')?.addEventListener('click', closeQuickCreateMenu);
+  menu.querySelector('.quick-create-cancel')?.addEventListener('click', closeQuickCreateMenu);
+  menu.querySelector('.quick-create-delete')?.addEventListener('click', async () => {
+    if (state.quickCreateAppointmentId == null) return;
+    const ok = await showConfirm('Delete Appointment', 'This appointment will be permanently removed.');
+    if (!ok) return;
+    const deleteBtn = menu.querySelector('.quick-create-delete');
+    const oldText = deleteBtn?.textContent || 'Delete';
+    if (deleteBtn) {
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting...';
+    }
+    try {
+      const result = await queueAwareMutation(`/api/appointments/${state.quickCreateAppointmentId}`, { method: 'DELETE' }, {
+        allowOfflineQueue: true,
+        description: 'Appointment deletion'
+      });
+      closeQuickCreateMenu();
+      if (!result.queued) showToast('Appointment removed.', 'success');
+      const targetDate = state.selectedDate || state.quickCreateDate || date;
+      await loadDashboard(targetDate, { refreshDots: false });
+      await loadAppointmentsTable();
+      await refreshCalendarDots({ force: true });
+    } catch (error) {
+      showToast(error.message, 'error');
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = oldText;
+      }
+    }
+  });
+
+  const typeSelect = menu.querySelector('select[name="typeId"]');
+  const durationSelect = menu.querySelector('select[name="durationMinutes"]');
+  typeSelect?.addEventListener('change', () => {
+    const selectedOption = typeSelect.options[typeSelect.selectedIndex];
+    const suggested = Number(selectedOption?.dataset?.duration || 45);
+    if (durationSelect) durationSelect.value = String(suggested);
+  });
+
+  menu.querySelector('.quick-create-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submitBtn = form.querySelector('.quick-create-submit');
+    const oldText = submitBtn?.textContent || (isEditing ? 'Save' : 'Create');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = isEditing ? 'Saving...' : 'Creating...';
+    }
+
+    try {
+      const data = Object.fromEntries(new FormData(form).entries());
+      const requestDate = state.quickCreateDate;
+      const requestTime = String(data.time || state.quickCreateTime || '09:00').slice(0, 5);
+      const payload = {
+        clientName: String(data.clientName || '').trim(),
+        typeId: data.typeId ? Number(data.typeId) : null,
+        date: requestDate,
+        time: requestTime,
+        durationMinutes: Number(data.durationMinutes || 45),
+        location: String(data.location || 'office')
+      };
+      if (!payload.clientName) throw new Error('Please enter a name or title.');
+
+      const isUpdate = state.quickCreateAppointmentId != null;
+      const targetUrl = isUpdate
+        ? `/api/appointments/${state.quickCreateAppointmentId}`
+        : '/api/appointments';
+      const method = isUpdate ? 'PUT' : 'POST';
+      const result = await queueAwareMutation(targetUrl, {
+        method,
+        body: JSON.stringify(payload)
+      }, {
+        allowOfflineQueue: true,
+        description: isUpdate ? 'Appointment update' : 'Appointment creation'
+      });
+
+      closeQuickCreateMenu();
+      if (result.queued) {
+        await loadDashboard(payload.date, { refreshDots: false });
+        await refreshCalendarDots({ force: true });
+        return;
+      }
+      showToast(isUpdate ? 'Appointment updated.' : 'Appointment created.', 'success');
+      state.selectedDate = payload.date;
+      await loadDashboard(payload.date, { refreshDots: false });
+      await loadAppointmentsTable();
+      await refreshCalendarDots({ force: true });
+    } catch (error) {
+      showToast(error.message, 'error');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = oldText;
+      }
+    }
+  });
+
+  menu.querySelector('input[name="clientName"]')?.focus();
 }
 
 function ensureNotificationsMenu() {
@@ -703,7 +953,19 @@ function openNewAppointmentModalForDate(date) {
   updateAppointmentPreview();
 }
 
+function openNewAppointmentModalForSlot(date, time) {
+  openNewAppointmentModalForDate(date);
+  const form = document.getElementById('appointment-form');
+  const timeInput = form?.querySelector('input[name="time"]');
+  if (timeInput && time) {
+    timeInput.value = String(time).slice(0, 5);
+    syncTimeBuilderFromInput(form);
+  }
+  updateAppointmentPreview();
+}
+
 async function openDayMenu(anchorEl, date) {
+  closeQuickCreateMenu();
   const menu = ensureDayMenu();
   state.dayMenuDate = date;
   state.dayMenuAnchorEl = anchorEl;
@@ -897,6 +1159,17 @@ function repositionDayMenuIfOpen() {
   const anchorEl = state.dayMenuAnchorEl;
   if (!anchorEl || !document.contains(anchorEl)) {
     closeDayMenu();
+    return;
+  }
+  positionDayMenu(anchorEl, menu);
+}
+
+function repositionQuickCreateMenuIfOpen() {
+  const menu = document.getElementById('calendar-quick-create-menu');
+  if (!menu || menu.classList.contains('hidden')) return;
+  const anchorEl = state.quickCreateAnchorEl;
+  if (!anchorEl || !document.contains(anchorEl)) {
+    closeQuickCreateMenu();
     return;
   }
   positionDayMenu(anchorEl, menu);
@@ -1322,6 +1595,9 @@ function setActiveView(view) {
   if (!view) return;
   const activeView = resolveView(view);
   if (!activeView) return;
+  if (activeView !== 'calendar') {
+    closeQuickCreateMenu();
+  }
 
   if (typeof localStorage !== 'undefined') {
     try {
@@ -1474,6 +1750,11 @@ function renderCalendarGrid() {
   const grid = document.getElementById('calendar-grid');
   if (!grid) return;
 
+  if (state.calendarGoogleLikeView) {
+    renderCalendarWeekGrid();
+    return;
+  }
+
   const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const year = state.calendarDate.getFullYear();
   const month = state.calendarDate.getMonth();
@@ -1504,7 +1785,117 @@ function renderCalendarGrid() {
       </div>`;
   }).join('');
 
+  grid.classList.remove('google-like');
   grid.innerHTML = `${headers}${empties}${days}`;
+}
+
+function getCalendarDisplayRangeMinutes() {
+  const defaultOpen = '08:00';
+  const defaultClose = '18:00';
+  const openRaw = document.getElementById('settings-open-time')?.value || defaultOpen;
+  const closeRaw = document.getElementById('settings-close-time')?.value || defaultClose;
+  const openMinutes = timeToMinutes(openRaw);
+  const closeMinutes = timeToMinutes(closeRaw);
+  if (!Number.isFinite(openMinutes) || !Number.isFinite(closeMinutes) || closeMinutes <= openMinutes) {
+    return { start: 8 * 60, end: 18 * 60 };
+  }
+  return { start: openMinutes, end: closeMinutes };
+}
+
+function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {}) {
+  const grid = document.getElementById('calendar-grid');
+  if (!grid) return;
+
+  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const todayYmd = localYmd();
+  const selectedDate = state.selectedDate;
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const { start, end } = getCalendarDisplayRangeMinutes();
+  const slotMinutes = [];
+  for (let mins = start; mins < end; mins += 30) slotMinutes.push(mins);
+
+  const apptMap = new Map();
+  weekAppointments.forEach((appointment) => {
+    const date = String(appointment?.date || '');
+    const time = String(appointment?.time || '').slice(0, 5);
+    if (!date || !time) return;
+    const key = `${date} ${time}`;
+    if (!apptMap.has(key)) apptMap.set(key, []);
+    apptMap.get(key).push(appointment);
+  });
+
+  const headerCells = weekDates.map((date, idx) => {
+    const isToday = date === todayYmd;
+    const isSelected = date === selectedDate;
+    const dayNum = Number(String(date).slice(8, 10));
+    const classes = ['week-day-header'];
+    if (isToday) classes.push('today');
+    if (isSelected) classes.push('selected');
+    return `
+      <button type="button" class="${classes.join(' ')}" data-week-date="${date}" aria-label="Open ${escapeHtml(formatMenuDate(date))}">
+        <span class="week-day-name">${dayNames[idx]}</span>
+        <span class="week-day-num">${dayNum}</span>
+      </button>`;
+  }).join('');
+
+  const rows = slotMinutes.map((mins) => {
+    const time24 = minutesToTime(mins);
+    const rowCells = weekDates.map((date) => {
+      const key = `${date} ${time24}`;
+      const appointments = apptMap.get(key) || [];
+      const isToday = date === todayYmd;
+      const isSelectedDate = date === selectedDate;
+      const classes = ['week-slot'];
+      if (isToday) classes.push('today');
+      if (isSelectedDate) classes.push('selected-day');
+      if (appointments.length) classes.push('has-event');
+      const chips = loading
+        ? '<div class="week-slot-skeleton"></div>'
+        : appointments.slice(0, 2).map((a) => `
+            <div
+              class="week-event-chip"
+              data-appointment-id="${Number(a.id)}"
+              data-appointment-type-id="${a.typeId != null ? Number(a.typeId) : ''}"
+              data-appointment-client-name="${escapeHtml(a.clientName || '')}"
+              data-appointment-date="${escapeHtml(a.date || date)}"
+              data-appointment-time="${escapeHtml(a.time || time24)}"
+              data-appointment-duration="${Number(a.durationMinutes || 45)}"
+              data-appointment-location="${escapeHtml(a.location || 'office')}">
+              <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
+              <span class="week-event-time">${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}</span>
+            </div>
+          `).join('');
+      const more = !loading && appointments.length > 2
+        ? `<div class="week-event-more">+${appointments.length - 2} more</div>`
+        : '';
+      return `
+        <button type="button" class="${classes.join(' ')}" data-slot-date="${date}" data-slot-time="${time24}" aria-label="Add appointment on ${escapeHtml(formatMenuDate(date))} at ${escapeHtml(toTime12(time24))}">
+          <div class="week-slot-content">${chips}${more}</div>
+        </button>`;
+    }).join('');
+
+    return `
+      <div class="week-time-label">${escapeHtml(toTime12(time24))}</div>
+      ${rowCells}`;
+  }).join('');
+
+  grid.classList.add('google-like');
+  grid.innerHTML = `
+    <div class="week-grid-corner"></div>
+    ${headerCells}
+    ${rows}
+  `;
+}
+
+function updateGoogleWeekSelectionUi() {
+  if (!state.calendarGoogleLikeView) return;
+  const selectedDate = state.selectedDate;
+  document.querySelectorAll('.week-day-header[data-week-date]').forEach((node) => {
+    node.classList.toggle('selected', node.dataset.weekDate === selectedDate);
+  });
+  document.querySelectorAll('.week-slot[data-slot-date]').forEach((node) => {
+    node.classList.toggle('selected-day', node.dataset.slotDate === selectedDate);
+  });
 }
 
 function updateCalendarExpandedState() {
@@ -1522,7 +1913,7 @@ function updateCalendarExpandedState() {
 function bindCalendarNav() {
   const labelNode = document.querySelector('.current-month');
   const setMonth = () => {
-    if (labelNode) labelNode.textContent = monthLabel(state.calendarDate);
+    if (labelNode) labelNode.textContent = getCalendarHeaderLabel();
     renderCalendarGrid();
   };
   setMonth();
@@ -1536,21 +1927,93 @@ function bindCalendarNav() {
 
   document.getElementById('calendar-prev')?.addEventListener('click', async () => {
     closeDayMenu();
-    state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
+    closeQuickCreateMenu();
+    if (state.calendarGoogleLikeView) {
+      state.calendarDate = addDays(state.calendarDate, -7);
+    } else {
+      state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
+    }
     setMonth();
     await refreshCalendarDots();
   });
 
   document.getElementById('calendar-next')?.addEventListener('click', async () => {
     closeDayMenu();
-    state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
+    closeQuickCreateMenu();
+    if (state.calendarGoogleLikeView) {
+      state.calendarDate = addDays(state.calendarDate, 7);
+    } else {
+      state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
+    }
     setMonth();
     await refreshCalendarDots();
   });
 
   document.getElementById('calendar-grid')?.addEventListener('click', (event) => {
+    if (state.calendarGoogleLikeView) {
+      const dayHeader = event.target.closest('.week-day-header[data-week-date]');
+      if (dayHeader) {
+        const date = dayHeader.dataset.weekDate;
+        if (!date) return;
+        state.selectedDate = date;
+        closeQuickCreateMenu();
+        state.viewAll = false;
+        const btn = document.getElementById('btn-view-all');
+        if (btn) btn.textContent = 'View All';
+        void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          showToast('Offline mode: open a time slot to create an appointment.', 'info');
+          return;
+        }
+        void openDayMenu(dayHeader, date).catch(swallowBackgroundAsyncError);
+        updateGoogleWeekSelectionUi();
+        return;
+      }
+
+      const eventCard = event.target.closest('.week-event-chip[data-appointment-id]');
+      if (eventCard) {
+        const appointmentId = Number(eventCard.dataset.appointmentId);
+        if (!Number.isFinite(appointmentId) || appointmentId <= 0) return;
+        const appointment = {
+          id: appointmentId,
+          typeId: eventCard.dataset.appointmentTypeId ? Number(eventCard.dataset.appointmentTypeId) : null,
+          clientName: String(eventCard.dataset.appointmentClientName || ''),
+          date: String(eventCard.dataset.appointmentDate || ''),
+          time: String(eventCard.dataset.appointmentTime || '').slice(0, 5),
+          durationMinutes: Number(eventCard.dataset.appointmentDuration || 45),
+          location: String(eventCard.dataset.appointmentLocation || 'office')
+        };
+        if (!appointment.date || !appointment.time) return;
+        state.selectedDate = appointment.date;
+        state.viewAll = false;
+        const btn = document.getElementById('btn-view-all');
+        if (btn) btn.textContent = 'View All';
+        closeDayMenu();
+        void loadDashboard(appointment.date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
+        void openQuickCreateMenu(eventCard, appointment.date, appointment.time, appointment).catch(swallowBackgroundAsyncError);
+        updateGoogleWeekSelectionUi();
+        return;
+      }
+
+      const slot = event.target.closest('.week-slot[data-slot-date][data-slot-time]');
+      if (!slot) return;
+      const date = slot.dataset.slotDate;
+      const time = slot.dataset.slotTime;
+      if (!date || !time) return;
+      state.selectedDate = date;
+      state.viewAll = false;
+      const btn = document.getElementById('btn-view-all');
+      if (btn) btn.textContent = 'View All';
+      closeDayMenu();
+      void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
+      void openQuickCreateMenu(slot, date, time).catch(swallowBackgroundAsyncError);
+      updateGoogleWeekSelectionUi();
+      return;
+    }
+
     const dayCell = event.target.closest('.day-cell[data-day]');
     if (!dayCell) return;
+    closeQuickCreateMenu();
 
     const day = Number(dayCell.dataset.day);
     const yyyy = state.calendarDate.getFullYear();
@@ -1602,6 +2065,7 @@ function bindKeyboard() {
       if (activeModal?.id) closeModal(activeModal.id);
       else {
         closeDayMenu();
+        closeQuickCreateMenu();
         closeEmailComposerMenu();
         closeCancelReasonMenu();
         closeNotificationsMenu();
@@ -2054,7 +2518,38 @@ function prefetchAdjacentCalendarMonths(monthParam) {
   });
 }
 
+async function refreshCalendarGoogleWeekView(options = {}) {
+  const { force = false } = options;
+  const requestId = ++state.calendarWeekRequestId;
+  renderCalendarWeekGrid([], { loading: true });
+
+  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const months = Array.from(new Set(
+    weekDates
+      .map((date) => parseYmd(date))
+      .filter(Boolean)
+      .map((dt) => toMonthParam(dt))
+  ));
+
+  try {
+    const monthResults = await Promise.all(months.map((month) => fetchCalendarMonth(month, { force })));
+    if (requestId !== state.calendarWeekRequestId) return;
+    const weekSet = new Set(weekDates);
+    const appointments = monthResults
+      .flat()
+      .filter((a) => weekSet.has(String(a?.date || '')));
+    renderCalendarWeekGrid(appointments, { loading: false });
+  } catch (_error) {
+    if (requestId !== state.calendarWeekRequestId) return;
+    renderCalendarWeekGrid([], { loading: false });
+  }
+}
+
 async function refreshCalendarDots(options = {}) {
+  if (state.calendarGoogleLikeView) {
+    await refreshCalendarGoogleWeekView(options);
+    return;
+  }
   const { force = false } = options;
   const monthParam = toMonthParam(state.calendarDate);
   const requestId = ++state.calendarDotsRequestId;
@@ -2669,6 +3164,8 @@ async function loadSettings() {
   // Calendar preview toggle
   const previewToggle = document.getElementById('settings-calendar-show-client-names');
   if (previewToggle) previewToggle.checked = Boolean(state.calendarShowClientNames);
+  const googleLikeToggle = document.getElementById('settings-calendar-google-like-view');
+  if (googleLikeToggle) googleLikeToggle.checked = Boolean(state.calendarGoogleLikeView);
 
   // Owner email notification toggle (server setting)
   const notifyToggle = document.getElementById('settings-notify-owner-email');
@@ -3448,6 +3945,28 @@ function bindForms() {
     await refreshCalendarDots();
   });
 
+  document.getElementById('settings-calendar-google-like-view')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.currentTarget?.checked);
+    state.calendarGoogleLikeView = checked;
+    setStoredValue('calendarGoogleLikeView', checked);
+    if (checked) {
+      const selectedDate = parseYmd(state.selectedDate);
+      if (selectedDate) state.calendarDate = selectedDate;
+    }
+    closeDayMenu();
+    closeQuickCreateMenu();
+    const labelNode = document.querySelector('.current-month');
+    if (labelNode) labelNode.textContent = getCalendarHeaderLabel();
+    renderCalendarGrid();
+    await refreshCalendarDots();
+    showToast(
+      checked
+        ? 'Google-style week view enabled.'
+        : 'Month grid view enabled.',
+      'success'
+    );
+  });
+
   document.getElementById('settings-mobile-nav-bottom-tabs')?.addEventListener('change', (e) => {
     const nextMode = applyMobileNavMode(e.currentTarget?.checked ? 'bottom' : 'sidebar');
     showToast(nextMode === 'bottom' ? 'Bottom tabs enabled on mobile' : 'Sidebar menu enabled on mobile', 'success');
@@ -3680,7 +4199,15 @@ async function init() {
     if (dayMenu && !dayMenu.classList.contains('hidden')) {
       const clickedInMenu = event.target.closest('#calendar-day-menu');
       const clickedOnDay = event.target.closest('.day-cell[data-day]');
-      if (!clickedInMenu && !clickedOnDay) closeDayMenu();
+      const clickedOnWeekHeader = event.target.closest('.week-day-header[data-week-date]');
+      if (!clickedInMenu && !clickedOnDay && !clickedOnWeekHeader) closeDayMenu();
+    }
+
+    const quickCreateMenu = document.getElementById('calendar-quick-create-menu');
+    if (quickCreateMenu && !quickCreateMenu.classList.contains('hidden')) {
+      const clickedInQuickCreate = event.target.closest('#calendar-quick-create-menu');
+      const clickedOnSlot = event.target.closest('.week-slot[data-slot-date][data-slot-time]');
+      if (!clickedInQuickCreate && !clickedOnSlot) closeQuickCreateMenu();
     }
 
     const notificationsMenu = document.getElementById('notifications-menu');
@@ -3692,8 +4219,10 @@ async function init() {
   });
 
   window.addEventListener('resize', repositionDayMenuIfOpen);
+  window.addEventListener('resize', repositionQuickCreateMenuIfOpen);
   window.addEventListener('resize', repositionNotificationsMenuIfOpen);
   window.addEventListener('scroll', repositionDayMenuIfOpen, true);
+  window.addEventListener('scroll', repositionQuickCreateMenuIfOpen, true);
   window.addEventListener('scroll', repositionNotificationsMenuIfOpen, true);
 
   try {
