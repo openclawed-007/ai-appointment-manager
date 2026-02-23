@@ -191,6 +191,102 @@ describe('API smoke', () => {
     expect(deleteRes.body.ok).toBe(true);
   });
 
+  it('returns 503 for AI import when OPENROUTER_API_KEY is not configured', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      const res = await post(agent, '/api/data/import-ai').send({
+        fileName: 'sample.csv',
+        fileContent: 'name,date,time\nAlice,2026-02-21,09:00'
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(String(res.body.error || '')).toContain('OPENROUTER_API_KEY');
+    } finally {
+      if (originalKey == null) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = originalKey;
+    }
+  });
+
+  it('returns AI import quota status for the signed-in business', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const before = await agent.get('/api/data/import-ai/quota');
+    expect(before.statusCode).toBe(200);
+    expect(before.body.quota?.limit).toBe(3);
+    expect(Number(before.body.quota?.used || 0)).toBeGreaterThanOrEqual(0);
+    expect(Number(before.body.quota?.remaining || 0)).toBeLessThanOrEqual(3);
+  });
+
+  it('enforces AI import quota at 3 per business per day', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    const originalFetch = global.fetch;
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    let callCount = 0;
+    global.fetch = async () => {
+      callCount += 1;
+      const hour = String(8 + callCount).padStart(2, '0');
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                parsed: {
+                  appointments: [
+                    {
+                      clientName: `Quota Client ${callCount}`,
+                      clientEmail: null,
+                      title: 'Quota Test',
+                      typeName: 'Quota Test',
+                      date: `2026-08-0${callCount}`,
+                      time: `${hour}:00`,
+                      durationMinutes: 30,
+                      location: 'office',
+                      notes: null,
+                      status: 'confirmed',
+                      source: 'owner'
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        })
+      };
+    };
+
+    try {
+      for (let i = 0; i < 3; i += 1) {
+        const okRes = await post(agent, '/api/data/import-ai').send({
+          fileName: `quota-${i + 1}.txt`,
+          fileContent: `Quota test row ${i + 1}`
+        });
+        expect(okRes.statusCode).toBe(200);
+        expect(okRes.body.quota?.used).toBe(i + 1);
+      }
+
+      const blocked = await post(agent, '/api/data/import-ai').send({
+        fileName: 'quota-4.txt',
+        fileContent: 'Quota test row 4'
+      });
+      expect(blocked.statusCode).toBe(429);
+      expect(String(blocked.body.error || '')).toContain('AI import limit reached');
+      expect(blocked.body.quota?.limit).toBe(3);
+    } finally {
+      if (originalKey == null) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = originalKey;
+      global.fetch = originalFetch;
+    }
+  });
+
   it('isolates data between businesses', async () => {
     const unique = Date.now();
     const agentA = request.agent(app);

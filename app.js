@@ -1380,6 +1380,7 @@ async function api(path, options = {}) {
   if (response.status === 401) {
     const error = new Error(body.error || 'Authentication required.');
     error.code = 401;
+    error.details = body;
     throw error;
   }
   if (!response.ok) {
@@ -1388,6 +1389,7 @@ async function api(path, options = {}) {
     error.code = response.status === 503 && body?.error === 'Offline'
       ? 'OFFLINE'
       : response.status;
+    error.details = body;
     throw error;
   }
   return body;
@@ -3349,6 +3351,41 @@ async function submitSettings(e) {
   }
 }
 
+function renderAiImportQuotaIndicator(quota) {
+  const indicator = document.getElementById('ai-import-quota-indicator');
+  const valueNode = document.getElementById('ai-import-quota-value');
+  const importBtn = document.getElementById('btn-import-ai-data');
+  if (!indicator) return;
+  const remaining = Number(quota?.remaining);
+  const limit = Number(quota?.limit || 3);
+  if (importBtn) {
+    importBtn.disabled = false;
+    importBtn.removeAttribute('title');
+  }
+  if (!Number.isFinite(remaining)) {
+    if (valueNode) valueNode.textContent = `Remaining today: -- / ${limit}`;
+    indicator.classList.remove('is-empty');
+    return;
+  }
+  const safeRemaining = Math.max(0, remaining);
+  if (valueNode) valueNode.textContent = `Remaining today: ${safeRemaining} / ${limit}`;
+  const noQuotaLeft = safeRemaining <= 0;
+  indicator.classList.toggle('is-empty', noQuotaLeft);
+  if (importBtn && noQuotaLeft) {
+    importBtn.disabled = true;
+    importBtn.title = 'Daily AI import limit reached.';
+  }
+}
+
+async function loadAiImportQuotaIndicator() {
+  try {
+    const payload = await api('/api/data/import-ai/quota');
+    renderAiImportQuotaIndicator(payload?.quota);
+  } catch (_error) {
+    renderAiImportQuotaIndicator(null);
+  }
+}
+
 async function loadSettings() {
   const { settings } = await api('/api/settings');
   const form = document.getElementById('settings-form');
@@ -3392,6 +3429,8 @@ async function loadSettings() {
   if (navModeToggle) {
     navModeToggle.checked = getStoredMobileNavMode() === 'bottom';
   }
+
+  await loadAiImportQuotaIndicator();
 }
 
 function triggerJsonDownload(filename, data) {
@@ -3440,6 +3479,65 @@ async function importBusinessDataFromFile(file) {
     await loadSettings();
   } catch (error) {
     showToast(error.message || 'Invalid backup file.', 'error');
+  }
+}
+
+async function importAiAppointmentsFromFile(file) {
+  if (!file) return;
+  try {
+    const raw = await file.text();
+    if (!String(raw || '').trim()) throw new Error('Selected file is empty.');
+    const ok = await showConfirm(
+      'AI Import Appointments',
+      'AI will convert this file and import only non-overlapping appointments. Continue?'
+    );
+    if (!ok) return;
+
+    showToast('AI import started. Parsing file and converting appointments…', 'info');
+
+    const result = await api('/api/data/import-ai', {
+      method: 'POST',
+      body: JSON.stringify({
+        fileName: file.name,
+        fileContent: raw
+      })
+    });
+    renderAiImportQuotaIndicator(result?.quota);
+
+    showToast(
+      `AI import complete (${result.model || 'model'}): ${result.importedAppointments || 0} imported, ${result.skippedOverlaps || 0} overlap skipped, ${result.skippedInvalid || 0} invalid skipped.`,
+      'success'
+    );
+    if ((result.skippedOverlaps || 0) > 0) {
+      const samples = Array.isArray(result.overlapSamples) ? result.overlapSamples.slice(0, 4) : [];
+      if (samples.length) {
+        const summary = samples
+          .map((s) => `${s.clientName || 'Appointment'} ${s.date || ''} ${s.time || ''}`.trim())
+          .join(' | ');
+        showToast(
+          `Skipped overlaps (${result.skippedOverlaps}): ${summary}${result.skippedOverlaps > samples.length ? ' | ...' : ''}`,
+          'info'
+        );
+      } else {
+        showToast('Some appointments were skipped because they overlapped existing bookings.', 'info');
+      }
+    }
+    if ((result.skippedInvalid || 0) > 0) {
+      const invalidSamples = Array.isArray(result.invalidSamples) ? result.invalidSamples.slice(0, 3) : [];
+      showToast(
+        invalidSamples.length
+          ? `Skipped invalid rows (${result.skippedInvalid}): ${invalidSamples.map((r) => `row ${Number(r.index) + 1}`).join(', ')}.`
+          : 'Some rows were skipped because required date/time fields were invalid.',
+        'info'
+      );
+    }
+
+    await loadDashboard();
+    await loadAppointmentsTable();
+    await refreshCalendarDots({ force: true });
+  } catch (error) {
+    if (error?.details?.quota) renderAiImportQuotaIndicator(error.details.quota);
+    showToast(error.message || 'AI import failed.', 'error');
   }
 }
 
@@ -4147,6 +4245,15 @@ function bindForms() {
     const input = e.currentTarget;
     const file = input?.files?.[0];
     await importBusinessDataFromFile(file);
+    if (input) input.value = '';
+  });
+  document.getElementById('btn-import-ai-data')?.addEventListener('click', () => {
+    document.getElementById('import-ai-data-file')?.click();
+  });
+  document.getElementById('import-ai-data-file')?.addEventListener('change', async (e) => {
+    const input = e.currentTarget;
+    const file = input?.files?.[0];
+    await importAiAppointmentsFromFile(file);
     if (input) input.value = '';
   });
   document.getElementById('settings-calendar-show-client-names')?.addEventListener('change', async (e) => {

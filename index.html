@@ -867,6 +867,20 @@
                                         </div>
                                         <div class="settings-utility-item">
                                             <div class="settings-utility-copy">
+                                                <strong>AI Appointment Import</strong>
+                                                <small>Upload CSV, JSON, TXT, or ICS and AI will convert/import non-overlapping appointments.</small>
+                                                <span class="ai-import-quota-indicator" id="ai-import-quota-indicator" aria-live="polite">
+                                                    <strong class="ai-import-quota-value" id="ai-import-quota-value">Remaining today: -- / 3</strong>
+                                                </span>
+                                            </div>
+                                            <div class="settings-utility-action">
+                                                <button type="button" class="btn-secondary" id="btn-import-ai-data">
+                                                    AI Import
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="settings-utility-item">
+                                            <div class="settings-utility-copy">
                                                 <strong>Customer Booking Page</strong>
                                                 <small>Share this link with clients so they can book appointments
                                                     directly.</small>
@@ -889,6 +903,8 @@
 
                     <!-- Hidden file input for backup restore -->
                     <input id="import-data-file" type="file" accept="application/json,.json" hidden />
+                    <input id="import-ai-data-file" type="file"
+                        accept=".csv,.json,.txt,.ics,text/csv,application/json,text/plain,text/calendar" hidden />
                 </section>
 
             </div>
