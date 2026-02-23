@@ -280,6 +280,10 @@
         gap: 1px;
     }
 
+    .calendar-view-selector {
+        margin-left: auto;
+    }
+
     .timeline,
     .appointment-types-list,
     .insights-list {

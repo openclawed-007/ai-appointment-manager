@@ -240,6 +240,14 @@
                                             <polyline points="9 18 15 12 9 6" />
                                         </svg>
                                     </button>
+                                    <div class="calendar-view-selector" role="tablist" aria-label="Calendar range">
+                                        <button type="button" class="calendar-view-btn" id="calendar-view-day"
+                                            data-calendar-view="day" role="tab" aria-selected="false">Day</button>
+                                        <button type="button" class="calendar-view-btn" id="calendar-view-week"
+                                            data-calendar-view="week" role="tab" aria-selected="false">Week</button>
+                                        <button type="button" class="calendar-view-btn active" id="calendar-view-month"
+                                            data-calendar-view="month" role="tab" aria-selected="true">Month</button>
+                                    </div>
                                     <button class="icon-btn small desktop-only" type="button" id="btn-calendar-expand"
                                         aria-label="Toggle calendar width">
                                         <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -706,19 +714,6 @@
                                         </div>
                                         <label class="toggle-switch">
                                             <input type="checkbox" id="settings-calendar-show-client-names" />
-                                            <span class="toggle-switch-track">
-                                                <span class="toggle-switch-thumb"></span>
-                                            </span>
-                                        </label>
-                                    </div>
-                                    <div class="settings-toggle-item">
-                                        <div class="settings-toggle-copy">
-                                            <strong>Google-style calendar layout</strong>
-                                            <small>Days across the top and times down the side. Click any time slot to
-                                                create an appointment there.</small>
-                                        </div>
-                                        <label class="toggle-switch">
-                                            <input type="checkbox" id="settings-calendar-google-like-view" />
                                             <span class="toggle-switch-track">
                                                 <span class="toggle-switch-thumb"></span>
                                             </span>

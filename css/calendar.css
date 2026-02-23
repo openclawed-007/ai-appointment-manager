@@ -7,6 +7,7 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    flex-wrap: wrap;
 }
 
 .current-month {
@@ -16,6 +17,35 @@
     color: var(--text);
     min-width: 130px;
     text-align: center;
+}
+
+.calendar-view-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-raised);
+    padding: 2px;
+}
+
+.calendar-view-btn {
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.calendar-view-btn.active {
+    background: var(--gold-dim);
+    color: var(--gold);
 }
 
 .calendar-grid {
@@ -231,6 +261,10 @@
     max-height: min(68vh, 720px);
 }
 
+.calendar-grid.google-like.google-like-day {
+    grid-template-columns: 72px minmax(220px, 1fr);
+}
+
 .week-grid-corner {
     background: var(--bg-base);
     position: sticky;
@@ -397,6 +431,10 @@
 @media (max-width: 980px) {
     .calendar-grid.google-like {
         grid-template-columns: 62px repeat(7, minmax(105px, 1fr));
+    }
+
+    .calendar-grid.google-like.google-like-day {
+        grid-template-columns: 62px minmax(180px, 1fr);
     }
 
     .week-slot {

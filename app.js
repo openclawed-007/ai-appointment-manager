@@ -16,6 +16,15 @@ function setStoredValue(key, value) {
   }
 }
 
+function getStoredCalendarViewMode() {
+  if (typeof localStorage === 'undefined') return 'month';
+  try {
+    return normalizeCalendarViewMode(localStorage.getItem('calendarViewMode'));
+  } catch (_error) {
+    return 'month';
+  }
+}
+
 const state = {
   types: [],
   selectedTypeId: null,
@@ -40,7 +49,7 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
-  calendarGoogleLikeView: getStoredBoolean('calendarGoogleLikeView'),
+  calendarViewMode: 'month',
   authShellDismissed: false,
   queueSyncInProgress: false,
   calendarExpanded: getStoredBoolean('calendarExpanded'),
@@ -53,6 +62,7 @@ const state = {
 };
 
 const CALENDAR_MONTH_CACHE_TTL_MS = 120000;
+const CALENDAR_VIEW_MODES = ['day', 'week', 'month'];
 const calendarMonthCache = new Map();
 const calendarMonthInFlight = new Map();
 
@@ -61,6 +71,11 @@ const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
 const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
 const BUSINESS_HOURS_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+function normalizeCalendarViewMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return CALENDAR_VIEW_MODES.includes(mode) ? mode : 'month';
+}
 
 function normalizeAccentColor(value) {
   const color = String(value || '').trim();
@@ -325,9 +340,33 @@ function getVisibleWeekDates(baseDate = state.calendarDate) {
   return Array.from({ length: 7 }, (_, idx) => localYmd(addDays(start, idx)));
 }
 
+function getVisibleCalendarDates(baseDate = state.calendarDate, mode = state.calendarViewMode) {
+  const resolvedMode = normalizeCalendarViewMode(mode);
+  if (resolvedMode === 'day') {
+    return [localYmd(baseDate)];
+  }
+  if (resolvedMode === 'week') {
+    return getVisibleWeekDates(baseDate);
+  }
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, idx) => {
+    const day = String(idx + 1).padStart(2, '0');
+    const mm = String(month + 1).padStart(2, '0');
+    return `${year}-${mm}-${day}`;
+  });
+}
+
 function getCalendarHeaderLabel() {
-  if (!state.calendarGoogleLikeView) return monthLabel(state.calendarDate);
-  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  if (mode === 'month') return monthLabel(state.calendarDate);
+  if (mode === 'day') {
+    const date = parseYmd(localYmd(state.calendarDate));
+    if (!date) return monthLabel(state.calendarDate);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  const weekDates = getVisibleCalendarDates(state.calendarDate, 'week');
   const start = parseYmd(weekDates[0]);
   const end = parseYmd(weekDates[6]);
   if (!start || !end) return monthLabel(state.calendarDate);
@@ -709,9 +748,12 @@ async function openNotificationsMenu(anchorEl) {
         state.selectedDate = date;
         const dt = new Date(`${date}T00:00:00`);
         if (!Number.isNaN(dt.getTime())) {
-          state.calendarDate = new Date(dt.getFullYear(), dt.getMonth(), 1);
+          const mode = normalizeCalendarViewMode(state.calendarViewMode);
+          state.calendarDate = mode === 'month'
+            ? new Date(dt.getFullYear(), dt.getMonth(), 1)
+            : new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
           const monthLabelNode = document.querySelector('.current-month');
-          if (monthLabelNode) monthLabelNode.textContent = monthLabel(state.calendarDate);
+          if (monthLabelNode) monthLabelNode.textContent = getCalendarHeaderLabel();
           renderCalendarGrid();
           await refreshCalendarDots();
         }
@@ -1750,8 +1792,9 @@ function renderCalendarGrid() {
   const grid = document.getElementById('calendar-grid');
   if (!grid) return;
 
-  if (state.calendarGoogleLikeView) {
-    renderCalendarWeekGrid();
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  if (mode === 'week' || mode === 'day') {
+    renderCalendarTimeGrid();
     return;
   }
 
@@ -1786,6 +1829,7 @@ function renderCalendarGrid() {
   }).join('');
 
   grid.classList.remove('google-like');
+  grid.classList.remove('google-like-day');
   grid.innerHTML = `${headers}${empties}${days}`;
 }
 
@@ -1802,11 +1846,12 @@ function getCalendarDisplayRangeMinutes() {
   return { start: openMinutes, end: closeMinutes };
 }
 
-function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {}) {
+function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } = {}) {
   const grid = document.getElementById('calendar-grid');
   if (!grid) return;
 
-  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  const visibleDates = getVisibleCalendarDates(state.calendarDate, mode);
   const todayYmd = localYmd();
   const selectedDate = state.selectedDate;
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1815,7 +1860,7 @@ function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {})
   for (let mins = start; mins < end; mins += 30) slotMinutes.push(mins);
 
   const apptMap = new Map();
-  weekAppointments.forEach((appointment) => {
+  timeGridAppointments.forEach((appointment) => {
     const date = String(appointment?.date || '');
     const time = String(appointment?.time || '').slice(0, 5);
     if (!date || !time) return;
@@ -1824,7 +1869,9 @@ function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {})
     apptMap.get(key).push(appointment);
   });
 
-  const headerCells = weekDates.map((date, idx) => {
+  const headerCells = visibleDates.map((date, idx) => {
+    const parsed = parseYmd(date);
+    const dayIndex = parsed ? parsed.getDay() : idx;
     const isToday = date === todayYmd;
     const isSelected = date === selectedDate;
     const dayNum = Number(String(date).slice(8, 10));
@@ -1833,14 +1880,14 @@ function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {})
     if (isSelected) classes.push('selected');
     return `
       <button type="button" class="${classes.join(' ')}" data-week-date="${date}" aria-label="Open ${escapeHtml(formatMenuDate(date))}">
-        <span class="week-day-name">${dayNames[idx]}</span>
+        <span class="week-day-name">${dayNames[dayIndex] || ''}</span>
         <span class="week-day-num">${dayNum}</span>
       </button>`;
   }).join('');
 
   const rows = slotMinutes.map((mins) => {
     const time24 = minutesToTime(mins);
-    const rowCells = weekDates.map((date) => {
+    const rowCells = visibleDates.map((date) => {
       const key = `${date} ${time24}`;
       const appointments = apptMap.get(key) || [];
       const isToday = date === todayYmd;
@@ -1880,6 +1927,7 @@ function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {})
   }).join('');
 
   grid.classList.add('google-like');
+  grid.classList.toggle('google-like-day', mode === 'day');
   grid.innerHTML = `
     <div class="week-grid-corner"></div>
     ${headerCells}
@@ -1887,8 +1935,18 @@ function renderCalendarWeekGrid(weekAppointments = [], { loading = false } = {})
   `;
 }
 
-function updateGoogleWeekSelectionUi() {
-  if (!state.calendarGoogleLikeView) return;
+function syncCalendarViewSelector() {
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  document.querySelectorAll('.calendar-view-btn[data-calendar-view]').forEach((btn) => {
+    const active = btn.dataset.calendarView === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
+function updateTimeGridSelectionUi() {
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  if (mode !== 'week' && mode !== 'day') return;
   const selectedDate = state.selectedDate;
   document.querySelectorAll('.week-day-header[data-week-date]').forEach((node) => {
     node.classList.toggle('selected', node.dataset.weekDate === selectedDate);
@@ -1914,6 +1972,7 @@ function bindCalendarNav() {
   const labelNode = document.querySelector('.current-month');
   const setMonth = () => {
     if (labelNode) labelNode.textContent = getCalendarHeaderLabel();
+    syncCalendarViewSelector();
     renderCalendarGrid();
   };
   setMonth();
@@ -1928,8 +1987,11 @@ function bindCalendarNav() {
   document.getElementById('calendar-prev')?.addEventListener('click', async () => {
     closeDayMenu();
     closeQuickCreateMenu();
-    if (state.calendarGoogleLikeView) {
+    const mode = normalizeCalendarViewMode(state.calendarViewMode);
+    if (mode === 'week') {
       state.calendarDate = addDays(state.calendarDate, -7);
+    } else if (mode === 'day') {
+      state.calendarDate = addDays(state.calendarDate, -1);
     } else {
       state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
     }
@@ -1940,8 +2002,11 @@ function bindCalendarNav() {
   document.getElementById('calendar-next')?.addEventListener('click', async () => {
     closeDayMenu();
     closeQuickCreateMenu();
-    if (state.calendarGoogleLikeView) {
+    const mode = normalizeCalendarViewMode(state.calendarViewMode);
+    if (mode === 'week') {
       state.calendarDate = addDays(state.calendarDate, 7);
+    } else if (mode === 'day') {
+      state.calendarDate = addDays(state.calendarDate, 1);
     } else {
       state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
     }
@@ -1949,8 +2014,24 @@ function bindCalendarNav() {
     await refreshCalendarDots();
   });
 
+  document.querySelectorAll('.calendar-view-btn[data-calendar-view]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const nextMode = normalizeCalendarViewMode(btn.dataset.calendarView);
+      if (state.calendarViewMode === nextMode) return;
+      state.calendarViewMode = nextMode;
+      setStoredValue('calendarViewMode', nextMode);
+      const selectedDate = parseYmd(state.selectedDate);
+      if (selectedDate) state.calendarDate = selectedDate;
+      closeDayMenu();
+      closeQuickCreateMenu();
+      setMonth();
+      await refreshCalendarDots();
+    });
+  });
+
   document.getElementById('calendar-grid')?.addEventListener('click', (event) => {
-    if (state.calendarGoogleLikeView) {
+    const mode = normalizeCalendarViewMode(state.calendarViewMode);
+    if (mode === 'week' || mode === 'day') {
       const dayHeader = event.target.closest('.week-day-header[data-week-date]');
       if (dayHeader) {
         const date = dayHeader.dataset.weekDate;
@@ -1966,7 +2047,7 @@ function bindCalendarNav() {
           return;
         }
         void openDayMenu(dayHeader, date).catch(swallowBackgroundAsyncError);
-        updateGoogleWeekSelectionUi();
+        updateTimeGridSelectionUi();
         return;
       }
 
@@ -1991,7 +2072,7 @@ function bindCalendarNav() {
         closeDayMenu();
         void loadDashboard(appointment.date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
         void openQuickCreateMenu(eventCard, appointment.date, appointment.time, appointment).catch(swallowBackgroundAsyncError);
-        updateGoogleWeekSelectionUi();
+        updateTimeGridSelectionUi();
         return;
       }
 
@@ -2007,7 +2088,7 @@ function bindCalendarNav() {
       closeDayMenu();
       void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
       void openQuickCreateMenu(slot, date, time).catch(swallowBackgroundAsyncError);
-      updateGoogleWeekSelectionUi();
+      updateTimeGridSelectionUi();
       return;
     }
 
@@ -2518,14 +2599,14 @@ function prefetchAdjacentCalendarMonths(monthParam) {
   });
 }
 
-async function refreshCalendarGoogleWeekView(options = {}) {
+async function refreshCalendarTimeGrid(options = {}) {
   const { force = false } = options;
   const requestId = ++state.calendarWeekRequestId;
-  renderCalendarWeekGrid([], { loading: true });
+  renderCalendarTimeGrid([], { loading: true });
 
-  const weekDates = getVisibleWeekDates(state.calendarDate);
+  const visibleDates = getVisibleCalendarDates(state.calendarDate, state.calendarViewMode);
   const months = Array.from(new Set(
-    weekDates
+    visibleDates
       .map((date) => parseYmd(date))
       .filter(Boolean)
       .map((dt) => toMonthParam(dt))
@@ -2534,20 +2615,21 @@ async function refreshCalendarGoogleWeekView(options = {}) {
   try {
     const monthResults = await Promise.all(months.map((month) => fetchCalendarMonth(month, { force })));
     if (requestId !== state.calendarWeekRequestId) return;
-    const weekSet = new Set(weekDates);
+    const weekSet = new Set(visibleDates);
     const appointments = monthResults
       .flat()
       .filter((a) => weekSet.has(String(a?.date || '')));
-    renderCalendarWeekGrid(appointments, { loading: false });
+    renderCalendarTimeGrid(appointments, { loading: false });
   } catch (_error) {
     if (requestId !== state.calendarWeekRequestId) return;
-    renderCalendarWeekGrid([], { loading: false });
+    renderCalendarTimeGrid([], { loading: false });
   }
 }
 
 async function refreshCalendarDots(options = {}) {
-  if (state.calendarGoogleLikeView) {
-    await refreshCalendarGoogleWeekView(options);
+  const mode = normalizeCalendarViewMode(state.calendarViewMode);
+  if (mode === 'week' || mode === 'day') {
+    await refreshCalendarTimeGrid(options);
     return;
   }
   const { force = false } = options;
@@ -3164,8 +3246,6 @@ async function loadSettings() {
   // Calendar preview toggle
   const previewToggle = document.getElementById('settings-calendar-show-client-names');
   if (previewToggle) previewToggle.checked = Boolean(state.calendarShowClientNames);
-  const googleLikeToggle = document.getElementById('settings-calendar-google-like-view');
-  if (googleLikeToggle) googleLikeToggle.checked = Boolean(state.calendarGoogleLikeView);
 
   // Owner email notification toggle (server setting)
   const notifyToggle = document.getElementById('settings-notify-owner-email');
@@ -3945,28 +4025,6 @@ function bindForms() {
     await refreshCalendarDots();
   });
 
-  document.getElementById('settings-calendar-google-like-view')?.addEventListener('change', async (e) => {
-    const checked = Boolean(e.currentTarget?.checked);
-    state.calendarGoogleLikeView = checked;
-    setStoredValue('calendarGoogleLikeView', checked);
-    if (checked) {
-      const selectedDate = parseYmd(state.selectedDate);
-      if (selectedDate) state.calendarDate = selectedDate;
-    }
-    closeDayMenu();
-    closeQuickCreateMenu();
-    const labelNode = document.querySelector('.current-month');
-    if (labelNode) labelNode.textContent = getCalendarHeaderLabel();
-    renderCalendarGrid();
-    await refreshCalendarDots();
-    showToast(
-      checked
-        ? 'Google-style week view enabled.'
-        : 'Month grid view enabled.',
-      'success'
-    );
-  });
-
   document.getElementById('settings-mobile-nav-bottom-tabs')?.addEventListener('change', (e) => {
     const nextMode = applyMobileNavMode(e.currentTarget?.checked ? 'bottom' : 'sidebar');
     showToast(nextMode === 'bottom' ? 'Bottom tabs enabled on mobile' : 'Sidebar menu enabled on mobile', 'success');
@@ -4177,6 +4235,9 @@ async function init() {
     void flushOfflineMutationQueue().catch(swallowBackgroundAsyncError);
   }
   const preferredView = getStoredViewPreference();
+  state.calendarViewMode = getStoredCalendarViewMode();
+  const selectedDate = parseYmd(state.selectedDate);
+  if (selectedDate) state.calendarDate = selectedDate;
   bindAuthUi();
   await configureDevLoginVisibility();
   bindNavigation();
