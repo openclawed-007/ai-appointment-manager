@@ -1,9 +1,63 @@
 /* ── Stats ── */
+.stats-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-sm);
+}
+
+.stats-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: all var(--transition-fast);
+}
+
+.stats-toggle-btn:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+    background: var(--bg-surface);
+}
+
+.stats-toggle-icon {
+    width: 14px;
+    height: 14px;
+    transition: transform var(--transition-fast);
+}
+
+body.dashboard-stats-collapsed .stats-toggle-icon {
+    transform: rotate(180deg);
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-2xl);
+    max-height: 320px;
+    opacity: 1;
+    transform: translateY(0);
+    overflow: hidden;
+    transition:
+        max-height 280ms ease,
+        opacity 220ms ease,
+        margin-bottom 280ms ease,
+        transform 220ms ease;
+}
+
+body.dashboard-stats-collapsed .stats-grid {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: var(--spacing-sm);
+    transform: translateY(-8px);
+    pointer-events: none;
 }
 
 .stat-card {
@@ -166,60 +220,6 @@
 
 .dashboard-grid.two-col {
     grid-template-columns: 1fr 1fr;
-}
-
-/* ── Calendar-only tab mode ── */
-body.calendar-view-only section.app-view[data-view='dashboard'].active .stats-grid,
-body.calendar-view-only section.app-view[data-view='dashboard'].active .completed-card,
-body.calendar-view-only section.app-view[data-view='dashboard'].active .dashboard-grid.two-col {
-    display: none;
-}
-
-body.calendar-view-only section.app-view[data-view='dashboard'].active .dashboard-grid {
-    grid-template-columns: 1fr;
-}
-
-body.calendar-view-only section.app-view[data-view='dashboard'].active .schedule-card {
-    display: none;
-}
-
-body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-card {
-    min-height: 70vh;
-}
-
-body.calendar-view-only section.app-view[data-view='dashboard'].active .day-cell {
-    min-height: 110px;
-}
-
-body.calendar-view-only #btn-calendar-expand {
-    display: none;
-}
-
-@media (max-width: 900px) {
-    body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-card {
-        min-height: auto;
-    }
-
-    body.calendar-view-only section.app-view[data-view='dashboard'].active .calendar-grid {
-        padding: 1px;
-        gap: 1px;
-        background: var(--border-strong);
-    }
-
-    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-header {
-        padding: 6px 0;
-        font-size: 0.56rem;
-    }
-
-    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-cell {
-        min-height: 64px;
-        aspect-ratio: auto;
-        padding: 4px;
-    }
-
-    body.calendar-view-only section.app-view[data-view='dashboard'].active .day-events-preview {
-        display: none;
-    }
 }
 
 /* ── Cards ── */

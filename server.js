@@ -948,7 +948,7 @@ app.get('/api/calendar/month', async (req, res) => {
 
   if (!USE_POSTGRES) {
     const rows = getSqlite().prepare(
-      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title,
+      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title, a.source, a.type_id, a.location,
               COALESCE(t.name, a.title, 'Appointment') AS type_name,
               t.color AS type_color
        FROM appointments a
@@ -970,6 +970,9 @@ app.get('/api/calendar/month', async (req, res) => {
         status: r.status,
         clientName: r.client_name,
         title: r.title || r.type_name || 'Appointment',
+        source: r.source || 'owner',
+        typeId: r.type_id == null ? null : Number(r.type_id),
+        location: r.location || 'office',
         typeName: r.type_name || 'Appointment',
         color: r.type_color || null
       }))
@@ -978,7 +981,7 @@ app.get('/api/calendar/month', async (req, res) => {
 
   const rows = (
     await getPgPool().query(
-      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title,
+      `SELECT a.id, a.date, a.time, a.duration_minutes, a.status, a.client_name, a.title, a.source, a.type_id, a.location,
               COALESCE(t.name, a.title, 'Appointment') AS type_name,
               t.color AS type_color
        FROM appointments a
@@ -1002,6 +1005,9 @@ app.get('/api/calendar/month', async (req, res) => {
       status: r.status,
       clientName: r.client_name,
       title: r.title || r.type_name || 'Appointment',
+      source: r.source || 'owner',
+      typeId: r.type_id == null ? null : Number(r.type_id),
+      location: r.location || 'office',
       typeName: r.type_name || 'Appointment',
       color: r.type_color || null
     }))

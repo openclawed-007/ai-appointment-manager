@@ -426,6 +426,11 @@
         padding: 8px;
     }
 
+    .quick-create-meta {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
     .quick-create-grid {
         grid-template-columns: 1fr;
         gap: 6px;

@@ -49,6 +49,7 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
+  dashboardStatsCollapsed: getStoredBoolean('dashboardStatsCollapsed'),
   calendarViewMode: 'month',
   authShellDismissed: false,
   queueSyncInProgress: false,
@@ -472,9 +473,16 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   const defaultType = state.types.find((t) => Number(t.id) === Number(appointment?.typeId || state.selectedTypeId)) || state.types[0] || null;
   const defaultTypeId = defaultType ? Number(defaultType.id) : '';
   const defaultDuration = Number(appointment?.durationMinutes || defaultType?.durationMinutes || 45);
-  const defaultLocation = String(appointment?.location || 'office');
+  const defaultLocation = appointment?.location
+    ? normalizeAppointmentLocation(appointment.location)
+    : resolveDefaultLocationForType(defaultType);
   const defaultClientName = String(appointment?.clientName || '');
+  const defaultEntryMode = String(appointment?.source || '').toLowerCase() === 'reminder' ? 'reminder' : 'appointment';
   const isEditing = state.quickCreateAppointmentId != null;
+  const lockReminderMode = isEditing && defaultEntryMode === 'reminder';
+  const quickCreateTitle = isEditing
+    ? (defaultEntryMode === 'reminder' ? 'Edit Reminder' : 'Edit Appointment')
+    : 'Quick Add Appointment';
   const typeOptions = state.types.length
     ? state.types.map((t) =>
       `<option value="${Number(t.id)}" data-duration="${Number(t.durationMinutes || 45)}" ${Number(t.id) === defaultTypeId ? 'selected' : ''}>${escapeHtml(t.name)} (${Number(t.durationMinutes || 45)}m)</option>`
@@ -483,41 +491,65 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
 
   menu.innerHTML = `
     <div class="quick-create-header">
-      <h3>${isEditing ? 'Edit Appointment' : 'Quick Add'}</h3>
+      <div class="quick-create-title-wrap">
+        <p class="quick-create-kicker">Calendar</p>
+        <h3>${quickCreateTitle}</h3>
+      </div>
       <button type="button" class="quick-create-close" aria-label="Close quick add">×</button>
     </div>
     <div class="quick-create-meta">
-      <span>${escapeHtml(formatMenuDate(resolvedDate))}</span>
-      <span>${escapeHtml(toTime12(resolvedTime))}</span>
+      <div class="quick-create-meta-item">
+        <small>Date</small>
+        <strong>${escapeHtml(formatMenuDate(resolvedDate))}</strong>
+      </div>
+      <div class="quick-create-meta-item">
+        <small>Time</small>
+        <strong>${escapeHtml(toTime12(resolvedTime))}</strong>
+      </div>
     </div>
     <form class="quick-create-form">
-      <div class="form-group">
-        <label for="quick-create-client">What is this for?</label>
-        <input id="quick-create-client" name="clientName" type="text" required placeholder="Client or appointment title" value="${escapeHtml(defaultClientName)}" />
+      ${lockReminderMode ? '' : `
+        <div class="quick-create-section">
+          <div class="quick-entry-mode" role="group" aria-label="Entry type">
+            <button type="button" class="quick-entry-mode-btn ${defaultEntryMode === 'appointment' ? 'active' : ''}" data-entry-mode="appointment">Appointment</button>
+            <button type="button" class="quick-entry-mode-btn ${defaultEntryMode === 'reminder' ? 'active' : ''}" data-entry-mode="reminder">Reminder</button>
+          </div>
+        </div>
+      `}
+      <input type="hidden" name="entryMode" value="${defaultEntryMode}" />
+      <div class="quick-create-section">
+        <div class="form-group">
+          <label for="quick-create-client" id="quick-create-client-label">${defaultEntryMode === 'reminder' ? 'Reminder' : 'Client / Title'}</label>
+          <input id="quick-create-client" name="clientName" type="text" required placeholder="${defaultEntryMode === 'reminder' ? 'Reminder note or title' : 'Client or appointment title'}" value="${escapeHtml(defaultClientName)}" />
+        </div>
       </div>
-      <div class="quick-create-grid">
-        <div class="form-group">
-          <label for="quick-create-type">Type</label>
-          <select id="quick-create-type" name="typeId" ${state.types.length ? '' : 'disabled'}>${typeOptions}</select>
-        </div>
-        <div class="form-group">
-          <label for="quick-create-time">Time</label>
-          <input id="quick-create-time" name="time" type="time" step="60" required value="${escapeHtml(resolvedTime)}" />
+      <div class="quick-create-section">
+        <div class="quick-create-grid">
+          <div class="form-group quick-create-field quick-create-type-group">
+            <label for="quick-create-type">Type</label>
+            <select id="quick-create-type" name="typeId" ${state.types.length ? '' : 'disabled'}>${typeOptions}</select>
+          </div>
+          <div class="form-group quick-create-field">
+            <label for="quick-create-time">Start Time</label>
+            <input id="quick-create-time" name="time" type="time" step="60" required value="${escapeHtml(resolvedTime)}" />
+          </div>
         </div>
       </div>
-      <div class="quick-create-grid">
-        <div class="form-group">
-          <label for="quick-create-duration">Duration</label>
-          <select id="quick-create-duration" name="durationMinutes">${renderQuickCreateDurationOptions(defaultDuration)}</select>
-        </div>
-        <div class="form-group">
-          <label for="quick-create-location">Location</label>
-          <select id="quick-create-location" name="location">
-            <option value="office" ${defaultLocation === 'office' ? 'selected' : ''}>Office</option>
-            <option value="on-premises" ${defaultLocation === 'on-premises' ? 'selected' : ''}>On premises</option>
-            <option value="virtual" ${defaultLocation === 'virtual' ? 'selected' : ''}>Virtual</option>
-            <option value="phone" ${defaultLocation === 'phone' ? 'selected' : ''}>Phone</option>
-          </select>
+      <div class="quick-create-section">
+        <div class="quick-create-grid">
+          <div class="form-group quick-create-field">
+            <label for="quick-create-duration">Duration</label>
+            <select id="quick-create-duration" name="durationMinutes">${renderQuickCreateDurationOptions(defaultDuration)}</select>
+          </div>
+          <div class="form-group quick-create-field quick-create-location-group">
+            <label for="quick-create-location">Location</label>
+            <select id="quick-create-location" name="location">
+              <option value="office" ${defaultLocation === 'office' ? 'selected' : ''}>Office</option>
+              <option value="on-premises" ${defaultLocation === 'on-premises' ? 'selected' : ''}>On premises</option>
+              <option value="virtual" ${defaultLocation === 'virtual' ? 'selected' : ''}>Virtual</option>
+              <option value="phone" ${defaultLocation === 'phone' ? 'selected' : ''}>Phone</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="quick-create-actions">
@@ -534,7 +566,13 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   menu.querySelector('.quick-create-cancel')?.addEventListener('click', closeQuickCreateMenu);
   menu.querySelector('.quick-create-delete')?.addEventListener('click', async () => {
     if (state.quickCreateAppointmentId == null) return;
-    const ok = await showConfirm('Delete Appointment', 'This appointment will be permanently removed.');
+    const isReminderDelete = defaultEntryMode === 'reminder';
+    const ok = await showConfirm(
+      isReminderDelete ? 'Delete Reminder' : 'Delete Appointment',
+      isReminderDelete
+        ? 'This reminder will be permanently removed.'
+        : 'This appointment will be permanently removed.'
+    );
     if (!ok) return;
     const deleteBtn = menu.querySelector('.quick-create-delete');
     const oldText = deleteBtn?.textContent || 'Delete';
@@ -564,6 +602,37 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
 
   const typeSelect = menu.querySelector('select[name="typeId"]');
   const durationSelect = menu.querySelector('select[name="durationMinutes"]');
+  const locationSelect = menu.querySelector('select[name="location"]');
+  const entryModeInput = menu.querySelector('input[name="entryMode"]');
+  const entryLabel = menu.querySelector('#quick-create-client-label');
+  const entryInput = menu.querySelector('input[name="clientName"]');
+  const typeGroup = menu.querySelector('.quick-create-type-group');
+  const locationGroup = menu.querySelector('.quick-create-location-group');
+  const syncEntryModeUi = () => {
+    if (lockReminderMode && entryModeInput) entryModeInput.value = 'reminder';
+    const mode = String(entryModeInput?.value || 'appointment');
+    const isReminder = mode === 'reminder';
+    if (typeSelect) typeSelect.disabled = isReminder || !state.types.length;
+    if (locationSelect) locationSelect.disabled = isReminder;
+    if (typeGroup) typeGroup.classList.toggle('hidden', isReminder);
+    if (locationGroup) locationGroup.classList.toggle('hidden', isReminder);
+    if (entryLabel) entryLabel.textContent = isReminder ? 'Reminder' : 'Client / Title';
+    if (entryInput) entryInput.placeholder = isReminder ? 'Reminder note or title' : 'Client or appointment title';
+    menu.querySelectorAll('.quick-entry-mode-btn[data-entry-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.entryMode === mode);
+    });
+  };
+
+  menu.querySelectorAll('.quick-entry-mode-btn[data-entry-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (lockReminderMode) return;
+      if (!entryModeInput) return;
+      entryModeInput.value = String(btn.dataset.entryMode || 'appointment');
+      syncEntryModeUi();
+    });
+  });
+  syncEntryModeUi();
+
   typeSelect?.addEventListener('change', () => {
     const selectedOption = typeSelect.options[typeSelect.selectedIndex];
     const suggested = Number(selectedOption?.dataset?.duration || 45);
@@ -584,13 +653,17 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
       const data = Object.fromEntries(new FormData(form).entries());
       const requestDate = state.quickCreateDate;
       const requestTime = String(data.time || state.quickCreateTime || '09:00').slice(0, 5);
+      const entryMode = String(data.entryMode || 'appointment');
+      const isReminder = entryMode === 'reminder';
       const payload = {
         clientName: String(data.clientName || '').trim(),
-        typeId: data.typeId ? Number(data.typeId) : null,
+        typeId: isReminder ? null : (data.typeId ? Number(data.typeId) : null),
+        title: isReminder ? String(data.clientName || '').trim() : undefined,
+        source: isReminder ? 'reminder' : 'owner',
         date: requestDate,
         time: requestTime,
         durationMinutes: Number(data.durationMinutes || 45),
-        location: String(data.location || 'office')
+        location: isReminder ? 'office' : String(data.location || 'office')
       };
       if (!payload.clientName) throw new Error('Please enter a name or title.');
 
@@ -613,7 +686,12 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         await refreshCalendarDots({ force: true });
         return;
       }
-      showToast(isUpdate ? 'Appointment updated.' : 'Appointment created.', 'success');
+      showToast(
+        isReminder
+          ? (isUpdate ? 'Reminder updated.' : 'Reminder added.')
+          : (isUpdate ? 'Appointment updated.' : 'Appointment created.'),
+        'success'
+      );
       state.selectedDate = payload.date;
       await loadDashboard(payload.date, { refreshDots: false });
       await loadAppointmentsTable();
@@ -1253,6 +1331,27 @@ function getCalendarPreviewLabel(appointment = {}) {
   return appointment.typeName || appointment.title || appointment.clientName || 'Appointment';
 }
 
+function normalizeAppointmentLocation(value = '') {
+  const location = String(value || '').trim().toLowerCase();
+  if (location === 'office' || location === 'on-premises' || location === 'virtual' || location === 'phone') {
+    return location;
+  }
+  // "hybrid" (or any unknown) falls back to office for owner-side create/edit forms.
+  return 'office';
+}
+
+function resolveDefaultLocationForType(type) {
+  return normalizeAppointmentLocation(type?.locationMode);
+}
+
+function setAppointmentFormLocation(location = 'office') {
+  const form = document.getElementById('appointment-form');
+  if (!form) return;
+  const normalized = normalizeAppointmentLocation(location);
+  const radio = form.querySelector(`input[name="location"][value="${normalized}"]`);
+  if (radio) radio.checked = true;
+}
+
 function addMinutesToTime(time24 = '09:00', durationMinutes = 0) {
   const [h, m] = String(time24).split(':').map(Number);
   const start = (Number(h) || 0) * 60 + (Number(m) || 0);
@@ -1599,14 +1698,11 @@ function getStoredViewPreference() {
 }
 
 function applyViewSelection(activeView) {
-  const isCalendarOnly = activeView === 'calendar';
-  const visibleView = isCalendarOnly ? 'dashboard' : activeView;
+  const visibleView = activeView;
   const views = [...document.querySelectorAll('.app-view')];
   views.forEach((section) => {
     section.classList.toggle('active', section.dataset.view === visibleView);
   });
-
-  document.body.classList.toggle('calendar-view-only', isCalendarOnly);
 
   document.querySelectorAll('.nav-item').forEach((n) => {
     n.classList.toggle('active', n.dataset.view === activeView);
@@ -1620,7 +1716,7 @@ function applyViewSelection(activeView) {
 function resolveView(view) {
   const views = [...document.querySelectorAll('.app-view')];
   const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
-  if (view === 'calendar' && availableViews.has('dashboard')) return 'calendar';
+  if (view === 'calendar') view = 'dashboard';
   const fallbackView = availableViews.has('dashboard') ? 'dashboard' : views[0]?.dataset.view;
   const activeView = availableViews.has(view) ? view : fallbackView;
   return activeView || null;
@@ -1637,9 +1733,7 @@ function setActiveView(view) {
   if (!view) return;
   const activeView = resolveView(view);
   if (!activeView) return;
-  if (activeView !== 'calendar') {
-    closeQuickCreateMenu();
-  }
+  closeQuickCreateMenu();
 
   if (typeof localStorage !== 'undefined') {
     try {
@@ -1659,7 +1753,6 @@ function setActiveView(view) {
 }
 
 function getActiveView() {
-  if (document.body.classList.contains('calendar-view-only')) return 'calendar';
   return document.querySelector('.app-view.active')?.dataset.view || 'dashboard';
 }
 
@@ -1769,6 +1862,29 @@ function bindHeaderButtons() {
   });
 
   document.getElementById('btn-refresh-appointments')?.addEventListener('click', loadAppointmentsTable);
+}
+
+function syncDashboardStatsUi() {
+  const collapsed = Boolean(state.dashboardStatsCollapsed);
+  document.body.classList.toggle('dashboard-stats-collapsed', collapsed);
+
+  const btn = document.getElementById('btn-toggle-stats');
+  if (btn) btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+
+  const label = document.querySelector('[data-stats-toggle-label]');
+  if (label) label.textContent = collapsed ? 'Show overview' : 'Hide overview';
+}
+
+function bindDashboardStatsToggle() {
+  syncDashboardStatsUi();
+  const btn = document.getElementById('btn-toggle-stats');
+  if (!btn) return;
+
+  btn.addEventListener('click', () => {
+    state.dashboardStatsCollapsed = !state.dashboardStatsCollapsed;
+    setStoredValue('dashboardStatsCollapsed', state.dashboardStatsCollapsed);
+    syncDashboardStatsUi();
+  });
 }
 
 function renderNotificationDots(count = 0) {
@@ -1907,7 +2023,8 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
               data-appointment-date="${escapeHtml(a.date || date)}"
               data-appointment-time="${escapeHtml(a.time || time24)}"
               data-appointment-duration="${Number(a.durationMinutes || 45)}"
-              data-appointment-location="${escapeHtml(a.location || 'office')}">
+              data-appointment-location="${escapeHtml(a.location || 'office')}"
+              data-appointment-source="${escapeHtml(a.source || 'owner')}">
               <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
               <span class="week-event-time">${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}</span>
             </div>
@@ -2062,7 +2179,8 @@ function bindCalendarNav() {
           date: String(eventCard.dataset.appointmentDate || ''),
           time: String(eventCard.dataset.appointmentTime || '').slice(0, 5),
           durationMinutes: Number(eventCard.dataset.appointmentDuration || 45),
-          location: String(eventCard.dataset.appointmentLocation || 'office')
+          location: String(eventCard.dataset.appointmentLocation || 'office'),
+          source: String(eventCard.dataset.appointmentSource || 'owner')
         };
         if (!appointment.date || !appointment.time) return;
         state.selectedDate = appointment.date;
@@ -2255,9 +2373,17 @@ function renderTypeSelector(types) {
       const selected = state.types.find((t) => t.id === state.selectedTypeId);
       const durationSelect = document.querySelector('select[name="durationMinutes"]');
       if (selected && durationSelect) durationSelect.value = String(selected.durationMinutes);
+      if (!state.editingAppointmentId) {
+        setAppointmentFormLocation(resolveDefaultLocationForType(selected));
+      }
       updateAppointmentPreview();
     });
   });
+
+  if (!state.editingAppointmentId) {
+    const selected = state.types.find((t) => t.id === state.selectedTypeId);
+    setAppointmentFormLocation(resolveDefaultLocationForType(selected));
+  }
 
   updateAppointmentPreview();
 }
@@ -2387,6 +2513,11 @@ function setAppointmentDefaults() {
   if (timeInput && !timeInput.value) {
     const dt = roundToNextQuarterHour(new Date(Date.now() + 60 * 60 * 1000));
     timeInput.value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+  }
+
+  if (!state.editingAppointmentId) {
+    const selectedType = state.types.find((t) => Number(t.id) === Number(state.selectedTypeId));
+    setAppointmentFormLocation(resolveDefaultLocationForType(selectedType));
   }
 
   syncTimeBuilderFromInput(form);
@@ -4244,6 +4375,7 @@ async function init() {
   applyMobileNavMode(getStoredMobileNavMode(), { persist: false });
   applyInitialViewPreference(preferredView);
   bindHeaderButtons();
+  bindDashboardStatsToggle();
   bindModalControls();
   bindCalendarNav();
   bindKeyboard();
