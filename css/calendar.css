@@ -3,6 +3,10 @@
     min-height: 420px;
 }
 
+.calendar-card.is-collapsed {
+    min-height: 0;
+}
+
 .calendar-nav {
     display: flex;
     align-items: center;

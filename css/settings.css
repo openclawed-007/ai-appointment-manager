@@ -62,6 +62,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    flex: 1;
 }
 
 .settings-section-title h2 {
@@ -102,6 +103,11 @@
     padding: var(--spacing-md) var(--spacing-xl);
     border-top: 1px solid var(--border);
     background: var(--bg-raised);
+}
+
+.settings-section.is-collapsed .settings-section-body,
+.settings-section.is-collapsed .settings-section-actions {
+    display: none;
 }
 
 /* ── Toggle rows (appearance section) ── */

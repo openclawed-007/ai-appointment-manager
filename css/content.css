@@ -222,6 +222,10 @@ body.dashboard-stats-collapsed .stats-grid {
     grid-template-columns: 1fr 1fr;
 }
 
+.completed-card {
+    margin-bottom: var(--spacing-lg);
+}
+
 /* ── Cards ── */
 .card {
     background: var(--bg-surface);
@@ -249,4 +253,26 @@ body.dashboard-stats-collapsed .stats-grid {
     font-weight: 600;
     color: var(--text);
     letter-spacing: -0.01em;
+}
+
+.card-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.collapse-toggle-btn {
+    color: var(--text-muted);
+}
+
+.collapse-toggle-btn svg {
+    transition: transform var(--transition-fast);
+}
+
+.collapse-toggle-btn.is-collapsed svg {
+    transform: rotate(180deg);
+}
+
+.card.is-collapsed {
+    align-self: start;
 }

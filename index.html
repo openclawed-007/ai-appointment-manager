@@ -275,6 +275,13 @@
                                             <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
                                         </svg>
                                     </button>
+                                    <button class="icon-btn small collapse-toggle-btn" type="button"
+                                        data-collapse-target="#calendar-grid" data-collapse-storage="home.calendar"
+                                        aria-expanded="true" aria-label="Collapse calendar panel">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 15 12 9 18 15" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                             <div class="calendar-grid" id="calendar-grid"></div>
@@ -283,7 +290,16 @@
                         <div class="card schedule-card">
                             <div class="card-header">
                                 <h2 id="schedule-title">Today's Schedule</h2>
-                                <button class="btn-text" id="btn-view-all" type="button">View All</button>
+                                <div class="card-header-actions">
+                                    <button class="btn-text" id="btn-view-all" type="button">View All</button>
+                                    <button class="icon-btn small collapse-toggle-btn" type="button"
+                                        data-collapse-target="#timeline-list" data-collapse-storage="home.schedule"
+                                        aria-expanded="true" aria-label="Collapse schedule panel">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 15 12 9 18 15" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                             <div class="timeline" id="timeline-list">
                                 <div class="empty-state">No appointments for this day yet.</div>
@@ -294,6 +310,13 @@
                     <div class="card completed-card">
                         <div class="card-header">
                             <h2>Completed</h2>
+                            <button class="icon-btn small collapse-toggle-btn" type="button"
+                                data-collapse-target="#completed-list" data-collapse-storage="home.completed"
+                                aria-expanded="true" aria-label="Collapse completed panel">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 15 12 9 18 15" />
+                                </svg>
+                            </button>
                         </div>
                         <div class="timeline" id="completed-list">
                             <div class="empty-state">No completed appointments yet.</div>
@@ -305,7 +328,16 @@
                         <div class="card">
                             <div class="card-header">
                                 <h2>Appointment Types</h2>
-                                <button class="btn-text" id="btn-manage-types" type="button">Manage</button>
+                                <div class="card-header-actions">
+                                    <button class="btn-text" id="btn-manage-types" type="button">Manage</button>
+                                    <button class="icon-btn small collapse-toggle-btn" type="button"
+                                        data-collapse-target="#type-list" data-collapse-storage="home.types"
+                                        aria-expanded="true" aria-label="Collapse appointment types panel">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 15 12 9 18 15" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                             <div class="appointment-types-list" id="type-list">
                                 <div class="empty-state">Loading appointment types…</div>
@@ -315,7 +347,16 @@
                         <div class="card ai-insights">
                             <div class="card-header">
                                 <h2>AI Insights</h2>
-                                <span class="badge pulse">Live</span>
+                                <div class="card-header-actions">
+                                    <span class="badge pulse">Live</span>
+                                    <button class="icon-btn small collapse-toggle-btn" type="button"
+                                        data-collapse-target="#insights-list" data-collapse-storage="home.insights"
+                                        aria-expanded="true" aria-label="Collapse insights panel">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="6 15 12 9 18 15" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                             <div class="insights-list" id="insights-list">
                                 <div class="empty-state">AI insights will appear here as data comes in.</div>
@@ -406,7 +447,7 @@
                     <div class="settings-page">
 
                         <!-- ── Section 1: Business Profile ── -->
-                        <div class="settings-section">
+                        <div class="settings-section" id="settings-section-profile">
                             <div class="settings-section-header">
                                 <div class="settings-section-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -418,6 +459,13 @@
                                     <h2>Business Profile</h2>
                                     <p>Your business identity, contact details, and timezone.</p>
                                 </div>
+                                <button type="button" class="icon-btn small collapse-toggle-btn"
+                                    data-collapse-target="#settings-section-profile" data-collapse-storage="settings.profile"
+                                    aria-expanded="true" aria-label="Collapse Business Profile section">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 15 12 9 18 15" />
+                                    </svg>
+                                </button>
                             </div>
                             <form id="settings-form">
                                 <div class="settings-section-body">
@@ -623,7 +671,7 @@
                         </div>
 
                         <!-- ── Section 2: Appearance ── -->
-                        <div class="settings-section">
+                        <div class="settings-section" id="settings-section-appearance">
                             <div class="settings-section-header">
                                 <div class="settings-section-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -642,6 +690,14 @@
                                     <h2>Appearance</h2>
                                     <p>Theme preference and calendar display options.</p>
                                 </div>
+                                <button type="button" class="icon-btn small collapse-toggle-btn"
+                                    data-collapse-target="#settings-section-appearance"
+                                    data-collapse-storage="settings.appearance" aria-expanded="true"
+                                    aria-label="Collapse Appearance section">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 15 12 9 18 15" />
+                                    </svg>
+                                </button>
                             </div>
                             <div class="settings-section-body">
 
@@ -748,7 +804,7 @@
                         </div>
 
                         <!-- ── Section 3: Data & Exports ── -->
-                        <div class="settings-section">
+                        <div class="settings-section" id="settings-section-data">
                             <div class="settings-section-header">
                                 <div class="settings-section-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -761,6 +817,13 @@
                                     <h2>Data &amp; Exports</h2>
                                     <p>Export filtered appointment reports or manage full backups.</p>
                                 </div>
+                                <button type="button" class="icon-btn small collapse-toggle-btn"
+                                    data-collapse-target="#settings-section-data" data-collapse-storage="settings.data"
+                                    aria-expanded="true" aria-label="Collapse Data and Exports section">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 15 12 9 18 15" />
+                                    </svg>
+                                </button>
                             </div>
                             <div class="settings-section-body">
 

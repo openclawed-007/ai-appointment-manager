@@ -4465,6 +4465,67 @@ function bindForms() {
   }
 }
 
+function applyCollapseState(button, target, collapsed) {
+  if (!button || !target) return;
+  const shouldCollapse = Boolean(collapsed);
+  button.classList.toggle('is-collapsed', shouldCollapse);
+  button.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
+
+  if (target.classList.contains('settings-section')) {
+    target.classList.toggle('is-collapsed', shouldCollapse);
+    return;
+  }
+
+  if (shouldCollapse) {
+    target.hidden = true;
+    target.classList.add('hidden');
+    target.classList.add('is-collapsed');
+  } else {
+    target.hidden = false;
+    target.classList.remove('hidden');
+    target.classList.remove('is-collapsed');
+  }
+
+  const parentCard = button.closest('.card');
+  if (parentCard) {
+    parentCard.classList.toggle('is-collapsed', shouldCollapse);
+  }
+}
+
+function bindCollapsiblePanels() {
+  document.querySelectorAll('.collapse-toggle-btn[data-collapse-target]').forEach((button) => {
+    const targetSelector = String(button.dataset.collapseTarget || '').trim();
+    if (!targetSelector) return;
+    const target = document.querySelector(targetSelector);
+    if (!target) return;
+
+    const storageKey = String(button.dataset.collapseStorage || '').trim();
+    let collapsed = false;
+    if (storageKey) {
+      collapsed = getStoredBoolean(`panelCollapsed.${storageKey}`, false);
+    }
+    applyCollapseState(button, target, collapsed);
+  });
+}
+
+function handleCollapseToggleClick(event) {
+  const button = event.target?.closest?.('.collapse-toggle-btn[data-collapse-target]');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const targetSelector = String(button.dataset.collapseTarget || '').trim();
+  if (!targetSelector) return;
+  const target = document.querySelector(targetSelector);
+  if (!target) return;
+
+  const nextCollapsed = button.getAttribute('aria-expanded') === 'true';
+  applyCollapseState(button, target, nextCollapsed);
+
+  const storageKey = String(button.dataset.collapseStorage || '').trim();
+  if (storageKey) setStoredValue(`panelCollapsed.${storageKey}`, nextCollapsed);
+}
+
 function applyInitialTheme() {
   const saved = localStorage.getItem('theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -4496,6 +4557,8 @@ async function init() {
   bindCalendarNav();
   bindKeyboard();
   bindForms();
+  bindCollapsiblePanels();
+  document.addEventListener('click', handleCollapseToggleClick);
   applyInitialTheme();
   setupTimezoneSearch();
   setupTimezoneSearch('signup-timezone', 'signup-timezone-suggestions');
