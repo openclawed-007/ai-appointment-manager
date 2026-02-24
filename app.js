@@ -242,6 +242,30 @@ function getEntryWordPluralTitle() {
   return isReminderModeEnabled() ? 'Reminders' : 'Appointments';
 }
 
+function isReminderEntry(entry = {}) {
+  return String(entry?.source || '').toLowerCase() === 'reminder';
+}
+
+function formatEntryTimeRange(entry = {}) {
+  const start = toTime12(entry.time || '09:00');
+  const duration = Number(entry.durationMinutes || 0);
+  if (isReminderEntry(entry) || duration <= 0) return start;
+  return `${start} - ${toTime12(addMinutesToTime(entry.time, duration))}`;
+}
+
+function syncAppointmentDurationFieldVisibility() {
+  const form = document.getElementById('appointment-form');
+  if (!form) return;
+  const durationGroup = document.getElementById('appt-duration-group');
+  const durationSelect = form.querySelector('select[name="durationMinutes"]');
+  const isReminder = isReminderModeEnabled() || String(form.dataset.entrySource || '').toLowerCase() === 'reminder';
+  if (durationGroup) durationGroup.classList.toggle('hidden', isReminder);
+  if (durationSelect) {
+    durationSelect.disabled = isReminder;
+    if (isReminder) durationSelect.value = '0';
+  }
+}
+
 function applyReminderModeUi() {
   const reminderMode = isReminderModeEnabled();
   document.body.classList.toggle('reminder-mode', reminderMode);
@@ -358,6 +382,7 @@ function applyReminderModeUi() {
   if (typeHeader && (typeHeader.textContent === 'Appointment Types' || typeHeader.textContent === 'Reminder Types')) {
     typeHeader.textContent = `${entrySingularTitle} Types`;
   }
+  syncAppointmentDurationFieldVisibility();
 }
 
 function normalizeMobileNavMode(mode) {
@@ -471,7 +496,8 @@ function updateAppointmentEditorUi(isEditing) {
   const title = document.getElementById('new-appointment-title');
   const subtitle = document.getElementById('new-appointment-subtitle');
   const submit = document.querySelector('#appointment-form button[type="submit"]');
-  const reminderModeEnabled = isReminderModeEnabled();
+  const form = document.getElementById('appointment-form');
+  const reminderModeEnabled = isReminderModeEnabled() || String(form?.dataset?.entrySource || '').toLowerCase() === 'reminder';
   const entryWord = getEntryWordSingularTitle();
   if (title) title.textContent = isEditing ? `Edit ${entryWord}` : `Create ${entryWord}`;
   if (subtitle) {
@@ -484,11 +510,12 @@ function updateAppointmentEditorUi(isEditing) {
   if (submit) submit.textContent = isEditing ? 'Save Changes' : `Create ${entryWord}`;
 
   const clientNameLabel = document.querySelector('label[for="appt-client-name"]');
-  if (clientNameLabel) clientNameLabel.textContent = isReminderModeEnabled() ? 'Reminder' : 'Client Name';
+  if (clientNameLabel) clientNameLabel.textContent = reminderModeEnabled ? 'Reminder' : 'Client Name';
   const clientNameInput = document.getElementById('appt-client-name');
   if (clientNameInput) {
-    clientNameInput.placeholder = isReminderModeEnabled() ? 'e.g. Pay rent' : 'e.g. Jane Smith';
+    clientNameInput.placeholder = reminderModeEnabled ? 'e.g. Pay rent' : 'e.g. Jane Smith';
   }
+  syncAppointmentDurationFieldVisibility();
 }
 
 function fillAppointmentForm(appointment) {
@@ -511,6 +538,9 @@ function fillAppointmentForm(appointment) {
   if (appointment.notes != null) form.notes.value = appointment.notes;
   const locationRadio = form.querySelector(`input[name="location"][value="${appointment.location || 'office'}"]`);
   if (locationRadio) locationRadio.checked = true;
+  form.dataset.entrySource = isReminderEntry(appointment) ? 'reminder' : 'owner';
+  syncAppointmentDurationFieldVisibility();
+  updateAppointmentEditorUi(Boolean(state.editingAppointmentId));
   updateAppointmentPreview();
 }
 
@@ -791,7 +821,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
       </div>
       <div class="quick-create-section">
         <div class="quick-create-grid">
-          <div class="form-group quick-create-field">
+          <div class="form-group quick-create-field quick-create-duration-group">
             <label for="quick-create-duration">Duration</label>
             <select id="quick-create-duration" name="durationMinutes">${renderQuickCreateDurationOptions(defaultDuration)}</select>
           </div>
@@ -865,14 +895,17 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   const entryLabel = menu.querySelector('#quick-create-client-label');
   const entryInput = menu.querySelector('input[name="clientName"]');
   const typeGroup = menu.querySelector('.quick-create-type-group');
+  const durationGroup = menu.querySelector('.quick-create-duration-group');
   const locationGroup = menu.querySelector('.quick-create-location-group');
   const syncEntryModeUi = () => {
     if (lockReminderMode && entryModeInput) entryModeInput.value = 'reminder';
     const mode = String(entryModeInput?.value || 'appointment');
     const isReminder = mode === 'reminder';
     if (typeSelect) typeSelect.disabled = isReminder || !state.types.length;
+    if (durationSelect) durationSelect.disabled = isReminder;
     if (locationSelect) locationSelect.disabled = isReminder;
     if (typeGroup) typeGroup.classList.toggle('hidden', isReminder);
+    if (durationGroup) durationGroup.classList.toggle('hidden', isReminder);
     if (locationGroup) locationGroup.classList.toggle('hidden', isReminder);
     if (entryLabel) entryLabel.textContent = isReminder ? 'Reminder' : 'Client / Title';
     if (entryInput) entryInput.placeholder = isReminder ? 'Reminder note or title' : 'Client or appointment title';
@@ -920,7 +953,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         source: isReminder ? 'reminder' : 'owner',
         date: requestDate,
         time: requestTime,
-        durationMinutes: Number(data.durationMinutes || 45),
+        durationMinutes: isReminder ? 0 : Number(data.durationMinutes || 45),
         reminderOffsetMinutes: Number(data.reminderOffsetMinutes == null ? 10 : data.reminderOffsetMinutes),
         location: isReminder ? 'office' : String(data.location || 'office')
       };
@@ -2145,8 +2178,14 @@ function toHalfHourSlot(time24 = '09:00') {
   const [hRaw, mRaw] = String(time24 || '09:00').split(':').map(Number);
   const h = Number.isFinite(hRaw) ? hRaw : 9;
   const m = Number.isFinite(mRaw) ? mRaw : 0;
-  const rounded = Math.floor(m / 30) * 30;
-  return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`;
+  let totalMinutes = (h * 60) + m;
+  // Snap to nearest 30-minute grid slot for calendar placement.
+  totalMinutes = Math.round(totalMinutes / 30) * 30;
+  if (totalMinutes < 0) totalMinutes = 0;
+  if (totalMinutes > (23 * 60 + 30)) totalMinutes = 23 * 60 + 30;
+  const slotHour = Math.floor(totalMinutes / 60);
+  const slotMinute = totalMinutes % 60;
+  return `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`;
 }
 
 async function focusCalendarOnDate(date, { time = '', openMenu = true } = {}) {
@@ -2430,9 +2469,12 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
     const date = String(appointment?.date || '');
     const time = String(appointment?.time || '').slice(0, 5);
     if (!date || !time) return;
-    const key = `${date} ${time}`;
+    const key = `${date} ${toHalfHourSlot(time)}`;
     if (!apptMap.has(key)) apptMap.set(key, []);
     apptMap.get(key).push(appointment);
+  });
+  apptMap.forEach((items) => {
+    items.sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
   });
 
   const headerCells = visibleDates.map((date, idx) => {
@@ -2464,7 +2506,7 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
       if (appointments.length) classes.push('has-event');
       const chips = loading
         ? '<div class="week-slot-skeleton"></div>'
-        : appointments.slice(0, 2).map((a) => `
+        : appointments.map((a) => `
             <div
               class="week-event-chip"
               data-appointment-id="${Number(a.id)}"
@@ -2477,15 +2519,16 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
               data-appointment-location="${escapeHtml(a.location || 'office')}"
               data-appointment-source="${escapeHtml(a.source || 'owner')}">
               <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
-              <span class="week-event-time">${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}</span>
+              <span class="week-event-time">${escapeHtml(
+                isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0
+                  ? toTimeCompact(a.time)
+                  : `${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}`
+              )}</span>
             </div>
           `).join('');
-      const more = !loading && appointments.length > 2
-        ? `<div class="week-event-more">+${appointments.length - 2} more</div>`
-        : '';
       return `
         <button type="button" class="${classes.join(' ')}" data-slot-date="${date}" data-slot-time="${time24}" aria-label="Add ${escapeHtml(getEntryWordSingularTitle().toLowerCase())} on ${escapeHtml(formatMenuDate(date))} at ${escapeHtml(toTime12(time24))}">
-          <div class="week-slot-content">${chips}${more}</div>
+          <div class="week-slot-content">${chips}</div>
         </button>`;
     }).join('');
 
@@ -2856,10 +2899,16 @@ function updateAppointmentPreview() {
   const dateInput = document.querySelector('#appointment-form input[name="date"]');
   const timeInput = document.querySelector('#appointment-form input[name="time"]');
   const durationSelect = document.querySelector('#appointment-form select[name="durationMinutes"]');
+  const form = document.getElementById('appointment-form');
+  const isReminder = isReminderModeEnabled() || String(form?.dataset?.entrySource || '').toLowerCase() === 'reminder';
 
-  typeNode.textContent = selectedType
-    ? `${selectedType.name} • ${durationSelect?.value || selectedType.durationMinutes} min`
-    : 'Pick a service type';
+  if (isReminder) {
+    typeNode.textContent = 'Reminder';
+  } else {
+    typeNode.textContent = selectedType
+      ? `${selectedType.name} • ${durationSelect?.value || selectedType.durationMinutes} min`
+      : 'Pick a service type';
+  }
 
   if (dateInput?.value && timeInput?.value) {
     timeNode.textContent = `${formatPreviewDate(dateInput.value)} at ${toTime12(timeInput.value)}`;
@@ -2973,8 +3022,10 @@ function setAppointmentDefaults() {
     if (form.reminderOffsetMinutes && !form.reminderOffsetMinutes.value) {
       form.reminderOffsetMinutes.value = '10';
     }
+    form.dataset.entrySource = isReminderModeEnabled() ? 'reminder' : 'owner';
   }
 
+  syncAppointmentDurationFieldVisibility();
   syncTimeBuilderFromInput(form);
   updateAppointmentPreview();
 }
@@ -3295,11 +3346,12 @@ function renderTimeline(appointments = [], options = {}) {
     .map(
       (a) => {
         const statusClass = `status-${(a.status || 'pending').toLowerCase()}`;
+        const isReminder = isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0;
         return `
       <div class="timeline-item" data-id="${a.id}">
         <div class="time-column">
           <div class="time-start">${toTime12(a.time)}</div>
-          <div class="time-end">${toTime12(addMinutesToTime(a.time, a.durationMinutes))}</div>
+          <div class="time-end">${isReminder ? '' : toTime12(addMinutesToTime(a.time, a.durationMinutes))}</div>
         </div>
         <div class="appointment-card ${escapeHtml(a.typeClass || '')}" data-id="${a.id}">
           <div class="appointment-card-header">
@@ -3316,7 +3368,7 @@ function renderTimeline(appointments = [], options = {}) {
           <div class="appointment-card-footer">
             <div class="appointment-meta">
               <span>📍 ${escapeHtml(a.location)}</span>
-              <span>⏱ ${a.durationMinutes} min</span>
+              ${isReminder ? '' : `<span>⏱ ${a.durationMinutes} min</span>`}
             </div>
             <div class="appointment-actions">
               ${a.clientEmail ? `<button type="button" class="action-btn email-btn" title="Send Email">
@@ -3377,7 +3429,7 @@ function renderCompletedAppointments(appointments = []) {
         </div>
         <div class="completed-item-meta">
           <span>${escapeHtml(formatScheduleDate(a.date))}</span>
-          <span class="time-range">${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</span>
+          <span class="time-range">${escapeHtml(formatEntryTimeRange(a))}</span>
         </div>
       </div>`
     )
@@ -3798,9 +3850,12 @@ async function submitAppointment(e) {
     payload.typeId = null;
     payload.location = 'office';
   } else {
+    if (String(form.dataset.entrySource || '').toLowerCase() === 'reminder') payload.source = 'reminder';
     payload.typeId = state.selectedTypeId;
   }
-  payload.durationMinutes = Number(payload.durationMinutes || 45);
+  payload.durationMinutes = String(payload.source || '').toLowerCase() === 'reminder'
+    ? 0
+    : Number(payload.durationMinutes || 45);
   payload.reminderOffsetMinutes = Number(payload.reminderOffsetMinutes == null ? 10 : payload.reminderOffsetMinutes);
 
   const submitButton = form.querySelector('button[type="submit"]');

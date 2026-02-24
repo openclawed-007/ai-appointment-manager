@@ -425,9 +425,10 @@
 }
 
 .week-slot-content {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 4px;
+    align-content: start;
     min-height: 44px;
 }
 
@@ -486,6 +487,7 @@
 }
 
 .week-event-more {
+    grid-column: 1 / -1;
     font-size: 0.62rem;
     font-weight: 700;
     color: var(--gold);

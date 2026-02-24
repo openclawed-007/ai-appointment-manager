@@ -262,6 +262,43 @@ describe('API smoke', () => {
     expect(String(invalidOffset.body.error || '')).toContain('reminderOffsetMinutes');
   });
 
+  it('allows overlapping reminders without requiring duration', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const reminderA = await post(agent, '/api/appointments').send({
+      clientName: 'Reminder A',
+      date: '2026-07-10',
+      time: '10:15',
+      source: 'reminder',
+      reminderOffsetMinutes: 10
+    });
+    expect(reminderA.statusCode).toBe(201);
+    expect(reminderA.body.appointment.source).toBe('reminder');
+    expect(reminderA.body.appointment.durationMinutes).toBe(0);
+
+    const reminderB = await post(agent, '/api/appointments').send({
+      clientName: 'Reminder B',
+      date: '2026-07-10',
+      time: '10:15',
+      source: 'reminder',
+      reminderOffsetMinutes: 5
+    });
+    expect(reminderB.statusCode).toBe(201);
+    expect(reminderB.body.appointment.durationMinutes).toBe(0);
+
+    const updateReminder = await put(agent, `/api/appointments/${reminderA.body.appointment.id}`).send({
+      clientName: 'Reminder A Updated',
+      date: '2026-07-10',
+      time: '10:15',
+      source: 'reminder',
+      reminderOffsetMinutes: 15
+    });
+    expect(updateReminder.statusCode).toBe(200);
+    expect(updateReminder.body.appointment.source).toBe('reminder');
+    expect(updateReminder.body.appointment.durationMinutes).toBe(0);
+  });
+
   it('returns 503 for AI import when OPENROUTER_API_KEY is not configured', async () => {
     const agent = request.agent(app);
     await loginAndVerify(agent, adminEmail, adminPassword);

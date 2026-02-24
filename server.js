@@ -1326,7 +1326,7 @@ app.post('/api/appointments/:id/email', async (req, res) => {
 app.put('/api/appointments/:id', async (req, res) => {
   const businessId = req.auth.businessId;
   const id = Number(req.params.id);
-  const { typeId, clientName, clientEmail, date, time, durationMinutes, reminderOffsetMinutes, location, notes } = req.body || {};
+  const { typeId, clientName, clientEmail, date, time, durationMinutes, reminderOffsetMinutes, location, notes, source } = req.body || {};
 
   if (!clientName?.trim()) return res.status(400).json({ error: 'clientName is required' });
   if (!date) return res.status(400).json({ error: 'date is required' });
@@ -1343,11 +1343,6 @@ app.put('/api/appointments/:id', async (req, res) => {
     if (!selectedType) return res.status(400).json({ error: 'Invalid appointment type' });
   }
 
-  const resolvedDuration = Number(durationMinutes || selectedType?.duration_minutes || 45);
-  if (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0) {
-    return res.status(400).json({ error: 'durationMinutes must be greater than 0' });
-  }
-
   const previousRow = await dbGet(
     `SELECT a.*, t.name AS type_name
      FROM appointments a
@@ -1361,6 +1356,15 @@ app.put('/api/appointments/:id', async (req, res) => {
   );
 
   if (!previousRow) return res.status(404).json({ error: 'appointment not found' });
+  const requestedSource = String(source || '').toLowerCase();
+  const persistedSource = String(previousRow.source || '').toLowerCase();
+  const isReminderEntry = requestedSource === 'reminder' || persistedSource === 'reminder';
+  const resolvedDuration = isReminderEntry
+    ? 0
+    : Number(durationMinutes || selectedType?.duration_minutes || 45);
+  if (!isReminderEntry && (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0)) {
+    return res.status(400).json({ error: 'durationMinutes must be greater than 0' });
+  }
   const previousAppointment = rowToAppointment(previousRow);
   const hasReminderOffsetMinutes = !(reminderOffsetMinutes == null || reminderOffsetMinutes === '');
   const resolvedReminderOffsetMinutes = hasReminderOffsetMinutes
@@ -1370,6 +1374,10 @@ app.put('/api/appointments/:id', async (req, res) => {
     return res.status(400).json({ error: 'reminderOffsetMinutes must be between 0 and 10080' });
   }
 
+  const resolvedSource = source === undefined
+    ? String(previousRow.source || 'owner')
+    : String(source || 'owner');
+
   try {
     const startMinutes = parseTimeOrThrow(time);
     if (USE_POSTGRES) {
@@ -1377,25 +1385,27 @@ app.put('/api/appointments/:id', async (req, res) => {
       try {
         await tx.query('BEGIN');
         await tx.query('SELECT pg_advisory_xact_lock($1, $2)', [Number(businessId), dateLockKey(date)]);
-        await assertNoOverlap({
-          businessId,
-          date: String(date),
-          startMinutes,
-          durationMinutes: resolvedDuration,
-          excludeId: id,
-          pgClient: tx
-        });
+        if (!isReminderEntry) {
+          await assertNoOverlap({
+            businessId,
+            date: String(date),
+            startMinutes,
+            durationMinutes: resolvedDuration,
+            excludeId: id,
+            pgClient: tx
+          });
+        }
         const up = await tx.query(
           `UPDATE appointments
            SET type_id = $1, client_name = $2, client_email = $3, date = $4, time = $5,
-               duration_minutes = $6, reminder_offset_minutes = $7, location = $8, notes = $9
-           WHERE id = $10 AND business_id = $11`,
+               duration_minutes = $6, reminder_offset_minutes = $7, location = $8, notes = $9, source = $10
+           WHERE id = $11 AND business_id = $12`,
           [
             selectedType?.id || null, clientName.trim(), clientEmail || null,
             String(date), String(time), resolvedDuration,
             resolvedReminderOffsetMinutes,
             location || selectedType?.location_mode || 'office',
-            notes || null, id, businessId
+            notes || null, resolvedSource, id, businessId
           ]
         );
         if (!up.rowCount) {
@@ -1410,18 +1420,20 @@ app.put('/api/appointments/:id', async (req, res) => {
         tx.release();
       }
     } else {
-      await assertNoOverlap({
-        businessId,
-        date: String(date),
-        startMinutes,
-        durationMinutes: resolvedDuration,
-        excludeId: id
-      });
+      if (!isReminderEntry) {
+        await assertNoOverlap({
+          businessId,
+          date: String(date),
+          startMinutes,
+          durationMinutes: resolvedDuration,
+          excludeId: id
+        });
+      }
       const up = getSqlite()
         .prepare(
           `UPDATE appointments
            SET type_id = ?, client_name = ?, client_email = ?, date = ?, time = ?,
-               duration_minutes = ?, reminder_offset_minutes = ?, location = ?, notes = ?
+               duration_minutes = ?, reminder_offset_minutes = ?, location = ?, notes = ?, source = ?
            WHERE id = ? AND business_id = ?`
         )
         .run(
@@ -1429,7 +1441,7 @@ app.put('/api/appointments/:id', async (req, res) => {
           String(date), String(time), resolvedDuration,
           resolvedReminderOffsetMinutes,
           location || selectedType?.location_mode || 'office',
-          notes || null, id, businessId
+          notes || null, resolvedSource, id, businessId
         );
       if (!up.changes) return res.status(404).json({ error: 'appointment not found' });
     }
