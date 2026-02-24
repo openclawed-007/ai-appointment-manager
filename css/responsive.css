@@ -429,8 +429,8 @@
     }
 
     .quick-create-menu {
-        width: min(360px, calc(100vw - 24px));
-        max-height: 62vh;
+        width: calc(100vw - 16px);
+        max-height: calc(100dvh - 16px);
         padding: 8px;
     }
 
