@@ -365,7 +365,7 @@ function getCalendarHeaderLabel() {
   if (mode === 'day') {
     const date = parseYmd(localYmd(state.calendarDate));
     if (!date) return monthLabel(state.calendarDate);
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
   const weekDates = getVisibleCalendarDates(state.calendarDate, 'week');
   const start = parseYmd(weekDates[0]);
@@ -374,10 +374,10 @@ function getCalendarHeaderLabel() {
   const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
   if (sameMonth) {
     const month = start.toLocaleDateString('en-US', { month: 'short' });
-    return `${month} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`;
+    return `${month} ${start.getDate()} - ${end.getDate()}`;
   }
   const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `${startLabel} - ${endLabel}`;
 }
 
@@ -1372,7 +1372,7 @@ function escapeHtml(str = '') {
 }
 
 function monthLabel(date) {
-  return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  return date.toLocaleString('en-US', { month: 'short' });
 }
 
 async function api(path, options = {}) {
