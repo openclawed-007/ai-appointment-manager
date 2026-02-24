@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'intellischedule-static-v5';
+const STATIC_CACHE = 'intellischedule-static-v6';
 const RUNTIME_CACHE = 'intellischedule-runtime-v4';
 
 const APP_SHELL = [

@@ -85,6 +85,47 @@
     color: var(--text-muted);
 }
 
+.search-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    z-index: 80;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.search-suggestion {
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 10px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.search-suggestion:hover,
+.search-suggestion:focus-visible {
+    background: var(--bg-soft);
+    outline: none;
+}
+
+.search-suggestion small {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+
 .header-right {
     display: flex;
     align-items: center;

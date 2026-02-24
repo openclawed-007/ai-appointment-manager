@@ -1058,8 +1058,10 @@ app.get('/api/calendar/month', async (req, res) => {
 app.get('/api/appointments', async (req, res) => {
   const businessId = req.auth.businessId;
   const { date, q, status, month } = req.query;
+  const searchQuery = String(q || '').trim();
   const monthRange = month ? getMonthDateRange(month) : null;
   if (month && !monthRange) return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+  if (searchQuery && searchQuery.length < 2) return res.json({ appointments: [] });
 
   if (!USE_POSTGRES) {
     let sql = `
@@ -1073,9 +1075,9 @@ app.get('/api/appointments', async (req, res) => {
     if (date) { sql += ' AND a.date = ?'; params.push(String(date)); }
     if (monthRange) { sql += ' AND a.date >= ? AND a.date < ?'; params.push(monthRange.start, monthRange.end); }
     if (status) { sql += ' AND a.status = ?'; params.push(String(status)); }
-    if (q) {
-      sql += ' AND (a.client_name LIKE ? OR a.client_email LIKE ? OR a.title LIKE ? OR t.name LIKE ?)';
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+    if (searchQuery) {
+      sql += ' AND (a.client_name LIKE ? OR a.client_email LIKE ?)';
+      params.push(`%${searchQuery}%`, `%${searchQuery}%`);
     }
     sql += ' ORDER BY a.date ASC, a.time ASC';
     const rows = getSqlite().prepare(sql).all(...params).map((r) => {
@@ -1093,6 +1095,7 @@ app.get('/api/appointments', async (req, res) => {
     WHERE a.business_id = $1
   `;
   const params = [businessId];
+  let orderByClause = ' ORDER BY a.date ASC, a.time ASC';
 
   if (date) { params.push(String(date)); sql += ` AND a.date = $${params.length}`; }
   if (monthRange) {
@@ -1102,13 +1105,27 @@ app.get('/api/appointments', async (req, res) => {
     sql += ` AND a.date < $${params.length}`;
   }
   if (status) { params.push(String(status)); sql += ` AND a.status = $${params.length}`; }
-  if (q) {
-    params.push(`%${q}%`);
-    const idx = params.length;
-    sql += ` AND (a.client_name ILIKE $${idx} OR a.client_email ILIKE $${idx} OR a.title ILIKE $${idx} OR t.name ILIKE $${idx})`;
+  if (searchQuery) {
+    params.push(`%${searchQuery}%`);
+    const patternIdx = params.length;
+    params.push(searchQuery);
+    const termIdx = params.length;
+    const similarityExpr = `
+      GREATEST(
+        similarity(a.client_name, $${termIdx}),
+        similarity(COALESCE(a.client_email, ''), $${termIdx})
+      )
+    `;
+    sql += ` AND (
+      a.client_name ILIKE $${patternIdx}
+      OR a.client_email ILIKE $${patternIdx}
+      OR (${similarityExpr}) >= 0.62
+    )`;
+    orderByClause = ` ORDER BY ${similarityExpr} DESC, a.date ASC, a.time ASC`;
   }
 
-  sql += ' ORDER BY a.date ASC, a.time ASC';
+  sql += orderByClause;
+  if (searchQuery) sql += ' LIMIT 100';
   const rows = (await getPgPool().query(sql, params)).rows.map((r) => {
     const appt = rowToAppointment(r);
     if (r.type_color) appt.color = r.type_color;

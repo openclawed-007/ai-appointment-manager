@@ -234,6 +234,19 @@
 }
 
 /* ── Calendar Quick Create ── */
+.quick-create-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1410;
+    background: rgba(10, 14, 24, 0.45);
+    backdrop-filter: blur(2px);
+    animation: fade-in 140ms ease;
+}
+
+.quick-create-backdrop.hidden {
+    display: none;
+}
+
 .quick-create-menu {
     position: fixed;
     z-index: 1420;

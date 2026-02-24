@@ -59,7 +59,8 @@ const state = {
   authLoginEmail: '',
   authResendCooldownUntil: 0,
   calendarDotsRequestId: 0,
-  calendarWeekRequestId: 0
+  calendarWeekRequestId: 0,
+  searchRequestId: 0
 };
 
 const CALENDAR_MONTH_CACHE_TTL_MS = 120000;
@@ -72,6 +73,28 @@ const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
 const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
 const BUSINESS_HOURS_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const GLOBAL_SEARCH_SETTINGS_OPTIONS = [
+  { label: 'Business Name', targetId: 'settings-business-name', sectionSelector: '#settings-section-profile', keywords: ['business', 'name', 'company'] },
+  { label: 'Owner Email', targetId: 'settings-owner-email', sectionSelector: '#settings-section-profile', keywords: ['owner', 'email', 'contact'] },
+  { label: 'Open Time', targetId: 'settings-open-time', sectionSelector: '#settings-section-profile', keywords: ['open', 'hours', 'time'] },
+  { label: 'Close Time', targetId: 'settings-close-time', sectionSelector: '#settings-section-profile', keywords: ['close', 'hours', 'time'] },
+  { label: 'Monday Hours', targetId: 'settings-hours-mon-open', sectionSelector: '#settings-section-profile', keywords: ['monday', 'mon', 'hours'] },
+  { label: 'Tuesday Hours', targetId: 'settings-hours-tue-open', sectionSelector: '#settings-section-profile', keywords: ['tuesday', 'tue', 'hours'] },
+  { label: 'Wednesday Hours', targetId: 'settings-hours-wed-open', sectionSelector: '#settings-section-profile', keywords: ['wednesday', 'wed', 'hours'] },
+  { label: 'Thursday Hours', targetId: 'settings-hours-thu-open', sectionSelector: '#settings-section-profile', keywords: ['thursday', 'thu', 'hours'] },
+  { label: 'Friday Hours', targetId: 'settings-hours-fri-open', sectionSelector: '#settings-section-profile', keywords: ['friday', 'fri', 'hours'] },
+  { label: 'Saturday Hours', targetId: 'settings-hours-sat-open', sectionSelector: '#settings-section-profile', keywords: ['saturday', 'sat', 'hours'] },
+  { label: 'Sunday Hours', targetId: 'settings-hours-sun-open', sectionSelector: '#settings-section-profile', keywords: ['sunday', 'sun', 'hours'] },
+  { label: 'Theme', targetId: 'settings-theme-light', sectionSelector: '#settings-section-appearance', keywords: ['theme', 'dark', 'light'] },
+  { label: 'Accent Color', targetId: 'settings-section-appearance', sectionSelector: '#settings-section-appearance', keywords: ['accent', 'color', 'green', 'blue', 'red', 'purple', 'amber'] },
+  { label: 'Mobile Navigation Mode', targetId: 'settings-mobile-nav-bottom-tabs', sectionSelector: '#settings-section-appearance', keywords: ['mobile', 'navigation', 'bottom', 'tabs', 'sidebar'] },
+  { label: 'Calendar Client Names', targetId: 'settings-calendar-show-client-names', sectionSelector: '#settings-section-appearance', keywords: ['calendar', 'client', 'names', 'dots'] },
+  { label: 'Owner Email Notifications', targetId: 'settings-notify-owner-email', sectionSelector: '#settings-section-appearance', keywords: ['notify', 'notification', 'owner', 'email'] },
+  { label: 'Export Data', targetId: 'btn-export-data', sectionSelector: '#settings-section-data', keywords: ['export', 'backup', 'download'] },
+  { label: 'Import Data', targetId: 'btn-import-data', sectionSelector: '#settings-section-data', keywords: ['import', 'restore', 'upload'] },
+  { label: 'Import with AI', targetId: 'btn-import-ai-data', sectionSelector: '#settings-section-data', keywords: ['ai', 'import', 'text', 'paste'] },
+  { label: 'Customer Booking Page', targetId: 'btn-public-booking-settings', sectionSelector: '#settings-section-data', keywords: ['booking', 'public', 'link', 'clients'] }
+];
 
 function normalizeCalendarViewMode(value) {
   const mode = String(value || '').trim().toLowerCase();
@@ -438,10 +461,24 @@ function ensureQuickCreateMenu() {
   return menu;
 }
 
+function ensureQuickCreateBackdrop() {
+  let backdrop = document.getElementById('calendar-quick-create-backdrop');
+  if (backdrop) return backdrop;
+  backdrop = document.createElement('div');
+  backdrop.id = 'calendar-quick-create-backdrop';
+  backdrop.className = 'quick-create-backdrop hidden';
+  backdrop.setAttribute('aria-hidden', 'true');
+  backdrop.addEventListener('click', closeQuickCreateMenu);
+  document.body.appendChild(backdrop);
+  return backdrop;
+}
+
 function closeQuickCreateMenu() {
   const menu = document.getElementById('calendar-quick-create-menu');
   if (!menu) return;
   menu.classList.add('hidden');
+  const backdrop = document.getElementById('calendar-quick-create-backdrop');
+  backdrop?.classList.add('hidden');
   menu.innerHTML = '';
   state.quickCreateDate = '';
   state.quickCreateTime = '';
@@ -463,6 +500,8 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   closeDayMenu();
 
   const menu = ensureQuickCreateMenu();
+  const backdrop = ensureQuickCreateBackdrop();
+  backdrop.classList.remove('hidden');
   state.quickCreateAnchorEl = anchorEl;
   const resolvedDate = String(appointment?.date || date);
   const resolvedTime = String(appointment?.time || time).slice(0, 5);
@@ -1731,8 +1770,9 @@ function applyInitialViewPreference(view) {
   return activeView;
 }
 
-function setActiveView(view) {
+function setActiveView(view, options = {}) {
   if (!view) return;
+  const { skipAppointmentsReload = false } = options || {};
   const activeView = resolveView(view);
   if (!activeView) return;
   closeQuickCreateMenu();
@@ -1749,7 +1789,7 @@ function setActiveView(view) {
 
   const canAutoLoadAppointments =
     typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
-  if (activeView === 'appointments' && canAutoLoadAppointments) {
+  if (activeView === 'appointments' && canAutoLoadAppointments && !skipAppointmentsReload) {
     void loadAppointmentsTable().catch(swallowBackgroundAsyncError);
   }
 }
@@ -3800,17 +3840,105 @@ async function runFilteredExport() {
 }
 
 async function runSearch(query) {
-  if (!query) {
+  const normalizedQuery = String(query || '').trim();
+  const requestId = ++state.searchRequestId;
+  if (!normalizedQuery) {
     await loadAppointmentsTable();
     return;
   }
-  const { appointments } = await api(`/api/appointments?q=${encodeURIComponent(query)}`);
+  if (normalizedQuery.length < 2) {
+    renderAppointmentsTable([]);
+    setActiveView('appointments');
+    return;
+  }
+  const { appointments } = await api(`/api/appointments?q=${encodeURIComponent(normalizedQuery)}`);
+  if (requestId !== state.searchRequestId) return;
   renderAppointmentsTable(appointments);
-  setActiveView('appointments');
+  setActiveView('appointments', { skipAppointmentsReload: true });
+}
+
+function hideGlobalSearchSuggestions() {
+  const suggestions = document.getElementById('global-search-suggestions');
+  if (!suggestions) return;
+  suggestions.innerHTML = '';
+  suggestions.classList.add('hidden');
+}
+
+function findSettingsSearchMatches(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q || q.length < 2) return [];
+  return GLOBAL_SEARCH_SETTINGS_OPTIONS
+    .map((option) => {
+      const haystack = `${option.label} ${Array.isArray(option.keywords) ? option.keywords.join(' ') : ''}`.toLowerCase();
+      let score = 0;
+      if (haystack.includes(q)) score += 3;
+      if (option.label.toLowerCase().includes(q)) score += 2;
+      if (Array.isArray(option.keywords) && option.keywords.some((kw) => kw.toLowerCase().includes(q))) score += 1;
+      return { ...option, score };
+    })
+    .filter((option) => option.score > 0)
+    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+    .slice(0, 8);
+}
+
+function openSettingsSearchOption(option) {
+  if (!option) return;
+  state.searchRequestId += 1;
+  state.searchActive = false;
+  state.searchOriginView = null;
+  setActiveView('settings');
+
+  const sectionSelector = String(option.sectionSelector || '').trim();
+  if (sectionSelector) {
+    const section = document.querySelector(sectionSelector);
+    const toggle = document.querySelector(`.collapse-toggle-btn[data-collapse-target="${sectionSelector}"]`);
+    if (section && toggle) {
+      applyCollapseState(toggle, section, false);
+    } else {
+      section?.classList.remove('is-collapsed');
+    }
+  }
+
+  const target = document.getElementById(option.targetId);
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (typeof target.focus === 'function') target.focus({ preventScroll: true });
+}
+
+function renderGlobalSearchSuggestions(query) {
+  const suggestions = document.getElementById('global-search-suggestions');
+  if (!suggestions) return;
+  const matches = findSettingsSearchMatches(query);
+  if (!matches.length) {
+    hideGlobalSearchSuggestions();
+    return;
+  }
+
+  suggestions.innerHTML = matches.map((option, idx) => `
+    <button type="button" class="search-suggestion" data-settings-match-index="${idx}">
+      <span>${escapeHtml(option.label)}</span>
+      <small>Settings</small>
+    </button>
+  `).join('');
+  suggestions.classList.remove('hidden');
+
+  suggestions.querySelectorAll('.search-suggestion[data-settings-match-index]').forEach((btn) => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.settingsMatchIndex);
+      const choice = matches[idx];
+      const search = document.getElementById('global-search');
+      if (search) search.value = '';
+      hideGlobalSearchSuggestions();
+      openSettingsSearchOption(choice);
+    });
+  });
 }
 
 async function clearSearchAndRestoreView(searchInput) {
+  state.searchRequestId += 1;
   if (searchInput) searchInput.value = '';
+  hideGlobalSearchSuggestions();
   await loadAppointmentsTable();
   if (state.searchActive && state.searchOriginView) {
     setActiveView(state.searchOriginView);
@@ -4436,6 +4564,7 @@ function bindForms() {
     search.addEventListener('input', () => {
       clearTimeout(timer);
       const query = search.value.trim();
+      renderGlobalSearchSuggestions(query);
 
       if (query && !state.searchActive) {
         state.searchOriginView = getActiveView();
@@ -4452,15 +4581,24 @@ function bindForms() {
     });
 
     search.addEventListener('blur', async () => {
+      window.setTimeout(() => hideGlobalSearchSuggestions(), 120);
       if (!state.searchActive) return;
+      const query = String(search.value || '').trim();
+      if (query) return;
       await clearSearchAndRestoreView(search);
     });
 
     search.addEventListener('keydown', async (e) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
+      hideGlobalSearchSuggestions();
       await clearSearchAndRestoreView(search);
       search.blur();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (search.closest('.header-search')?.contains(e.target)) return;
+      hideGlobalSearchSuggestions();
     });
   }
 }
@@ -4594,7 +4732,6 @@ async function init() {
   window.addEventListener('resize', repositionQuickCreateMenuIfOpen);
   window.addEventListener('resize', repositionNotificationsMenuIfOpen);
   window.addEventListener('scroll', repositionDayMenuIfOpen, true);
-  window.addEventListener('scroll', repositionQuickCreateMenuIfOpen, true);
   window.addEventListener('scroll', repositionNotificationsMenuIfOpen, true);
 
   try {
