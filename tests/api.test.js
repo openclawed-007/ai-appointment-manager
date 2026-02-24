@@ -173,11 +173,13 @@ describe('API smoke', () => {
       date: '2026-02-20',
       time: '09:30',
       durationMinutes: 35,
+      reminderOffsetMinutes: 120,
       location: 'virtual',
       notes: 'api test'
     });
 
     expect(appointmentRes.statusCode).toBe(201);
+    expect(appointmentRes.body.appointment.reminderOffsetMinutes).toBe(120);
     const appointmentId = appointmentRes.body.appointment.id;
 
     const updateRes = await patch(agent, `/api/appointments/${appointmentId}/status`)
@@ -189,6 +191,75 @@ describe('API smoke', () => {
     const deleteRes = await del(agent, `/api/appointments/${appointmentId}`);
     expect(deleteRes.statusCode).toBe(200);
     expect(deleteRes.body.ok).toBe(true);
+  });
+
+  it('supports reminder offset create/update validation and persistence', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const typeRes = await post(agent, '/api/types').send({
+      name: `Offset Type ${Date.now()}`,
+      durationMinutes: 30,
+      priceCents: 2500,
+      locationMode: 'office'
+    });
+    expect(typeRes.statusCode).toBe(201);
+
+    const createRes = await post(agent, '/api/appointments').send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Offset Client',
+      clientEmail: 'offset@example.com',
+      date: '2026-03-20',
+      time: '11:00',
+      durationMinutes: 30,
+      reminderOffsetMinutes: 60,
+      location: 'office',
+      notes: 'offset create'
+    });
+    expect(createRes.statusCode).toBe(201);
+    expect(createRes.body.appointment.reminderOffsetMinutes).toBe(60);
+    const appointmentId = createRes.body.appointment.id;
+
+    const updateWithoutOffset = await put(agent, `/api/appointments/${appointmentId}`).send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Offset Client Updated',
+      clientEmail: 'offset@example.com',
+      date: '2026-03-20',
+      time: '11:30',
+      durationMinutes: 30,
+      location: 'office',
+      notes: 'offset unchanged'
+    });
+    expect(updateWithoutOffset.statusCode).toBe(200);
+    expect(updateWithoutOffset.body.appointment.reminderOffsetMinutes).toBe(60);
+
+    const updateWithOffset = await put(agent, `/api/appointments/${appointmentId}`).send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Offset Client Updated 2',
+      clientEmail: 'offset@example.com',
+      date: '2026-03-20',
+      time: '12:00',
+      durationMinutes: 30,
+      reminderOffsetMinutes: 15,
+      location: 'office',
+      notes: 'offset updated'
+    });
+    expect(updateWithOffset.statusCode).toBe(200);
+    expect(updateWithOffset.body.appointment.reminderOffsetMinutes).toBe(15);
+
+    const invalidOffset = await put(agent, `/api/appointments/${appointmentId}`).send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Offset Client Invalid',
+      clientEmail: 'offset@example.com',
+      date: '2026-03-20',
+      time: '12:30',
+      durationMinutes: 30,
+      reminderOffsetMinutes: 10081,
+      location: 'office',
+      notes: 'invalid offset'
+    });
+    expect(invalidOffset.statusCode).toBe(400);
+    expect(String(invalidOffset.body.error || '')).toContain('reminderOffsetMinutes');
   });
 
   it('returns 503 for AI import when OPENROUTER_API_KEY is not configured', async () => {
@@ -515,6 +586,11 @@ describe('API smoke', () => {
     const keepTypeName = `Backup Keep Type ${unique}`;
     const removeTypeName = `Backup Remove Type ${unique}`;
     const targetDate = '2026-04-01';
+    const expectedOffset = 90;
+
+    const settingsRes = await put(agent, '/api/settings').send({ reminderMode: true });
+    expect(settingsRes.statusCode).toBe(200);
+    expect(settingsRes.body.settings.reminder_mode).toBe(true);
 
     const keepTypeRes = await post(agent, '/api/types').send({
       name: keepTypeName,
@@ -531,6 +607,7 @@ describe('API smoke', () => {
       date: targetDate,
       time: '10:15',
       durationMinutes: 40,
+      reminderOffsetMinutes: expectedOffset,
       location: 'office',
       notes: 'backup test'
     });
@@ -541,6 +618,10 @@ describe('API smoke', () => {
     expect(Array.isArray(exportRes.body.appointmentTypes)).toBe(true);
     expect(Array.isArray(exportRes.body.appointments)).toBe(true);
     expect(exportRes.body.appointmentTypes.some((t) => t.name === keepTypeName)).toBe(true);
+    expect(exportRes.body.settings?.reminder_mode).toBe(true);
+    const exportedAppointment = exportRes.body.appointments.find((a) => a.client_name === `Backup Client ${unique}`);
+    expect(exportedAppointment).toBeTruthy();
+    expect(exportedAppointment.reminder_offset_minutes).toBe(expectedOffset);
 
     const removeTypeRes = await post(agent, '/api/types').send({
       name: removeTypeName,
@@ -564,6 +645,13 @@ describe('API smoke', () => {
     const apptsAfter = await agent.get('/api/appointments');
     expect(apptsAfter.statusCode).toBe(200);
     expect(apptsAfter.body.appointments.length).toBe(exportRes.body.appointments.length);
+    const restoredAppointment = apptsAfter.body.appointments.find((a) => a.clientName === `Backup Client ${unique}`);
+    expect(restoredAppointment).toBeTruthy();
+    expect(restoredAppointment.reminderOffsetMinutes).toBe(expectedOffset);
+
+    const settingsAfter = await agent.get('/api/settings');
+    expect(settingsAfter.statusCode).toBe(200);
+    expect(settingsAfter.body.settings.reminder_mode).toBe(true);
   });
 
   it(

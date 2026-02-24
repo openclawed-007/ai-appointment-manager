@@ -110,6 +110,23 @@ describe('Settings API', () => {
     expect(res.body.settings.timezone).toBe('Europe/London');
   });
 
+  it('PUT /api/settings persists reminder mode and returns it on fresh GET', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const enableRes = await put(agent, '/api/settings').send({ reminderMode: true });
+    expect(enableRes.statusCode).toBe(200);
+    expect(enableRes.body.settings.reminder_mode).toBe(true);
+
+    const fresh = await agent.get('/api/settings');
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.body.settings.reminder_mode).toBe(true);
+
+    const disableRes = await put(agent, '/api/settings').send({ reminderMode: false });
+    expect(disableRes.statusCode).toBe(200);
+    expect(disableRes.body.settings.reminder_mode).toBe(false);
+  });
+
   it('PUT /api/settings updates business open and close hours', async () => {
     const agent = request.agent(app);
     await loginAndVerify(agent);
@@ -201,6 +218,23 @@ describe('Settings API', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.settings.business_name).toBe('New Name Only');
     expect(res.body.settings.timezone).toBe('America/Chicago');
+  });
+
+  it('partial setting updates preserve reminder mode state', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const setReminderMode = await put(agent, '/api/settings').send({ reminderMode: true });
+    expect(setReminderMode.statusCode).toBe(200);
+    expect(setReminderMode.body.settings.reminder_mode).toBe(true);
+
+    const updateNameOnly = await put(agent, '/api/settings').send({ businessName: 'Reminder Mode Preserve Test' });
+    expect(updateNameOnly.statusCode).toBe(200);
+    expect(updateNameOnly.body.settings.reminder_mode).toBe(true);
+
+    const fresh = await agent.get('/api/settings');
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.body.settings.reminder_mode).toBe(true);
   });
 
   it('PUT /api/settings creates settings row when missing and persists business hours', async () => {

@@ -1326,7 +1326,7 @@ app.post('/api/appointments/:id/email', async (req, res) => {
 app.put('/api/appointments/:id', async (req, res) => {
   const businessId = req.auth.businessId;
   const id = Number(req.params.id);
-  const { typeId, clientName, clientEmail, date, time, durationMinutes, location, notes } = req.body || {};
+  const { typeId, clientName, clientEmail, date, time, durationMinutes, reminderOffsetMinutes, location, notes } = req.body || {};
 
   if (!clientName?.trim()) return res.status(400).json({ error: 'clientName is required' });
   if (!date) return res.status(400).json({ error: 'date is required' });
@@ -1362,6 +1362,13 @@ app.put('/api/appointments/:id', async (req, res) => {
 
   if (!previousRow) return res.status(404).json({ error: 'appointment not found' });
   const previousAppointment = rowToAppointment(previousRow);
+  const hasReminderOffsetMinutes = !(reminderOffsetMinutes == null || reminderOffsetMinutes === '');
+  const resolvedReminderOffsetMinutes = hasReminderOffsetMinutes
+    ? Number(reminderOffsetMinutes)
+    : Number(previousRow.reminder_offset_minutes == null ? 10 : previousRow.reminder_offset_minutes);
+  if (!Number.isFinite(resolvedReminderOffsetMinutes) || resolvedReminderOffsetMinutes < 0 || resolvedReminderOffsetMinutes > 10080) {
+    return res.status(400).json({ error: 'reminderOffsetMinutes must be between 0 and 10080' });
+  }
 
   try {
     const startMinutes = parseTimeOrThrow(time);
@@ -1381,11 +1388,12 @@ app.put('/api/appointments/:id', async (req, res) => {
         const up = await tx.query(
           `UPDATE appointments
            SET type_id = $1, client_name = $2, client_email = $3, date = $4, time = $5,
-               duration_minutes = $6, location = $7, notes = $8
-           WHERE id = $9 AND business_id = $10`,
+               duration_minutes = $6, reminder_offset_minutes = $7, location = $8, notes = $9
+           WHERE id = $10 AND business_id = $11`,
           [
             selectedType?.id || null, clientName.trim(), clientEmail || null,
             String(date), String(time), resolvedDuration,
+            resolvedReminderOffsetMinutes,
             location || selectedType?.location_mode || 'office',
             notes || null, id, businessId
           ]
@@ -1413,12 +1421,13 @@ app.put('/api/appointments/:id', async (req, res) => {
         .prepare(
           `UPDATE appointments
            SET type_id = ?, client_name = ?, client_email = ?, date = ?, time = ?,
-               duration_minutes = ?, location = ?, notes = ?
+               duration_minutes = ?, reminder_offset_minutes = ?, location = ?, notes = ?
            WHERE id = ? AND business_id = ?`
         )
         .run(
           selectedType?.id || null, clientName.trim(), clientEmail || null,
           String(date), String(time), resolvedDuration,
+          resolvedReminderOffsetMinutes,
           location || selectedType?.location_mode || 'office',
           notes || null, id, businessId
         );

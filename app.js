@@ -16,6 +16,43 @@ function setStoredValue(key, value) {
   }
 }
 
+function canUseBrowserNotifications() {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+function getNotificationPermission() {
+  if (!canUseBrowserNotifications()) return 'denied';
+  return Notification.permission;
+}
+
+function loadNotifiedReminderKeys() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(REMINDER_NOTIFIED_KEYS_STORAGE);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveNotifiedReminderKeys(keys = {}) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(REMINDER_NOTIFIED_KEYS_STORAGE, JSON.stringify(keys));
+  } catch (_error) {
+    // Ignore storage write failures.
+  }
+}
+
+function pruneNotifiedReminderKeys(keys = {}, maxAgeMs = 3 * 24 * 60 * 60 * 1000) {
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(keys).filter(([, seenAt]) => Number.isFinite(Number(seenAt)) && now - Number(seenAt) <= maxAgeMs)
+  );
+}
+
 function getStoredCalendarViewMode() {
   if (typeof localStorage === 'undefined') return 'month';
   try {
@@ -49,6 +86,7 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   reminderMode: getStoredBoolean('reminderMode'),
+  browserNotificationsEnabled: getStoredBoolean('browserNotificationsEnabled'),
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
   dashboardStatsCollapsed: getStoredBoolean('dashboardStatsCollapsed'),
   calendarViewMode: 'month',
@@ -56,6 +94,8 @@ const state = {
   queueSyncInProgress: false,
   calendarExpanded: getStoredBoolean('calendarExpanded'),
   unreadNotifications: 0,
+  nextReminder: null,
+  reminderNotificationTimer: null,
   authLoginChallengeToken: '',
   authLoginEmail: '',
   authResendCooldownUntil: 0,
@@ -73,6 +113,8 @@ const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
 const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
+const BROWSER_NOTIFICATIONS_KEY = 'browserNotificationsEnabled';
+const REMINDER_NOTIFIED_KEYS_STORAGE = 'intellischedule.reminderNotifiedKeys.v1';
 const BUSINESS_HOURS_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const GLOBAL_SEARCH_SETTINGS_OPTIONS = [
   { label: 'Business Name', targetId: 'settings-business-name', sectionSelector: '#settings-section-profile', keywords: ['business', 'name', 'company'] },
@@ -240,13 +282,8 @@ function applyReminderModeUi() {
 
   const scheduleCard = document.querySelector('.schedule-card');
   if (scheduleCard) {
-    if (reminderMode) {
-      scheduleCard.setAttribute('hidden', 'hidden');
-      scheduleCard.classList.add('hidden');
-    } else {
-      scheduleCard.removeAttribute('hidden');
-      scheduleCard.classList.remove('hidden');
-    }
+    scheduleCard.removeAttribute('hidden');
+    scheduleCard.classList.remove('hidden');
   }
 
   const dashboardAiInsightsCard = document.querySelector('section[data-view="dashboard"] .card.ai-insights');
@@ -466,6 +503,11 @@ function fillAppointmentForm(appointment) {
   form.date.value = appointment.date || '';
   form.time.value = appointment.time || '';
   form.durationMinutes.value = String(appointment.durationMinutes || 45);
+  if (form.reminderOffsetMinutes) {
+    form.reminderOffsetMinutes.value = String(
+      appointment.reminderOffsetMinutes == null ? 10 : Number(appointment.reminderOffsetMinutes)
+    );
+  }
   if (appointment.notes != null) form.notes.value = appointment.notes;
   const locationRadio = form.querySelector(`input[name="location"][value="${appointment.location || 'office'}"]`);
   if (locationRadio) locationRadio.checked = true;
@@ -647,6 +689,23 @@ function renderQuickCreateDurationOptions(selectedDuration = 45) {
     .join('');
 }
 
+function renderNotifyOffsetOptions(selectedOffset = 10) {
+  const options = [
+    { value: 0, label: 'At time of event' },
+    { value: 5, label: '5 minutes before' },
+    { value: 10, label: '10 minutes before' },
+    { value: 15, label: '15 minutes before' },
+    { value: 30, label: '30 minutes before' },
+    { value: 60, label: '1 hour before' },
+    { value: 120, label: '2 hours before' },
+    { value: 1440, label: '1 day before' }
+  ];
+  const normalized = Number.isFinite(Number(selectedOffset)) ? Number(selectedOffset) : 10;
+  return options
+    .map((opt) => `<option value="${opt.value}" ${opt.value === normalized ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`)
+    .join('');
+}
+
 async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   if (!anchorEl || !date || !time) return;
   closeDayMenu();
@@ -668,6 +727,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     ? normalizeAppointmentLocation(appointment.location)
     : resolveDefaultLocationForType(defaultType);
   const defaultClientName = String(appointment?.clientName || '');
+  const defaultReminderOffset = Number(appointment?.reminderOffsetMinutes == null ? 10 : appointment.reminderOffsetMinutes);
   const reminderModeEnabled = isReminderModeEnabled();
   const defaultEntryMode = reminderModeEnabled
     ? 'reminder'
@@ -734,6 +794,10 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
           <div class="form-group quick-create-field">
             <label for="quick-create-duration">Duration</label>
             <select id="quick-create-duration" name="durationMinutes">${renderQuickCreateDurationOptions(defaultDuration)}</select>
+          </div>
+          <div class="form-group quick-create-field">
+            <label for="quick-create-reminder-offset">Notify</label>
+            <select id="quick-create-reminder-offset" name="reminderOffsetMinutes">${renderNotifyOffsetOptions(defaultReminderOffset)}</select>
           </div>
           <div class="form-group quick-create-field quick-create-location-group">
             <label for="quick-create-location">Location</label>
@@ -857,6 +921,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         date: requestDate,
         time: requestTime,
         durationMinutes: Number(data.durationMinutes || 45),
+        reminderOffsetMinutes: Number(data.reminderOffsetMinutes == null ? 10 : data.reminderOffsetMinutes),
         location: isReminder ? 'office' : String(data.location || 'office')
       };
       if (!payload.clientName) throw new Error('Please enter a name or title.');
@@ -1511,6 +1576,126 @@ function toTime12(time24 = '09:00') {
   return `${hh}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
+function reminderNotificationKey(reminder = {}) {
+  const id = Number(reminder.id || 0);
+  const date = String(reminder.date || '').slice(0, 10);
+  const time = String(reminder.time || '').slice(0, 5);
+  return `${id}|${date}|${time}`;
+}
+
+async function checkUpcomingReminderDesktopNotifications() {
+  if (!state.browserNotificationsEnabled) return;
+  if (!state.currentUser) return;
+  if (!canUseBrowserNotifications()) return;
+  if (getNotificationPermission() !== 'granted') return;
+  const reminderModeEnabled = isReminderModeEnabled();
+
+  let appointments = [];
+  try {
+    const payload = await api('/api/appointments');
+    appointments = Array.isArray(payload?.appointments) ? payload.appointments : [];
+  } catch (_error) {
+    return;
+  }
+
+  const now = Date.now();
+  const upcoming = appointments
+    .filter((a) => {
+      const source = String(a.source || '').toLowerCase();
+      if (reminderModeEnabled) {
+        if (source !== 'reminder') return false;
+      }
+      const status = String(a.status || '').toLowerCase();
+      if (status === 'completed' || status === 'cancelled') return false;
+      const date = String(a.date || '').slice(0, 10);
+      const time = String(a.time || '').slice(0, 5);
+      const at = new Date(`${date}T${time}:00`).getTime();
+      if (!Number.isFinite(at)) return false;
+      const notifyOffsetMinutes = Number(a.reminderOffsetMinutes == null ? 10 : a.reminderOffsetMinutes);
+      const notifyAt = at - (Math.max(0, notifyOffsetMinutes) * 60 * 1000);
+      const diffMs = notifyAt - now;
+      return diffMs >= -60 * 1000 && diffMs <= 5 * 60 * 1000;
+    })
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+
+  if (!upcoming.length) return;
+
+  const existing = pruneNotifiedReminderKeys(loadNotifiedReminderKeys());
+  let changed = false;
+  upcoming.forEach((item) => {
+    const key = reminderNotificationKey(item);
+    if (existing[key]) return;
+    const fallbackLabel = reminderModeEnabled ? 'Reminder' : 'Appointment';
+    const titleText = String(item.clientName || item.title || item.typeName || fallbackLabel).trim();
+    const title = titleText || 'Reminder';
+    const body = `${formatMenuDate(String(item.date || '').slice(0, 10))} at ${toTime12(String(item.time || '09:00').slice(0, 5))}`;
+    const n = new Notification(title, {
+      body,
+      tag: `reminder-${key}`,
+      renotify: false
+    });
+    n.onclick = () => {
+      try { window.focus(); } catch (_error) { }
+      void focusCalendarOnDate(item.date, { time: item.time, openMenu: false });
+      n.close();
+    };
+    existing[key] = Date.now();
+    changed = true;
+  });
+
+  if (changed) saveNotifiedReminderKeys(existing);
+}
+
+function stopReminderNotificationPolling() {
+  if (!state.reminderNotificationTimer) return;
+  clearInterval(state.reminderNotificationTimer);
+  state.reminderNotificationTimer = null;
+}
+
+function startReminderNotificationPolling() {
+  stopReminderNotificationPolling();
+  if (!state.browserNotificationsEnabled) return;
+  if (!canUseBrowserNotifications()) return;
+  state.reminderNotificationTimer = setInterval(() => {
+    void checkUpcomingReminderDesktopNotifications().catch(swallowBackgroundAsyncError);
+  }, 60 * 1000);
+  void checkUpcomingReminderDesktopNotifications().catch(swallowBackgroundAsyncError);
+}
+
+function formatUpcomingRelative(dateYmd = '', time24 = '09:00') {
+  const safeDate = String(dateYmd || '').slice(0, 10);
+  const safeTime = String(time24 || '').slice(0, 5);
+  const target = new Date(`${safeDate}T${safeTime}:00`);
+  if (Number.isNaN(target.getTime())) return toTime12(safeTime);
+
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin <= 1 && diffMin >= -1) return 'now';
+  if (diffMin > 1 && diffMin < 60) return `in ${diffMin} min`;
+  if (diffMin >= 60 && diffMin < 24 * 60) {
+    const hours = Math.floor(diffMin / 60);
+    const mins = diffMin % 60;
+    return mins ? `in ${hours}h ${mins}m` : `in ${hours}h`;
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (safeDate === tomorrow.toISOString().slice(0, 10)) {
+    return `tomorrow ${toTime12(safeTime)}`;
+  }
+
+  return toTime12(safeTime);
+}
+
+function isAtOrAfterNow(dateYmd = '', time24 = '09:00') {
+  const safeDate = String(dateYmd || '').slice(0, 10);
+  const safeTime = String(time24 || '').slice(0, 5);
+  const target = new Date(`${safeDate}T${safeTime}:00`);
+  if (Number.isNaN(target.getTime())) return false;
+  return target.getTime() >= Date.now();
+}
+
 function toTimeCompact(time24 = '09:00') {
   const [h, m] = String(time24).split(':').map(Number);
   const hh = Number.isFinite(h) ? String(h).padStart(2, '0') : '09';
@@ -1956,6 +2141,61 @@ function getActiveView() {
   return document.querySelector('.app-view.active')?.dataset.view || 'dashboard';
 }
 
+function toHalfHourSlot(time24 = '09:00') {
+  const [hRaw, mRaw] = String(time24 || '09:00').split(':').map(Number);
+  const h = Number.isFinite(hRaw) ? hRaw : 9;
+  const m = Number.isFinite(mRaw) ? mRaw : 0;
+  const rounded = Math.floor(m / 30) * 30;
+  return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`;
+}
+
+async function focusCalendarOnDate(date, { time = '', openMenu = true } = {}) {
+  const safeDate = String(date || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) return;
+
+  setActiveView('dashboard');
+  state.selectedDate = safeDate;
+
+  const dt = new Date(`${safeDate}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return;
+
+  let mode = normalizeCalendarViewMode(state.calendarViewMode);
+  if (mode === 'month' && time) {
+    mode = 'week';
+    state.calendarViewMode = mode;
+    setStoredValue('calendarViewMode', mode);
+  }
+  state.calendarDate = mode === 'month'
+    ? new Date(dt.getFullYear(), dt.getMonth(), 1)
+    : new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+
+  const monthLabelNode = document.querySelector('.current-month');
+  if (monthLabelNode) monthLabelNode.textContent = getCalendarHeaderLabel();
+  renderCalendarGrid();
+
+  await loadDashboard(safeDate, { refreshDots: false, showSkeleton: false });
+  await refreshCalendarDots({ force: true });
+
+  const slot = time
+    ? document.querySelector(`.week-slot[data-slot-date="${safeDate}"][data-slot-time="${toHalfHourSlot(time)}"]`)
+    : null;
+  if (slot) {
+    slot.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  } else {
+    document.querySelector('.calendar-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  if (!openMenu) return;
+  if (mode === 'month') {
+    const day = Number(safeDate.slice(8, 10));
+    const selectedCell = document.querySelector(`.day-cell[data-day="${day}"]:not(.empty)`);
+    if (selectedCell) await openDayMenu(selectedCell, safeDate);
+    return;
+  }
+  const selectedHeader = document.querySelector(`.week-day-header[data-week-date="${safeDate}"]`);
+  if (selectedHeader) await openDayMenu(selectedHeader, safeDate);
+}
+
 function bindNavigation() {
   document.querySelectorAll('.nav-item').forEach((item) => {
     item.addEventListener('click', (e) => {
@@ -2084,6 +2324,13 @@ function bindDashboardStatsToggle() {
     state.dashboardStatsCollapsed = !state.dashboardStatsCollapsed;
     setStoredValue('dashboardStatsCollapsed', state.dashboardStatsCollapsed);
     syncDashboardStatsUi();
+  });
+
+  document.getElementById('stat-card-pending')?.addEventListener('click', async () => {
+    if (!isReminderModeEnabled()) return;
+    const next = state.nextReminder;
+    if (!next?.date) return;
+    await focusCalendarOnDate(next.date, { time: next.time, openMenu: false });
   });
 }
 
@@ -2226,6 +2473,7 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
               data-appointment-date="${escapeHtml(a.date || date)}"
               data-appointment-time="${escapeHtml(a.time || time24)}"
               data-appointment-duration="${Number(a.durationMinutes || 45)}"
+              data-appointment-reminder-offset="${Number(a.reminderOffsetMinutes == null ? 10 : a.reminderOffsetMinutes)}"
               data-appointment-location="${escapeHtml(a.location || 'office')}"
               data-appointment-source="${escapeHtml(a.source || 'owner')}">
               <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
@@ -2382,6 +2630,7 @@ function bindCalendarNav() {
           date: String(eventCard.dataset.appointmentDate || ''),
           time: String(eventCard.dataset.appointmentTime || '').slice(0, 5),
           durationMinutes: Number(eventCard.dataset.appointmentDuration || 45),
+          reminderOffsetMinutes: Number(eventCard.dataset.appointmentReminderOffset == null ? 10 : eventCard.dataset.appointmentReminderOffset),
           location: String(eventCard.dataset.appointmentLocation || 'office'),
           source: String(eventCard.dataset.appointmentSource || 'owner')
         };
@@ -2721,6 +2970,9 @@ function setAppointmentDefaults() {
   if (!state.editingAppointmentId) {
     const selectedType = state.types.find((t) => Number(t.id) === Number(state.selectedTypeId));
     setAppointmentFormLocation(resolveDefaultLocationForType(selectedType));
+    if (form.reminderOffsetMinutes && !form.reminderOffsetMinutes.value) {
+      form.reminderOffsetMinutes.value = '10';
+    }
   }
 
   syncTimeBuilderFromInput(form);
@@ -2828,6 +3080,7 @@ function bindAppointmentFormEnhancements() {
 function renderStats(stats = {}, options = {}) {
   const reminderModeEnabled = isReminderModeEnabled();
   const nextReminder = options.nextReminder || null;
+  state.nextReminder = reminderModeEnabled ? nextReminder : null;
   document.getElementById('stat-today').textContent = stats.today ?? 0;
   document.getElementById('stat-week').textContent = stats.week ?? 0;
 
@@ -2836,21 +3089,24 @@ function renderStats(stats = {}, options = {}) {
   const pendingHint = document.querySelector('#stat-card-pending .stat-hint');
   if (reminderModeEnabled) {
     if (pendingLabel) pendingLabel.textContent = 'Upcoming';
+    pendingValue?.classList.add('is-reminder-title');
+    document.getElementById('stat-card-pending')?.classList.toggle('is-clickable', Boolean(nextReminder?.date));
     if (nextReminder?.date && nextReminder?.time) {
-      if (pendingValue) pendingValue.textContent = toTime12(nextReminder.time);
+      const reminderText = String(
+        nextReminder.clientName || nextReminder.title || nextReminder.typeName || 'Reminder'
+      ).trim();
+      const shortReminderText = reminderText.length > 72 ? `${reminderText.slice(0, 69)}...` : reminderText;
+      const relative = formatUpcomingRelative(nextReminder.date, nextReminder.time);
+      if (pendingValue) pendingValue.textContent = `${relative} • ${shortReminderText}`;
       if (pendingHint) {
-        const reminderText = String(
-          nextReminder.clientName || nextReminder.title || nextReminder.typeName || 'Reminder'
-        ).trim();
-        const shortReminderText = reminderText.length > 42 ? `${reminderText.slice(0, 39)}...` : reminderText;
         if (String(nextReminder.date).slice(0, 10) === localYmd()) {
-          pendingHint.textContent = `Today • ${shortReminderText}`;
+          pendingHint.textContent = 'Today';
         } else {
           const dt = new Date(`${String(nextReminder.date).slice(0, 10)}T00:00:00`);
           const dayLabel = Number.isNaN(dt.getTime())
             ? String(nextReminder.date).slice(0, 10)
             : dt.toLocaleDateString('en-US', { weekday: 'long' });
-          pendingHint.textContent = `${dayLabel} • ${shortReminderText}`;
+          pendingHint.textContent = dayLabel;
         }
       }
     } else {
@@ -2859,6 +3115,8 @@ function renderStats(stats = {}, options = {}) {
     }
   } else {
     if (pendingLabel) pendingLabel.textContent = 'Pending';
+    pendingValue?.classList.remove('is-reminder-title');
+    document.getElementById('stat-card-pending')?.classList.remove('is-clickable');
     if (pendingValue) pendingValue.textContent = stats.pending ?? 0;
   }
 
@@ -3394,7 +3652,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   const isTargetToday = targetDate === today;
   const reminderModeEnabled = isReminderModeEnabled();
 
-  if (showSkeleton && !reminderModeEnabled) {
+  if (showSkeleton) {
     // Show skeleton placeholders while data is loading
     renderSkeleton(document.getElementById('timeline-list'), 3);
     renderSkeleton(document.getElementById('insights-list'), 4);
@@ -3434,6 +3692,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       if (String(a.source || '').toLowerCase() !== 'reminder') return false;
       const status = String(a.status || '').toLowerCase();
       if (status === 'completed' || status === 'cancelled') return false;
+      if (!isAtOrAfterNow(a.date, a.time)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -3459,30 +3718,40 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     : stats;
 
   let activeAppointments = todayAppointments;
-  if (state.viewAll) {
-    activeAppointments = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= targetDate);
-    if (scheduleTitle) scheduleTitle.textContent = `Upcoming from ${formatScheduleDate(targetDate)}`;
-  } else if (scheduleTitle) {
-    scheduleTitle.textContent = isTargetToday
-      ? `Today's ${getEntryWordPluralTitle()}`
-      : `${getEntryWordPluralTitle()}: ${formatScheduleDate(targetDate)}`;
-  }
-
-  if (!state.viewAll && !todayAppointments.length && isTargetToday) {
-    // Fall back to the next upcoming day from all appointments.
-    const upcomingFiltered = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= today);
-
-    const next = upcomingFiltered[0];
-    if (next?.date && next.date > today) {
-      // next upcoming day — need to fetch that day specifically
-      const nextDayResult = await api(`/api/appointments?date=${encodeURIComponent(next.date)}`);
-      activeAppointments = (nextDayResult?.appointments || []).filter((a) => {
-        const status = String(a.status || '').toLowerCase();
-        return status !== 'completed' && status !== 'cancelled';
-      });
-      if (scheduleTitle) scheduleTitle.textContent = `Next: ${formatScheduleDate(next.date)}`;
+  if (reminderModeEnabled) {
+    const fromDate = state.viewAll ? targetDate : today;
+    activeAppointments = reminderQueue.filter((a) => typeof a.date === 'string' && a.date >= fromDate);
+    if (scheduleTitle) {
+      scheduleTitle.textContent = state.viewAll
+        ? `Upcoming Reminders from ${formatScheduleDate(fromDate)}`
+        : 'Upcoming Reminders';
+    }
+  } else {
+    if (state.viewAll) {
+      activeAppointments = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= targetDate);
+      if (scheduleTitle) scheduleTitle.textContent = `Upcoming from ${formatScheduleDate(targetDate)}`;
     } else if (scheduleTitle) {
-      scheduleTitle.textContent = `Today's ${getEntryWordPluralTitle()}`;
+      scheduleTitle.textContent = isTargetToday
+        ? `Today's ${getEntryWordPluralTitle()}`
+        : `${getEntryWordPluralTitle()}: ${formatScheduleDate(targetDate)}`;
+    }
+
+    if (!state.viewAll && !todayAppointments.length && isTargetToday) {
+      // Fall back to the next upcoming day from all appointments.
+      const upcomingFiltered = allActiveAppointments.filter((a) => typeof a.date === 'string' && a.date >= today);
+
+      const next = upcomingFiltered[0];
+      if (next?.date && next.date > today) {
+        // next upcoming day — need to fetch that day specifically
+        const nextDayResult = await api(`/api/appointments?date=${encodeURIComponent(next.date)}`);
+        activeAppointments = (nextDayResult?.appointments || []).filter((a) => {
+          const status = String(a.status || '').toLowerCase();
+          return status !== 'completed' && status !== 'cancelled';
+        });
+        if (scheduleTitle) scheduleTitle.textContent = `Next: ${formatScheduleDate(next.date)}`;
+      } else if (scheduleTitle) {
+        scheduleTitle.textContent = `Today's ${getEntryWordPluralTitle()}`;
+      }
     }
   }
 
@@ -3495,14 +3764,14 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     });
 
   renderStats(effectiveStats, { nextReminder });
-  if (!reminderModeEnabled) {
-    renderTimeline(activeAppointments, {
-      emptyMessage: state.viewAll
+  renderTimeline(activeAppointments, {
+    emptyMessage: reminderModeEnabled
+      ? 'No upcoming reminders.'
+      : (state.viewAll
         ? `No upcoming ${getEntryWordPlural()} from this day onward.`
-        : `No ${getEntryWordPlural()} for this day yet.`,
-      includeDate: state.viewAll
-    });
-  }
+        : `No ${getEntryWordPlural()} for this day yet.`),
+    includeDate: state.viewAll || reminderModeEnabled
+  });
   renderCompletedAppointments(completedAppointments);
   renderTypes(types);
   renderInsights(insights);
@@ -3532,6 +3801,7 @@ async function submitAppointment(e) {
     payload.typeId = state.selectedTypeId;
   }
   payload.durationMinutes = Number(payload.durationMinutes || 45);
+  payload.reminderOffsetMinutes = Number(payload.reminderOffsetMinutes == null ? 10 : payload.reminderOffsetMinutes);
 
   const submitButton = form.querySelector('button[type="submit"]');
   const oldText = submitButton.textContent;
@@ -3715,6 +3985,15 @@ async function loadSettings() {
 
   const reminderToggle = document.getElementById('settings-reminder-mode');
   if (reminderToggle) reminderToggle.checked = state.reminderMode;
+  const browserNotifToggle = document.getElementById('settings-browser-notifications');
+  if (browserNotifToggle) {
+    browserNotifToggle.checked = Boolean(state.browserNotificationsEnabled);
+    if (!canUseBrowserNotifications()) {
+      browserNotifToggle.checked = false;
+      browserNotifToggle.disabled = true;
+      browserNotifToggle.title = 'Browser notifications are not supported in this browser.';
+    }
+  }
   applyReminderModeUi();
 
   // Populate the export type chips
@@ -3726,6 +4005,7 @@ async function loadSettings() {
   }
 
   await loadAiImportQuotaIndicator();
+  if (state.browserNotificationsEnabled) startReminderNotificationPolling();
 }
 
 function triggerJsonDownload(filename, data) {
@@ -4382,6 +4662,7 @@ async function ensureAuth() {
     state.authShellDismissed = false;
     updateAccountUi();
     hideAuthShell();
+    if (state.browserNotificationsEnabled) startReminderNotificationPolling();
     return true;
   } catch (error) {
     if (error?.code === 'OFFLINE' || error?.code === 'NETWORK') {
@@ -4391,18 +4672,21 @@ async function ensureAuth() {
         state.currentBusiness = snapshot.business;
         updateAccountUi();
         hideAuthShell();
+        if (state.browserNotificationsEnabled) startReminderNotificationPolling();
         return true;
       }
       // Offline without a cached auth snapshot: keep shell hidden so offline
       // queueing/creation UX is still usable until connectivity returns.
       state.currentUser = null;
       state.currentBusiness = null;
+      stopReminderNotificationPolling();
       updateAccountUi();
       hideAuthShell();
       return false;
     }
     state.currentUser = null;
     state.currentBusiness = null;
+    stopReminderNotificationPolling();
     saveAuthSnapshot(null, null);
     updateAccountUi();
     showAuthShell();
@@ -4597,6 +4881,7 @@ function bindAuthUi() {
     }
     state.currentUser = null;
     state.currentBusiness = null;
+    stopReminderNotificationPolling();
     saveAuthSnapshot(null, null);
     updateAccountUi();
     showAuthShell();
@@ -4658,6 +4943,64 @@ function bindForms() {
   document.getElementById('settings-mobile-nav-bottom-tabs')?.addEventListener('change', (e) => {
     const nextMode = applyMobileNavMode(e.currentTarget?.checked ? 'bottom' : 'sidebar');
     showToast(nextMode === 'bottom' ? 'Bottom tabs enabled on mobile' : 'Sidebar menu enabled on mobile', 'success');
+  });
+
+  document.getElementById('settings-browser-notifications')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.currentTarget?.checked);
+    if (!canUseBrowserNotifications()) {
+      showToast('Browser notifications are not supported in this browser.', 'error');
+      e.currentTarget.checked = false;
+      return;
+    }
+
+    if (checked) {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        state.browserNotificationsEnabled = false;
+        setStoredValue(BROWSER_NOTIFICATIONS_KEY, false);
+        e.currentTarget.checked = false;
+        showToast('Browser notification permission was not granted.', 'info');
+        stopReminderNotificationPolling();
+        return;
+      }
+    }
+
+    state.browserNotificationsEnabled = checked;
+    setStoredValue(BROWSER_NOTIFICATIONS_KEY, checked);
+    if (checked) {
+      startReminderNotificationPolling();
+      showToast('Desktop reminder notifications enabled.', 'success');
+    } else {
+      stopReminderNotificationPolling();
+      showToast('Desktop reminder notifications disabled.', 'success');
+    }
+  });
+
+  document.getElementById('btn-test-browser-notification')?.addEventListener('click', async () => {
+    if (!canUseBrowserNotifications()) {
+      showToast('Browser notifications are not supported in this browser.', 'error');
+      return;
+    }
+
+    let permission = getNotificationPermission();
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission();
+    }
+    if (permission !== 'granted') {
+      showToast('Browser notification permission was not granted.', 'info');
+      return;
+    }
+
+    const notification = new Notification('Test notification', {
+      body: 'Desktop notifications are working for this app.',
+      tag: 'test-browser-notification',
+      renotify: true
+    });
+    notification.onclick = () => {
+      try { window.focus(); } catch (_error) { }
+      notification.close();
+    };
+    showToast('Test notification sent.', 'success');
   });
 
   BUSINESS_HOURS_DAYS.forEach((day) => {

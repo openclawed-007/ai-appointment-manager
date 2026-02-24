@@ -77,6 +77,10 @@ body.dashboard-stats-collapsed .stats-grid {
     border-color: var(--border-strong);
 }
 
+.stat-card.is-clickable {
+    cursor: pointer;
+}
+
 /* Colored left accent bar */
 .stat-accent {
     width: 4px;
@@ -150,6 +154,16 @@ body.dashboard-stats-collapsed .stats-grid {
     color: var(--text);
     line-height: 1;
     letter-spacing: -0.03em;
+}
+
+.stat-value.is-reminder-title {
+    font-family: var(--font-primary);
+    font-size: 1.02rem;
+    line-height: 1.25;
+    letter-spacing: 0;
+    font-weight: 700;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .stat-label {

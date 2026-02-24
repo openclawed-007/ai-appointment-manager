@@ -774,6 +774,21 @@
                                     </div>
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
+                                            <strong>Desktop reminder notifications</strong>
+                                            <small>Show browser notifications on this device when reminders are due.</small>
+                                            <div style="margin-top:8px;">
+                                                <button type="button" class="btn-secondary" id="btn-test-browser-notification">Test Notification</button>
+                                            </div>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="settings-browser-notifications" />
+                                            <span class="toggle-switch-track">
+                                                <span class="toggle-switch-thumb"></span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div class="settings-toggle-item">
+                                        <div class="settings-toggle-copy">
                                             <strong>Mobile navigation style</strong>
                                             <small>Enabled: <span id="settings-mobile-nav-mode-label">Bottom
                                                     Tabs</span></small>
@@ -1164,6 +1179,19 @@
                                     <option value="45" selected>45 minutes</option>
                                     <option value="60">60 minutes</option>
                                     <option value="90">90 minutes</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="appt-reminder-offset">Notify</label>
+                                <select id="appt-reminder-offset" name="reminderOffsetMinutes">
+                                    <option value="0">At time of event</option>
+                                    <option value="5">5 minutes before</option>
+                                    <option value="10" selected>10 minutes before</option>
+                                    <option value="15">15 minutes before</option>
+                                    <option value="30">30 minutes before</option>
+                                    <option value="60">1 hour before</option>
+                                    <option value="120">2 hours before</option>
+                                    <option value="1440">1 day before</option>
                                 </select>
                             </div>
                         </div>

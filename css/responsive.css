@@ -269,6 +269,11 @@
         font-size: 1.15rem;
     }
 
+    .stat-value.is-reminder-title {
+        font-size: 0.82rem;
+        line-height: 1.2;
+    }
+
     .stat-label {
         font-size: 0.6rem;
         letter-spacing: 0.06em;
@@ -276,6 +281,15 @@
 
     .stat-hint {
         display: none;
+    }
+
+    body.reminder-mode #stat-card-pending .stat-hint {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.62rem;
+        line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 
     .card-header {
