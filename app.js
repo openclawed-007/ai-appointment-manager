@@ -4898,15 +4898,20 @@ function bindAuthUi() {
 
 async function configureDevLoginVisibility() {
   const devBtn = document.getElementById('btn-dev-login');
-  if (!devBtn) return;
-  devBtn.classList.add('hidden');
+  const testNotificationBtn = document.getElementById('btn-test-browser-notification');
+  if (devBtn) devBtn.classList.add('hidden');
+  if (testNotificationBtn) testNotificationBtn.classList.add('hidden');
+  if (!devBtn && !testNotificationBtn) return;
   try {
     const response = await fetch('/api/health', { credentials: 'same-origin' });
     if (!response.ok) return;
     const body = await response.json().catch(() => ({}));
-    devBtn.classList.toggle('hidden', !body.devLoginEnabled);
+    const showDevOnlyControls = Boolean(body.devLoginEnabled);
+    if (devBtn) devBtn.classList.toggle('hidden', !showDevOnlyControls);
+    if (testNotificationBtn) testNotificationBtn.classList.toggle('hidden', !showDevOnlyControls);
   } catch (_error) {
-    devBtn.classList.add('hidden');
+    if (devBtn) devBtn.classList.add('hidden');
+    if (testNotificationBtn) testNotificationBtn.classList.add('hidden');
   }
 }
 
