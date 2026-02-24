@@ -564,6 +564,10 @@
     gap: 4px;
 }
 
+body.reminder-mode .mobile-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .mobile-nav-item {
     border: 1px solid transparent;
     border-radius: 14px;

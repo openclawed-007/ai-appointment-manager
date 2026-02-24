@@ -48,6 +48,7 @@ const state = {
   notificationMenuAnchorEl: null,
   currentUser: null,
   currentBusiness: null,
+  reminderMode: getStoredBoolean('reminderMode'),
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
   dashboardStatsCollapsed: getStoredBoolean('dashboardStatsCollapsed'),
   calendarViewMode: 'month',
@@ -87,6 +88,7 @@ const GLOBAL_SEARCH_SETTINGS_OPTIONS = [
   { label: 'Sunday Hours', targetId: 'settings-hours-sun-open', sectionSelector: '#settings-section-profile', keywords: ['sunday', 'sun', 'hours'] },
   { label: 'Theme', targetId: 'settings-theme-light', sectionSelector: '#settings-section-appearance', keywords: ['theme', 'dark', 'light'] },
   { label: 'Accent Color', targetId: 'settings-section-appearance', sectionSelector: '#settings-section-appearance', keywords: ['accent', 'color', 'green', 'blue', 'red', 'purple', 'amber'] },
+  { label: 'Reminder Mode', targetId: 'settings-reminder-mode', sectionSelector: '#settings-section-appearance', keywords: ['reminder', 'mode', 'appointments'] },
   { label: 'Mobile Navigation Mode', targetId: 'settings-mobile-nav-bottom-tabs', sectionSelector: '#settings-section-appearance', keywords: ['mobile', 'navigation', 'bottom', 'tabs', 'sidebar'] },
   { label: 'Calendar Client Names', targetId: 'settings-calendar-show-client-names', sectionSelector: '#settings-section-appearance', keywords: ['calendar', 'client', 'names', 'dots'] },
   { label: 'Owner Email Notifications', targetId: 'settings-notify-owner-email', sectionSelector: '#settings-section-appearance', keywords: ['notify', 'notification', 'owner', 'email'] },
@@ -180,6 +182,145 @@ function collectBusinessHoursFromForm({ validate = true } = {}) {
     result[day] = { closed, openTime, closeTime };
   }
   return result;
+}
+
+function isReminderModeEnabled() {
+  return Boolean(state.reminderMode);
+}
+
+function getEntryWordPlural() {
+  return isReminderModeEnabled() ? 'reminders' : 'appointments';
+}
+
+function getEntryWordSingularTitle() {
+  return isReminderModeEnabled() ? 'Reminder' : 'Appointment';
+}
+
+function getEntryWordPluralTitle() {
+  return isReminderModeEnabled() ? 'Reminders' : 'Appointments';
+}
+
+function applyReminderModeUi() {
+  const reminderMode = isReminderModeEnabled();
+  document.body.classList.toggle('reminder-mode', reminderMode);
+
+  const setText = (selector, value) => {
+    const node = document.querySelector(selector);
+    if (node) node.textContent = value;
+  };
+
+  const entrySingularTitle = getEntryWordSingularTitle();
+  const entryPluralTitle = getEntryWordPluralTitle();
+  const entryPlural = getEntryWordPlural();
+
+  setText('#nav-appointments span', entryPluralTitle);
+  setText('.mobile-nav-item[data-view="appointments"] span', reminderMode ? 'Reminders' : 'Appts');
+  setText('section[data-view="appointments"] .card-header h2', `All ${entryPluralTitle}`);
+  setText('#btn-new-appointment span', `New ${entrySingularTitle}`);
+  setText('#stat-card-today .stat-hint', `${entryPlural} today`);
+  setText('#stat-card-week .stat-hint', reminderMode ? 'scheduled this week' : 'booked this week');
+  setText('#stat-card-pending .stat-hint', reminderMode ? 'awaiting completion' : 'awaiting confirmation');
+
+  const searchInput = document.getElementById('global-search');
+  if (searchInput) {
+    searchInput.placeholder = reminderMode
+      ? 'Search reminders, notes, or types...'
+      : 'Search appointments, clients, or types...';
+  }
+
+  const openCloseRow = document.getElementById('settings-open-close-row');
+  const businessHoursSection = document.getElementById('settings-business-hours-section');
+  if (openCloseRow) openCloseRow.classList.toggle('hidden', reminderMode);
+  if (businessHoursSection) businessHoursSection.classList.toggle('hidden', reminderMode);
+
+  const openInput = document.getElementById('settings-open-time');
+  const closeInput = document.getElementById('settings-close-time');
+  if (openInput) openInput.disabled = reminderMode;
+  if (closeInput) closeInput.disabled = reminderMode;
+
+  const scheduleCard = document.querySelector('.schedule-card');
+  if (scheduleCard) {
+    if (reminderMode) {
+      scheduleCard.setAttribute('hidden', 'hidden');
+      scheduleCard.classList.add('hidden');
+    } else {
+      scheduleCard.removeAttribute('hidden');
+      scheduleCard.classList.remove('hidden');
+    }
+  }
+
+  const dashboardAiInsightsCard = document.querySelector('section[data-view="dashboard"] .card.ai-insights');
+  if (dashboardAiInsightsCard) {
+    if (reminderMode) {
+      dashboardAiInsightsCard.setAttribute('hidden', 'hidden');
+      dashboardAiInsightsCard.classList.add('hidden');
+    } else {
+      dashboardAiInsightsCard.removeAttribute('hidden');
+      dashboardAiInsightsCard.classList.remove('hidden');
+    }
+  }
+
+  document.querySelectorAll('.nav-item[data-view="ai"], .mobile-nav-item[data-view="ai"]').forEach((node) => {
+    if (reminderMode) {
+      node.setAttribute('hidden', 'hidden');
+      node.classList.add('hidden');
+    } else {
+      node.removeAttribute('hidden');
+      node.classList.remove('hidden');
+    }
+  });
+  const aiView = document.querySelector('.app-view[data-view="ai"]');
+  if (aiView) {
+    if (reminderMode) {
+      aiView.setAttribute('hidden', 'hidden');
+      aiView.classList.add('hidden');
+    } else {
+      aiView.removeAttribute('hidden');
+      aiView.classList.remove('hidden');
+    }
+  }
+  if (reminderMode && getActiveView() === 'ai') {
+    setActiveView('dashboard');
+  }
+
+  document.querySelectorAll('.nav-item[data-view="types"], .mobile-nav-item[data-view="types"]').forEach((node) => {
+    if (reminderMode) {
+      node.setAttribute('hidden', 'hidden');
+      node.classList.add('hidden');
+    } else {
+      node.removeAttribute('hidden');
+      node.classList.remove('hidden');
+    }
+  });
+  const typesView = document.querySelector('.app-view[data-view="types"]');
+  if (typesView) {
+    if (reminderMode) {
+      typesView.setAttribute('hidden', 'hidden');
+      typesView.classList.add('hidden');
+    } else {
+      typesView.removeAttribute('hidden');
+      typesView.classList.remove('hidden');
+    }
+  }
+  const manageTypesBtn = document.getElementById('btn-manage-types');
+  const dashboardTypesCard = manageTypesBtn?.closest('.card');
+  if (dashboardTypesCard) {
+    if (reminderMode) {
+      dashboardTypesCard.setAttribute('hidden', 'hidden');
+      dashboardTypesCard.classList.add('hidden');
+    } else {
+      dashboardTypesCard.removeAttribute('hidden');
+      dashboardTypesCard.classList.remove('hidden');
+    }
+  }
+  if (reminderMode && getActiveView() === 'types') {
+    setActiveView('dashboard');
+  }
+
+  const typeHeader = document.querySelector('section[data-view="dashboard"] .card .card-header h2');
+  if (typeHeader && (typeHeader.textContent === 'Appointment Types' || typeHeader.textContent === 'Reminder Types')) {
+    typeHeader.textContent = `${entrySingularTitle} Types`;
+  }
 }
 
 function normalizeMobileNavMode(mode) {
@@ -293,13 +434,24 @@ function updateAppointmentEditorUi(isEditing) {
   const title = document.getElementById('new-appointment-title');
   const subtitle = document.getElementById('new-appointment-subtitle');
   const submit = document.querySelector('#appointment-form button[type="submit"]');
-  if (title) title.textContent = isEditing ? 'Edit Appointment' : 'Create Appointment';
+  const reminderModeEnabled = isReminderModeEnabled();
+  const entryWord = getEntryWordSingularTitle();
+  if (title) title.textContent = isEditing ? `Edit ${entryWord}` : `Create ${entryWord}`;
   if (subtitle) {
     subtitle.textContent = isEditing
-      ? 'Update details for this booking.'
-      : 'Add client details, lock a slot, and send confirmation.';
+      ? `Update details for this ${entryWord.toLowerCase()}.`
+      : reminderModeEnabled
+        ? 'Capture a reminder with date and time.'
+        : 'Add client details, lock a slot, and send confirmation.';
   }
-  if (submit) submit.textContent = isEditing ? 'Save Changes' : 'Create Appointment';
+  if (submit) submit.textContent = isEditing ? 'Save Changes' : `Create ${entryWord}`;
+
+  const clientNameLabel = document.querySelector('label[for="appt-client-name"]');
+  if (clientNameLabel) clientNameLabel.textContent = isReminderModeEnabled() ? 'Reminder' : 'Client Name';
+  const clientNameInput = document.getElementById('appt-client-name');
+  if (clientNameInput) {
+    clientNameInput.placeholder = isReminderModeEnabled() ? 'e.g. Pay rent' : 'e.g. Jane Smith';
+  }
 }
 
 function fillAppointmentForm(appointment) {
@@ -516,12 +668,15 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     ? normalizeAppointmentLocation(appointment.location)
     : resolveDefaultLocationForType(defaultType);
   const defaultClientName = String(appointment?.clientName || '');
-  const defaultEntryMode = String(appointment?.source || '').toLowerCase() === 'reminder' ? 'reminder' : 'appointment';
+  const reminderModeEnabled = isReminderModeEnabled();
+  const defaultEntryMode = reminderModeEnabled
+    ? 'reminder'
+    : (String(appointment?.source || '').toLowerCase() === 'reminder' ? 'reminder' : 'appointment');
   const isEditing = state.quickCreateAppointmentId != null;
-  const lockReminderMode = isEditing && defaultEntryMode === 'reminder';
+  const lockReminderMode = reminderModeEnabled || (isEditing && defaultEntryMode === 'reminder');
   const quickCreateTitle = isEditing
     ? (defaultEntryMode === 'reminder' ? 'Edit Reminder' : 'Edit Appointment')
-    : 'Quick Add Appointment';
+    : `Quick Add ${reminderModeEnabled ? 'Reminder' : 'Appointment'}`;
   const typeOptions = state.types.length
     ? state.types.map((t) =>
       `<option value="${Number(t.id)}" data-duration="${Number(t.durationMinutes || 45)}" ${Number(t.id) === defaultTypeId ? 'selected' : ''}>${escapeHtml(t.name)} (${Number(t.durationMinutes || 45)}m)</option>`
@@ -622,10 +777,10 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     try {
       const result = await queueAwareMutation(`/api/appointments/${state.quickCreateAppointmentId}`, { method: 'DELETE' }, {
         allowOfflineQueue: true,
-        description: 'Appointment deletion'
+        description: isReminderDelete ? 'Reminder deletion' : 'Appointment deletion'
       });
       closeQuickCreateMenu();
-      if (!result.queued) showToast('Appointment removed.', 'success');
+      if (!result.queued) showToast(isReminderDelete ? 'Reminder removed.' : 'Appointment removed.', 'success');
       const targetDate = state.selectedDate || state.quickCreateDate || date;
       await loadDashboard(targetDate, { refreshDots: false });
       await loadAppointmentsTable();
@@ -716,7 +871,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         body: JSON.stringify(payload)
       }, {
         allowOfflineQueue: true,
-        description: isUpdate ? 'Appointment update' : 'Appointment creation'
+        description: isUpdate ? (isReminder ? 'Reminder update' : 'Appointment update') : (isReminder ? 'Reminder creation' : 'Appointment creation')
       });
 
       closeQuickCreateMenu();
@@ -812,7 +967,7 @@ async function openNotificationsMenu(anchorEl) {
           </button>
         `)
         .join('')
-      : '<div class="notification-empty">No pending appointments right now.</div>';
+      : `<div class="notification-empty">No pending ${getEntryWordPlural()} right now.</div>`;
 
     menu.innerHTML = `
       <div class="notifications-header">
@@ -834,12 +989,12 @@ async function openNotificationsMenu(anchorEl) {
         </div>
       </div>
       <div class="notifications-section">
-        <div class="notifications-section-title">Pending appointments</div>
+        <div class="notifications-section-title">Pending ${escapeHtml(getEntryWordPlural())}</div>
         <div class="notifications-list">${pendingItems}</div>
       </div>
       <div class="notifications-actions">
         <button type="button" class="btn-secondary" id="notifications-open-dashboard">Open Dashboard</button>
-        <button type="button" class="btn-primary" id="notifications-open-appointments">Review Appointments</button>
+        <button type="button" class="btn-primary" id="notifications-open-appointments">Review ${escapeHtml(getEntryWordPluralTitle())}</button>
       </div>
     `;
 
@@ -939,7 +1094,7 @@ async function openCancelReasonMenu(appointmentId, date = '') {
 
   menu.innerHTML = `
     <div class="email-menu-header">
-      <h3>Cancel Appointment</h3>
+      <h3>Cancel ${escapeHtml(getEntryWordSingularTitle())}</h3>
       <button type="button" class="email-menu-close cancel-menu-close" aria-label="Close cancel menu">×</button>
     </div>
     <div class="cancel-menu-body">
@@ -1033,7 +1188,7 @@ async function openEmailComposerMenu(appointmentId) {
     <div class="email-custom-fields hidden">
       <div class="form-group">
         <label>Subject</label>
-        <input name="emailSubject" type="text" placeholder="Message about your appointment" />
+        <input name="emailSubject" type="text" placeholder="Message about your ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}" />
       </div>
       <div class="form-group">
         <label>Message</label>
@@ -1146,16 +1301,16 @@ async function openDayMenu(anchorEl, date) {
               <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
               <div class="day-menu-item-actions hidden" data-actions-for="${a.id}">
                 ${a.clientEmail
-            ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email appointment details">Email</button>`
+            ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email ${escapeHtml(getEntryWordSingularTitle().toLowerCase())} details">Email</button>`
             : ''
           }
                 ${a.status === 'pending'
-            ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm appointment">Confirm</button>`
+            ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Confirm</button>`
             : ''
           }
-                <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit appointment">Edit</button>
-                <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel appointment">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
-                <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete appointment">Delete</button>
+                <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Edit</button>
+                <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
+                <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Delete</button>
               </div>
             </div>
           </div>`
@@ -1168,10 +1323,10 @@ async function openDayMenu(anchorEl, date) {
         <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
       </div>
       <div class="day-menu-actions">
-        <button type="button" class="btn-primary day-menu-add">Add Appointment</button>
+        <button type="button" class="btn-primary day-menu-add">Add ${escapeHtml(getEntryWordSingularTitle())}</button>
       </div>
       <div class="day-menu-list">
-        ${items || '<div class="day-menu-empty">No appointments for this day.</div>'}
+        ${items || `<div class="day-menu-empty">No ${escapeHtml(getEntryWordPlural())} for this day.</div>`}
       </div>
     `;
 
@@ -1301,9 +1456,9 @@ async function openDayMenu(anchorEl, date) {
         <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
       </div>
       <div class="day-menu-actions">
-        <button type="button" class="btn-primary day-menu-add-offline">Add Appointment</button>
+        <button type="button" class="btn-primary day-menu-add-offline">Add ${escapeHtml(getEntryWordSingularTitle())}</button>
       </div>
-      <div class="day-menu-empty">Could not load this day while offline. You can still add an appointment.</div>
+      <div class="day-menu-empty">Could not load this day while offline. You can still add a ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}.</div>
     `;
     menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
     menu.querySelector('.day-menu-add-offline')?.addEventListener('click', () => {
@@ -1364,10 +1519,11 @@ function toTimeCompact(time24 = '09:00') {
 }
 
 function getCalendarPreviewLabel(appointment = {}) {
+  const fallback = getEntryWordSingularTitle();
   if (state.calendarShowClientNames) {
-    return appointment.clientName || appointment.typeName || appointment.title || 'Appointment';
+    return appointment.clientName || appointment.typeName || appointment.title || fallback;
   }
-  return appointment.typeName || appointment.title || appointment.clientName || 'Appointment';
+  return appointment.typeName || appointment.title || appointment.clientName || fallback;
 }
 
 function normalizeAppointmentLocation(value = '') {
@@ -1757,6 +1913,8 @@ function applyViewSelection(activeView) {
 function resolveView(view) {
   const views = [...document.querySelectorAll('.app-view')];
   const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
+  if (isReminderModeEnabled() && view === 'ai') view = 'dashboard';
+  if (isReminderModeEnabled() && view === 'types') view = 'dashboard';
   if (view === 'calendar') view = 'dashboard';
   const fallbackView = availableViews.has('dashboard') ? 'dashboard' : views[0]?.dataset.view;
   const activeView = availableViews.has(view) ? view : fallbackView;
@@ -1992,6 +2150,9 @@ function renderCalendarGrid() {
 }
 
 function getCalendarDisplayRangeMinutes() {
+  if (isReminderModeEnabled()) {
+    return { start: 0, end: 24 * 60 };
+  }
   const defaultOpen = '08:00';
   const defaultClose = '18:00';
   const openRaw = document.getElementById('settings-open-time')?.value || defaultOpen;
@@ -2075,7 +2236,7 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
         ? `<div class="week-event-more">+${appointments.length - 2} more</div>`
         : '';
       return `
-        <button type="button" class="${classes.join(' ')}" data-slot-date="${date}" data-slot-time="${time24}" aria-label="Add appointment on ${escapeHtml(formatMenuDate(date))} at ${escapeHtml(toTime12(time24))}">
+        <button type="button" class="${classes.join(' ')}" data-slot-date="${date}" data-slot-time="${time24}" aria-label="Add ${escapeHtml(getEntryWordSingularTitle().toLowerCase())} on ${escapeHtml(formatMenuDate(date))} at ${escapeHtml(toTime12(time24))}">
           <div class="week-slot-content">${chips}${more}</div>
         </button>`;
     }).join('');
@@ -2202,7 +2363,7 @@ function bindCalendarNav() {
         if (btn) btn.textContent = 'View All';
         void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          showToast('Offline mode: open a time slot to create an appointment.', 'info');
+          showToast(`Offline mode: open a time slot to create a ${getEntryWordSingularTitle().toLowerCase()}.`, 'info');
           return;
         }
         void openDayMenu(dayHeader, date).catch(swallowBackgroundAsyncError);
@@ -2274,7 +2435,7 @@ function bindCalendarNav() {
     const selectedDate = state.selectedDate;
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       openNewAppointmentModalForDate(selectedDate);
-      showToast('Offline mode: creating appointment for selected date.', 'info');
+      showToast(`Offline mode: creating ${getEntryWordSingularTitle().toLowerCase()} for selected date.`, 'info');
       return;
     }
     if (selectedCell) void openDayMenu(selectedCell, selectedDate).catch(swallowBackgroundAsyncError);
@@ -2664,10 +2825,43 @@ function bindAppointmentFormEnhancements() {
   syncTimeBuilderFromInput(form);
 }
 
-function renderStats(stats = {}) {
+function renderStats(stats = {}, options = {}) {
+  const reminderModeEnabled = isReminderModeEnabled();
+  const nextReminder = options.nextReminder || null;
   document.getElementById('stat-today').textContent = stats.today ?? 0;
   document.getElementById('stat-week').textContent = stats.week ?? 0;
-  document.getElementById('stat-pending').textContent = stats.pending ?? 0;
+
+  const pendingLabel = document.querySelector('#stat-card-pending .stat-label');
+  const pendingValue = document.getElementById('stat-pending');
+  const pendingHint = document.querySelector('#stat-card-pending .stat-hint');
+  if (reminderModeEnabled) {
+    if (pendingLabel) pendingLabel.textContent = 'Upcoming';
+    if (nextReminder?.date && nextReminder?.time) {
+      if (pendingValue) pendingValue.textContent = toTime12(nextReminder.time);
+      if (pendingHint) {
+        const reminderText = String(
+          nextReminder.clientName || nextReminder.title || nextReminder.typeName || 'Reminder'
+        ).trim();
+        const shortReminderText = reminderText.length > 42 ? `${reminderText.slice(0, 39)}...` : reminderText;
+        if (String(nextReminder.date).slice(0, 10) === localYmd()) {
+          pendingHint.textContent = `Today • ${shortReminderText}`;
+        } else {
+          const dt = new Date(`${String(nextReminder.date).slice(0, 10)}T00:00:00`);
+          const dayLabel = Number.isNaN(dt.getTime())
+            ? String(nextReminder.date).slice(0, 10)
+            : dt.toLocaleDateString('en-US', { weekday: 'long' });
+          pendingHint.textContent = `${dayLabel} • ${shortReminderText}`;
+        }
+      }
+    } else {
+      if (pendingValue) pendingValue.textContent = '--';
+      if (pendingHint) pendingHint.textContent = 'No upcoming reminder';
+    }
+  } else {
+    if (pendingLabel) pendingLabel.textContent = 'Pending';
+    if (pendingValue) pendingValue.textContent = stats.pending ?? 0;
+  }
+
   state.unreadNotifications = Number(stats.pending || 0);
   renderNotificationDots(state.unreadNotifications);
 }
@@ -2832,7 +3026,7 @@ async function refreshCalendarDots(options = {}) {
 function renderTimeline(appointments = [], options = {}) {
   const root = document.getElementById('timeline-list');
   if (!root) return;
-  const emptyMessage = options.emptyMessage || 'No appointments for this day yet.';
+  const emptyMessage = options.emptyMessage || `No ${getEntryWordPlural()} for this day yet.`;
   const includeDate = Boolean(options.includeDate);
   if (!appointments.length) {
     root.innerHTML = `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
@@ -2911,7 +3105,7 @@ function renderCompletedAppointments(appointments = []) {
   const root = document.getElementById('completed-list');
   if (!root) return;
   if (!appointments.length) {
-    root.innerHTML = '<div class="empty-state">No completed appointments yet.</div>';
+    root.innerHTML = `<div class="empty-state">No completed ${getEntryWordPlural()} yet.</div>`;
     return;
   }
 
@@ -2921,7 +3115,7 @@ function renderCompletedAppointments(appointments = []) {
       <div class="completed-item">
         <div class="completed-item-main">
           <strong class="client-name">${escapeHtml(a.clientName || 'Client')}</strong>
-          <span class="appointment-type-tag">${escapeHtml(a.typeName || a.title || 'Appointment')}</span>
+          <span class="appointment-type-tag">${escapeHtml(a.typeName || a.title || getEntryWordSingularTitle())}</span>
         </div>
         <div class="completed-item-meta">
           <span>${escapeHtml(formatScheduleDate(a.date))}</span>
@@ -3051,9 +3245,10 @@ function renderInsights(insights = []) {
 
 function renderAppointmentsTable(appointments = []) {
   const root = document.getElementById('appointments-table');
+  const reminderModeEnabled = isReminderModeEnabled();
   if (!root) return;
   if (!appointments.length) {
-    root.innerHTML = '<div class="empty-state">No appointments found.</div>';
+    root.innerHTML = `<div class="empty-state">No ${getEntryWordPlural()} found.</div>`;
     return;
   }
 
@@ -3071,17 +3266,24 @@ function renderAppointmentsTable(appointments = []) {
         <div class="appointment-time-cell">${toTime12(a.time)}</div>
         <div><span class="status-badge ${statusClass}">${escapeHtml(a.status)}</span></div>
         <div class="row-actions">
-          ${a.clientEmail
-            ? '<button class="btn-secondary btn-email" type="button" title="Send Email">Email</button>'
-            : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
+          ${reminderModeEnabled
+            ? ''
+            : (
+              a.clientEmail
+                ? '<button class="btn-secondary btn-email" type="button" title="Send Email">Email</button>'
+                : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
+            )
           }
-          ${a.status === 'pending'
-            ? '<button class="btn-secondary btn-confirm-booking" type="button">Confirm</button>'
-            : ''
+          ${reminderModeEnabled || a.status !== 'pending'
+            ? ''
+            : '<button class="btn-secondary btn-confirm-booking" type="button">Confirm</button>'
           }
-          <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>Complete</button>
-          <button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
-          <button class="btn-secondary btn-delete" type="button">Delete</button>
+          <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>${reminderModeEnabled ? 'Done' : 'Complete'}</button>
+          ${reminderModeEnabled
+            ? ''
+            : `<button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>`
+          }
+          <button class="btn-secondary btn-delete" type="button">${reminderModeEnabled ? 'Delete Reminder' : 'Delete'}</button>
         </div>
       </div>`;
       }
@@ -3107,10 +3309,10 @@ function renderAppointmentsTable(appointments = []) {
           body: JSON.stringify({ status: 'completed' })
         }, {
           allowOfflineQueue: true,
-          description: 'Appointment completion'
+          description: reminderModeEnabled ? 'Reminder completion' : 'Appointment completion'
         });
         if (result.queued) return;
-        showToast('Appointment marked completed', 'success');
+        showToast(reminderModeEnabled ? 'Reminder marked done' : 'Appointment marked completed', 'success');
         await loadAppointmentsTable();
         await loadDashboard();
       } catch (error) {
@@ -3167,10 +3369,10 @@ function renderAppointmentsTable(appointments = []) {
       try {
         const result = await queueAwareMutation(`/api/appointments/${id}`, { method: 'DELETE' }, {
           allowOfflineQueue: true,
-          description: 'Appointment deletion'
+          description: reminderModeEnabled ? 'Reminder deletion' : 'Appointment deletion'
         });
         if (result.queued) return;
-        showToast('Appointment deleted', 'success');
+        showToast(reminderModeEnabled ? 'Reminder deleted' : 'Appointment deleted', 'success');
         await loadAppointmentsTable();
         await loadDashboard();
       } catch (error) {
@@ -3190,8 +3392,9 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   const { refreshDots = true, showSkeleton = true } = options;
   const today = localYmd();
   const isTargetToday = targetDate === today;
+  const reminderModeEnabled = isReminderModeEnabled();
 
-  if (showSkeleton) {
+  if (showSkeleton && !reminderModeEnabled) {
     // Show skeleton placeholders while data is loading
     renderSkeleton(document.getElementById('timeline-list'), 3);
     renderSkeleton(document.getElementById('insights-list'), 4);
@@ -3226,6 +3429,34 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       const bKey = `${b.date || ''} ${b.time || ''}`;
       return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
     });
+  const reminderQueue = (upcomingResult?.appointments || [])
+    .filter((a) => {
+      if (String(a.source || '').toLowerCase() !== 'reminder') return false;
+      const status = String(a.status || '').toLowerCase();
+      if (status === 'completed' || status === 'cancelled') return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const aKey = `${a.date || ''} ${a.time || ''}`;
+      const bKey = `${b.date || ''} ${b.time || ''}`;
+      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+    });
+  const nextReminder = reminderQueue[0] || null;
+
+  const effectiveStats = reminderModeEnabled
+    ? (() => {
+      const reminders = (upcomingResult?.appointments || []).filter((a) => String(a.source || '').toLowerCase() === 'reminder');
+      const weekEnd = addDays(parseYmd(targetDate) || new Date(`${targetDate}T00:00:00`), 6).toISOString().slice(0, 10);
+      return {
+        today: reminders.filter((a) => String(a.date || '').slice(0, 10) === targetDate).length,
+        week: reminders.filter((a) => {
+          const d = String(a.date || '').slice(0, 10);
+          return d >= targetDate && d <= weekEnd;
+        }).length,
+        pending: reminders.filter((a) => String(a.status || '').toLowerCase() === 'pending').length
+      };
+    })()
+    : stats;
 
   let activeAppointments = todayAppointments;
   if (state.viewAll) {
@@ -3233,8 +3464,8 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     if (scheduleTitle) scheduleTitle.textContent = `Upcoming from ${formatScheduleDate(targetDate)}`;
   } else if (scheduleTitle) {
     scheduleTitle.textContent = isTargetToday
-      ? "Today's Schedule"
-      : `Schedule: ${formatScheduleDate(targetDate)}`;
+      ? `Today's ${getEntryWordPluralTitle()}`
+      : `${getEntryWordPluralTitle()}: ${formatScheduleDate(targetDate)}`;
   }
 
   if (!state.viewAll && !todayAppointments.length && isTargetToday) {
@@ -3251,7 +3482,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       });
       if (scheduleTitle) scheduleTitle.textContent = `Next: ${formatScheduleDate(next.date)}`;
     } else if (scheduleTitle) {
-      scheduleTitle.textContent = "Today's Schedule";
+      scheduleTitle.textContent = `Today's ${getEntryWordPluralTitle()}`;
     }
   }
 
@@ -3263,11 +3494,15 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       return aKey < bKey ? 1 : -1;
     });
 
-  renderStats(stats);
-  renderTimeline(activeAppointments, {
-    emptyMessage: state.viewAll ? 'No upcoming appointments from this day onward.' : 'No appointments for this day yet.',
-    includeDate: state.viewAll
-  });
+  renderStats(effectiveStats, { nextReminder });
+  if (!reminderModeEnabled) {
+    renderTimeline(activeAppointments, {
+      emptyMessage: state.viewAll
+        ? `No upcoming ${getEntryWordPlural()} from this day onward.`
+        : `No ${getEntryWordPlural()} for this day yet.`,
+      includeDate: state.viewAll
+    });
+  }
   renderCompletedAppointments(completedAppointments);
   renderTypes(types);
   renderInsights(insights);
@@ -3288,7 +3523,14 @@ async function submitAppointment(e) {
   const form = e.currentTarget;
   const payload = Object.fromEntries(new FormData(form).entries());
   const wasEditing = Boolean(state.editingAppointmentId);
-  payload.typeId = state.selectedTypeId;
+  if (isReminderModeEnabled()) {
+    payload.source = 'reminder';
+    payload.title = String(payload.clientName || '').trim();
+    payload.typeId = null;
+    payload.location = 'office';
+  } else {
+    payload.typeId = state.selectedTypeId;
+  }
   payload.durationMinutes = Number(payload.durationMinutes || 45);
 
   const submitButton = form.querySelector('button[type="submit"]');
@@ -3311,9 +3553,11 @@ async function submitAppointment(e) {
         return;
       }
     } else {
+      const sourceMode = String(payload.source || '').toLowerCase();
+      const isReminder = isReminderModeEnabled() || sourceMode === 'reminder';
       const result = await queueAwareMutation('/api/appointments', { method: 'POST', body: JSON.stringify(payload) }, {
         allowOfflineQueue: true,
-        description: 'Appointment creation'
+        description: isReminder ? 'Reminder creation' : 'Appointment creation'
       });
       if (result.queued) {
         form.reset();
@@ -3323,9 +3567,13 @@ async function submitAppointment(e) {
       }
       const provider = result?.body?.notifications?.mode;
       showToast(
-        provider === 'simulation'
-          ? 'Appointment created. Email simulation mode is active.'
-          : 'Appointment created and notifications sent.',
+        isReminder
+          ? 'Reminder created.'
+          : (
+            provider === 'simulation'
+              ? 'Appointment created. Email simulation mode is active.'
+              : 'Appointment created and notifications sent.'
+          ),
         'success'
       );
     }
@@ -3336,7 +3584,7 @@ async function submitAppointment(e) {
     await loadDashboard();
     await loadAppointmentsTable();
     await refreshCalendarDots({ force: true });
-    if (wasEditing) showToast('Appointment updated.', 'success');
+    if (wasEditing) showToast(`${getEntryWordSingularTitle()} updated.`, 'success');
   } catch (error) {
     showToast(error.message, 'error');
   } finally {
@@ -3380,6 +3628,7 @@ async function submitSettings(e) {
   try {
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     data.businessHours = collectBusinessHoursFromForm();
+    data.reminderMode = isReminderModeEnabled();
     const result = await queueAwareMutation('/api/settings', { method: 'PUT', body: JSON.stringify(data) }, {
       allowOfflineQueue: true,
       description: 'Settings update'
@@ -3430,6 +3679,8 @@ async function loadSettings() {
   const { settings } = await api('/api/settings');
   const form = document.getElementById('settings-form');
   if (!form) return;
+  state.reminderMode = settings.reminder_mode === true || settings.reminder_mode === 1;
+  setStoredValue('reminderMode', state.reminderMode);
   form.businessName.value = settings.business_name || '';
   form.ownerEmail.value = settings.owner_email || '';
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
@@ -3461,6 +3712,10 @@ async function loadSettings() {
     const val = settings.notify_owner_email;
     notifyToggle.checked = (val === false || val === 0) ? false : true;
   }
+
+  const reminderToggle = document.getElementById('settings-reminder-mode');
+  if (reminderToggle) reminderToggle.checked = state.reminderMode;
+  applyReminderModeUi();
 
   // Populate the export type chips
   populateExportTypeFilters();
@@ -4469,6 +4724,34 @@ function bindForms() {
     }
   });
 
+  document.getElementById('settings-reminder-mode')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.currentTarget?.checked);
+    const previous = state.reminderMode;
+    state.reminderMode = checked;
+    setStoredValue('reminderMode', checked);
+    applyReminderModeUi();
+    try {
+      const result = await queueAwareMutation('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ reminderMode: checked })
+      }, {
+        allowOfflineQueue: true,
+        description: 'Reminder mode update'
+      });
+      if (!result.queued) {
+        showToast(checked ? 'Reminder mode enabled' : 'Appointment mode enabled', 'success');
+      }
+      await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
+      await refreshCalendarDots({ force: true });
+    } catch (error) {
+      state.reminderMode = previous;
+      setStoredValue('reminderMode', previous);
+      if (e.currentTarget) e.currentTarget.checked = previous;
+      applyReminderModeUi();
+      showToast(error.message, 'error');
+    }
+  });
+
   // ── Settings: theme selector ──────────────────────────────────────────────
   // Handle clicks on the card labels directly so the theme applies
   // immediately — before the radio `change` event fires.
@@ -4698,6 +4981,7 @@ async function init() {
   bindCollapsiblePanels();
   document.addEventListener('click', handleCollapseToggleClick);
   applyInitialTheme();
+  applyReminderModeUi();
   setupTimezoneSearch();
   setupTimezoneSearch('signup-timezone', 'signup-timezone-suggestions');
 
@@ -4744,6 +5028,8 @@ async function init() {
     await loadDashboard();
     await loadAppointmentsTable();
     await loadSettings();
+    await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
+    await refreshCalendarDots({ force: true });
     await flushOfflineMutationQueue();
     state.apiOnline = true;
 
@@ -4751,7 +5037,7 @@ async function init() {
   } catch (error) {
     if (error?.code === 'OFFLINE') {
       state.apiOnline = false;
-      showToast('You are offline. Reconnect to load the latest appointment data.', 'info');
+      showToast(`You are offline. Reconnect to load the latest ${getEntryWordPlural()} data.`, 'info');
       return;
     }
     if (error?.code === 'NETWORK') {

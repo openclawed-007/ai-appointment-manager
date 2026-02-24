@@ -121,6 +121,10 @@ function resolveBusinessHoursForDate(settings = {}, isoDate = '') {
   return { dayKey, ...forDay, businessHours };
 }
 
+function isReminderModeEnabled(settings = {}) {
+  return settings.reminder_mode === true || settings.reminder_mode === 1;
+}
+
 // Render/Neon deployments run behind a reverse proxy. Trust the first proxy hop
 // so express-rate-limit can read client IP from X-Forwarded-For safely.
 app.set('trust proxy', 1);
@@ -681,6 +685,7 @@ app.get('/api/settings', async (req, res) => {
   res.json({
     settings: {
       ...settings,
+      reminder_mode: isReminderModeEnabled(settings),
       businessHours,
       theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
         ? userPrefs.theme_preference
@@ -691,7 +696,7 @@ app.get('/api/settings', async (req, res) => {
 });
 
 app.put('/api/settings', async (req, res) => {
-  const { businessName, ownerEmail, timezone, notifyOwnerEmail, openTime, closeTime, businessHours } = req.body || {};
+  const { businessName, ownerEmail, timezone, notifyOwnerEmail, reminderMode, openTime, closeTime, businessHours } = req.body || {};
   const incomingTheme = req.body?.theme;
   const incomingAccent = req.body?.accentColor;
   const businessId = req.auth.businessId;
@@ -732,6 +737,9 @@ app.put('/api/settings', async (req, res) => {
   const nextNotifyOwnerEmail = notifyOwnerEmail === undefined
     ? currentSettings.notify_owner_email
     : notifyOwnerEmail;
+  const nextReminderMode = reminderMode === undefined
+    ? isReminderModeEnabled(currentSettings)
+    : Boolean(reminderMode);
   const nextOpenTime = normalizedOpenTime
     || String(currentSettings.open_time || DEFAULT_PUBLIC_BOOKING_OPEN_TIME).slice(0, 5);
   const nextCloseTime = normalizedCloseTime
@@ -742,24 +750,26 @@ app.put('/api/settings', async (req, res) => {
 
   await dbRun(
     `INSERT INTO business_settings
-       (business_id, business_name, owner_email, timezone, notify_owner_email, open_time, close_time, business_hours_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       (business_id, business_name, owner_email, timezone, notify_owner_email, reminder_mode, open_time, close_time, business_hours_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(business_id) DO UPDATE SET
        business_name = excluded.business_name,
        owner_email = excluded.owner_email,
        timezone = excluded.timezone,
        notify_owner_email = excluded.notify_owner_email,
+       reminder_mode = excluded.reminder_mode,
        open_time = excluded.open_time,
        close_time = excluded.close_time,
        business_hours_json = excluded.business_hours_json`,
     `INSERT INTO business_settings
-       (business_id, business_name, owner_email, timezone, notify_owner_email, open_time, close_time, business_hours_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (business_id, business_name, owner_email, timezone, notify_owner_email, reminder_mode, open_time, close_time, business_hours_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (business_id) DO UPDATE SET
        business_name = EXCLUDED.business_name,
        owner_email = EXCLUDED.owner_email,
        timezone = EXCLUDED.timezone,
        notify_owner_email = EXCLUDED.notify_owner_email,
+       reminder_mode = EXCLUDED.reminder_mode,
        open_time = EXCLUDED.open_time,
        close_time = EXCLUDED.close_time,
        business_hours_json = EXCLUDED.business_hours_json`,
@@ -771,6 +781,7 @@ app.put('/api/settings', async (req, res) => {
       USE_POSTGRES
         ? Boolean(nextNotifyOwnerEmail == null ? true : nextNotifyOwnerEmail)
         : Number(Boolean(nextNotifyOwnerEmail == null ? true : nextNotifyOwnerEmail)),
+      USE_POSTGRES ? Boolean(nextReminderMode) : Number(Boolean(nextReminderMode)),
       nextOpenTime,
       nextCloseTime,
       nextBusinessHoursJson
@@ -809,6 +820,7 @@ app.put('/api/settings', async (req, res) => {
   res.json({
     settings: {
       ...settings,
+      reminder_mode: isReminderModeEnabled(settings),
       businessHours: responseBusinessHours,
       theme: (userPrefs?.theme_preference === 'dark' || userPrefs?.theme_preference === 'light')
         ? userPrefs.theme_preference

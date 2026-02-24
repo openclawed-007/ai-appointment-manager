@@ -491,7 +491,7 @@
                                         <div id="timezone-suggestions" class="timezone-suggestions hidden"
                                             role="listbox" aria-label="Timezone suggestions"></div>
                                     </div>
-                                    <div class="form-row">
+                                    <div class="form-row" id="settings-open-close-row">
                                         <div class="form-group">
                                             <label for="settings-open-time">Open Time</label>
                                             <input id="settings-open-time" name="openTime" type="time" value="09:00"
@@ -503,7 +503,7 @@
                                                 required />
                                         </div>
                                     </div>
-                                    <div class="form-group business-hours-group">
+                                    <div class="form-group business-hours-group" id="settings-business-hours-section">
                                         <div class="bh-header-modern">
                                             <label>Weekly Business Hours</label>
                                             <div class="bh-quick-actions">
@@ -760,6 +760,18 @@
 
                                 <!-- Toggle list -->
                                 <div class="settings-toggle-list">
+                                    <div class="settings-toggle-item">
+                                        <div class="settings-toggle-copy">
+                                            <strong>Reminder mode</strong>
+                                            <small>Use reminder wording and show full-day calendar hours.</small>
+                                        </div>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="settings-reminder-mode" />
+                                            <span class="toggle-switch-track">
+                                                <span class="toggle-switch-thumb"></span>
+                                            </span>
+                                        </label>
+                                    </div>
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
                                             <strong>Mobile navigation style</strong>
