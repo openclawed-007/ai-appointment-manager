@@ -1039,6 +1039,15 @@ app.get('/api/clients', async (req, res) => {
   const businessId = req.auth.businessId;
   const query = String(req.query.q || '').trim();
   const stage = String(req.query.stage || '').trim();
+  const liteRaw = String(req.query.lite || '').trim().toLowerCase();
+  const isLite = liteRaw === '1' || liteRaw === 'true';
+  const limitRaw = req.query.limit == null ? '' : String(req.query.limit).trim();
+  const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : null;
+  const limitValue = Number.isFinite(parsedLimit) ? parsedLimit : null;
+  if (limitRaw && (!limitValue || limitValue <= 0 || limitValue > 500)) {
+    return res.status(400).json({ error: 'limit must be between 1 and 500' });
+  }
+  const rowLimit = limitValue || (isLite ? 100 : 500);
   const normalizedStage = stage ? normalizeClientStage(stage, '') : '';
   if (stage && !normalizedStage) {
     return res.status(400).json({ error: `stage must be one of: ${CLIENT_STAGES.join(', ')}` });
@@ -1046,6 +1055,36 @@ app.get('/api/clients', async (req, res) => {
   if (query && query.length < 2) return res.json({ clients: [] });
 
   if (!USE_POSTGRES) {
+    if (isLite) {
+      let liteSql = `
+        SELECT c.*
+        FROM clients c
+        WHERE c.business_id = ?
+          AND c.archived_at IS NULL
+      `;
+      const liteParams = [businessId];
+      if (normalizedStage) {
+        liteSql += ' AND c.stage = ?';
+        liteParams.push(normalizedStage);
+      }
+      if (query) {
+        liteSql += ' AND (c.name LIKE ? OR COALESCE(c.email, \'\') LIKE ? OR COALESCE(c.phone, \'\') LIKE ?)';
+        liteParams.push(`%${query}%`, `%${query}%`, `%${query}%`);
+      }
+      liteSql += ' ORDER BY c.updated_at DESC, c.id DESC LIMIT ?';
+      liteParams.push(rowLimit);
+      const rows = getSqlite().prepare(liteSql).all(...liteParams);
+      return res.json({
+        clients: rows.map((row) => ({
+          ...rowToClient(row),
+          lastNote: null,
+          lastNoteAt: null,
+          nextAppointmentDate: null,
+          nextAppointmentTime: null
+        }))
+      });
+    }
+
     let sql = `
       SELECT c.*,
              (SELECT cn.note
@@ -1088,7 +1127,8 @@ app.get('/api/clients', async (req, res) => {
       sql += ' AND (c.name LIKE ? OR COALESCE(c.email, \'\') LIKE ? OR COALESCE(c.phone, \'\') LIKE ?)';
       params.push(`%${query}%`, `%${query}%`, `%${query}%`);
     }
-    sql += ' ORDER BY c.updated_at DESC, c.id DESC LIMIT 500';
+    sql += ' ORDER BY c.updated_at DESC, c.id DESC LIMIT ?';
+    params.push(rowLimit);
 
     const rows = getSqlite().prepare(sql).all(...params);
     return res.json({
@@ -1103,6 +1143,41 @@ app.get('/api/clients', async (req, res) => {
           nextAppointmentTime: next.time
         };
       })
+    });
+  }
+
+  if (isLite) {
+    let liteSql = `
+      SELECT c.*
+      FROM clients c
+      WHERE c.business_id = $1
+        AND c.archived_at IS NULL
+    `;
+    const liteParams = [businessId];
+    if (normalizedStage) {
+      liteParams.push(normalizedStage);
+      liteSql += ` AND c.stage = $${liteParams.length}`;
+    }
+    if (query) {
+      liteParams.push(`%${query}%`);
+      const patternIdx = liteParams.length;
+      liteSql += ` AND (
+        c.name ILIKE $${patternIdx}
+        OR COALESCE(c.email, '') ILIKE $${patternIdx}
+        OR COALESCE(c.phone, '') ILIKE $${patternIdx}
+      )`;
+    }
+    liteParams.push(rowLimit);
+    liteSql += ` ORDER BY c.updated_at DESC, c.id DESC LIMIT $${liteParams.length}`;
+    const rows = (await getPgPool().query(liteSql, liteParams)).rows;
+    return res.json({
+      clients: rows.map((row) => ({
+        ...rowToClient(row),
+        lastNote: null,
+        lastNoteAt: null,
+        nextAppointmentDate: null,
+        nextAppointmentTime: null
+      }))
     });
   }
 
@@ -1159,7 +1234,8 @@ app.get('/api/clients', async (req, res) => {
       OR COALESCE(c.phone, '') ILIKE $${patternIdx}
     )`;
   }
-  sql += ' ORDER BY c.updated_at DESC, c.id DESC LIMIT 500';
+  params.push(rowLimit);
+  sql += ` ORDER BY c.updated_at DESC, c.id DESC LIMIT $${params.length}`;
 
   const rows = (await getPgPool().query(sql, params)).rows;
   return res.json({
@@ -1279,7 +1355,8 @@ app.delete('/api/clients/:id', async (req, res) => {
     'UPDATE clients SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND business_id = $2 AND archived_at IS NULL',
     [id, businessId]
   );
-  if (!result?.changes) return res.status(404).json({ error: 'client not found' });
+  const affectedRows = USE_POSTGRES ? Number(result?.rowCount || 0) : Number(result?.changes || 0);
+  if (!affectedRows) return res.status(404).json({ error: 'client not found' });
   res.json({ success: true, archived: true });
 });
 
@@ -1508,10 +1585,21 @@ app.get('/api/calendar/month', async (req, res) => {
 
 app.get('/api/appointments', async (req, res) => {
   const businessId = req.auth.businessId;
-  const { date, q, status, month } = req.query;
+  const { date, q, status, month, from, to, limit } = req.query;
   const searchQuery = String(q || '').trim();
   const monthRange = month ? getMonthDateRange(month) : null;
+  const fromDate = from == null ? '' : String(from).trim();
+  const toDate = to == null ? '' : String(to).trim();
+  const limitRaw = limit == null ? '' : String(limit).trim();
+  const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : null;
+  const limitValue = Number.isFinite(parsedLimit) ? parsedLimit : null;
   if (month && !monthRange) return res.status(400).json({ error: 'month must be in YYYY-MM format' });
+  if (fromDate && !/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) return res.status(400).json({ error: 'from must be in YYYY-MM-DD format' });
+  if (toDate && !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) return res.status(400).json({ error: 'to must be in YYYY-MM-DD format' });
+  if (fromDate && toDate && fromDate > toDate) return res.status(400).json({ error: 'from must be on or before to' });
+  if (limitRaw && (!limitValue || limitValue <= 0 || limitValue > 5000)) {
+    return res.status(400).json({ error: 'limit must be between 1 and 5000' });
+  }
   if (searchQuery && searchQuery.length < 2) return res.json({ appointments: [] });
 
   if (!USE_POSTGRES) {
@@ -1525,12 +1613,18 @@ app.get('/api/appointments', async (req, res) => {
 
     if (date) { sql += ' AND a.date = ?'; params.push(String(date)); }
     if (monthRange) { sql += ' AND a.date >= ? AND a.date < ?'; params.push(monthRange.start, monthRange.end); }
+    if (fromDate) { sql += ' AND a.date >= ?'; params.push(fromDate); }
+    if (toDate) { sql += ' AND a.date <= ?'; params.push(toDate); }
     if (status) { sql += ' AND a.status = ?'; params.push(String(status)); }
     if (searchQuery) {
       sql += ' AND (a.client_name LIKE ? OR a.client_email LIKE ?)';
       params.push(`%${searchQuery}%`, `%${searchQuery}%`);
     }
     sql += ' ORDER BY a.date ASC, a.time ASC';
+    if (limitValue) {
+      sql += ' LIMIT ?';
+      params.push(limitValue);
+    }
     const rows = getSqlite().prepare(sql).all(...params).map((r) => {
       const appt = rowToAppointment(r);
       if (r.type_color) appt.color = r.type_color;
@@ -1555,6 +1649,14 @@ app.get('/api/appointments', async (req, res) => {
     params.push(monthRange.end);
     sql += ` AND a.date < $${params.length}`;
   }
+  if (fromDate) {
+    params.push(fromDate);
+    sql += ` AND a.date >= $${params.length}`;
+  }
+  if (toDate) {
+    params.push(toDate);
+    sql += ` AND a.date <= $${params.length}`;
+  }
   if (status) { params.push(String(status)); sql += ` AND a.status = $${params.length}`; }
   if (searchQuery) {
     params.push(`%${searchQuery}%`);
@@ -1576,7 +1678,12 @@ app.get('/api/appointments', async (req, res) => {
   }
 
   sql += orderByClause;
-  if (searchQuery) sql += ' LIMIT 100';
+  if (limitValue) {
+    params.push(limitValue);
+    sql += ` LIMIT $${params.length}`;
+  } else if (searchQuery) {
+    sql += ' LIMIT 100';
+  }
   const rows = (await getPgPool().query(sql, params)).rows.map((r) => {
     const appt = rowToAppointment(r);
     if (r.type_color) appt.color = r.type_color;
@@ -2091,27 +2198,40 @@ app.get('/api/dashboard', async (req, res) => {
 
   let stats;
   if (USE_POSTGRES) {
-    const [today, week, pending] = await Promise.all([
-      getPgPool().query('SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date = $2', [businessId, date]),
-      getPgPool().query(
-        "SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND date BETWEEN $2::date AND ($2::date + INTERVAL '6 day')",
+    const statsRow = (
+      await getPgPool().query(
+        `SELECT
+           COUNT(*) FILTER (WHERE date = $2)::int AS today,
+           COUNT(*) FILTER (WHERE date BETWEEN $2::date AND ($2::date + INTERVAL '6 day'))::int AS week,
+           COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
+         FROM appointments
+         WHERE business_id = $1`,
         [businessId, date]
-      ),
-      getPgPool().query("SELECT COUNT(*)::int AS c FROM appointments WHERE business_id = $1 AND status = 'pending'", [businessId])
-    ]);
-    stats = { today: today.rows[0].c, week: week.rows[0].c, pending: pending.rows[0].c };
-  } else {
+      )
+    ).rows[0] || {};
     stats = {
-      today: getSqlite().prepare('SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date = ?').get(businessId, date).c,
-      week: getSqlite()
-        .prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND date BETWEEN date(?) AND date(?, '+6 day')")
-        .get(businessId, date, date).c,
-      pending: getSqlite().prepare("SELECT COUNT(*) AS c FROM appointments WHERE business_id = ? AND status = 'pending'").get(businessId).c
+      today: Number(statsRow.today || 0),
+      week: Number(statsRow.week || 0),
+      pending: Number(statsRow.pending || 0)
+    };
+  } else {
+    const statsRow = getSqlite().prepare(
+      `SELECT
+         SUM(CASE WHEN date = ? THEN 1 ELSE 0 END) AS today,
+         SUM(CASE WHEN date BETWEEN date(?) AND date(?, '+6 day') THEN 1 ELSE 0 END) AS week,
+         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
+       FROM appointments
+       WHERE business_id = ?`
+    ).get(date, date, date, businessId) || {};
+    stats = {
+      today: Number(statsRow.today || 0),
+      week: Number(statsRow.week || 0),
+      pending: Number(statsRow.pending || 0)
     };
   }
 
-  const appointments = (
-    await dbAll(
+  const [appointmentRows, typeRows, insights] = await Promise.all([
+    dbAll(
       `SELECT a.*, t.name AS type_name
        FROM appointments a
        LEFT JOIN appointment_types t ON t.id = a.type_id
@@ -2123,28 +2243,29 @@ app.get('/api/dashboard', async (req, res) => {
        WHERE a.business_id = $1 AND a.date = $2
        ORDER BY a.time ASC`,
       [businessId, date]
-    )
-  ).map(rowToAppointment);
+    ),
+    dbAll(
+      `SELECT t.*, COUNT(a.id) AS booking_count
+       FROM appointment_types t
+       LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = ?
+       WHERE t.business_id = ? AND t.active = 1
+       GROUP BY t.id
+       ORDER BY t.id ASC`,
+      `SELECT t.*, COUNT(a.id)::int AS booking_count
+       FROM appointment_types t
+       LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = $1
+       WHERE t.business_id = $2 AND t.active = TRUE
+       GROUP BY t.id
+       ORDER BY t.id ASC`,
+      [businessId, businessId]
+    ),
+    createInsights(date, businessId)
+  ]);
 
-  const typeRows = await dbAll(
-    `SELECT t.*, COUNT(a.id) AS booking_count
-     FROM appointment_types t
-     LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = ?
-     WHERE t.business_id = ? AND t.active = 1
-     GROUP BY t.id
-     ORDER BY t.id ASC`,
-    `SELECT t.*, COUNT(a.id)::int AS booking_count
-     FROM appointment_types t
-     LEFT JOIN appointments a ON a.type_id = t.id AND a.business_id = $1
-     WHERE t.business_id = $2 AND t.active = TRUE
-     GROUP BY t.id
-     ORDER BY t.id ASC`,
-    [businessId, businessId]
-  );
-
+  const appointments = appointmentRows.map(rowToAppointment);
   const types = typeRows.map((row) => ({ ...rowToType(row), bookingCount: Number(row.booking_count || 0) }));
 
-  res.json({ stats, appointments, types, insights: await createInsights(date, businessId) });
+  res.json({ stats, appointments, types, insights });
 });
 
 // ── Page routes ───────────────────────────────────────────────────────────────

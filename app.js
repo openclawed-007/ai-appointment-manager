@@ -1034,7 +1034,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     }
     renderClientContextState('<small>Matching client...</small>');
     try {
-      const payload = await api(`/api/clients?q=${encodeURIComponent(name)}`);
+      const payload = await api(`/api/clients?q=${encodeURIComponent(name)}&lite=1&limit=20`);
       if (requestId !== clientContextRequestId) return;
       const clients = Array.isArray(payload?.clients) ? payload.clients : [];
       const exact = clients.find((item) => String(item.name || '').trim().toLowerCase() === name.toLowerCase())
@@ -4428,7 +4428,7 @@ async function ensureClientForAppointment(appointment = {}) {
   const email = String(appointment.clientEmail || '').trim();
   const queryTerm = email || name;
   if (queryTerm && queryTerm.length >= 2) {
-    const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}`);
+    const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}&lite=1&limit=25`);
     const clients = Array.isArray(payload?.clients) ? payload.clients : [];
     const exact = clients.find((item) => {
       const itemName = String(item.name || '').trim().toLowerCase();
@@ -4451,12 +4451,26 @@ async function ensureClientForAppointment(appointment = {}) {
 }
 
 async function findClientForAppointment(appointment = {}) {
+  const directClientId = Number(appointment.clientId);
+  if (Number.isFinite(directClientId) && directClientId > 0) {
+    const byId = state.clients.find((item) => Number(item.id) === directClientId);
+    if (byId) return byId;
+  }
+
   const name = String(appointment.clientName || appointment.title || '').trim();
   const email = String(appointment.clientEmail || '').trim();
   const queryTerm = email || name;
   if (!queryTerm || queryTerm.length < 2) return null;
 
-  const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}`);
+  const localExact = state.clients.find((item) => {
+    const itemName = String(item.name || '').trim().toLowerCase();
+    const itemEmail = String(item.email || '').trim().toLowerCase();
+    if (email && itemEmail === email.toLowerCase()) return true;
+    return itemName === name.toLowerCase();
+  });
+  if (localExact) return localExact;
+
+  const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}&lite=1&limit=25`);
   const clients = Array.isArray(payload?.clients) ? payload.clients : [];
   return clients.find((item) => {
     const itemName = String(item.name || '').trim().toLowerCase();
@@ -4468,9 +4482,21 @@ async function findClientForAppointment(appointment = {}) {
 
 async function openClientFromAppointment(appointment = null) {
   if (!appointment) return;
+
+  // Switch immediately so mobile users see progress without waiting on network.
+  setActiveView('clients');
+  const clientFormContainer = document.getElementById('client-form-container');
+  if (clientFormContainer) clientFormContainer.style.display = 'none';
+  const detailWrapper = document.getElementById('client-detail-panel-wrapper');
+  if (detailWrapper) {
+    detailWrapper.style.display = 'flex';
+    detailWrapper.innerHTML = '<div class="card empty-detail-card"><div class="empty-state">Loading client profile...</div></div>';
+  }
+
   const client = await findClientForAppointment(appointment);
   if (!client?.id) {
     showToast('No saved client profile found for this appointment yet.', 'info');
+    void loadClients().catch(swallowBackgroundAsyncError);
     return;
   }
 
@@ -4487,14 +4513,11 @@ async function openClientFromAppointment(appointment = null) {
   state.selectedClientId = clientId;
   document.getElementById('client-note-form')?.setAttribute('data-client-id', String(clientId));
 
-  setActiveView('clients');
-  await loadClients();
-
   if (!state.clients.some((item) => Number(item.id) === clientId)) {
     state.clients = [client, ...state.clients.filter((item) => Number(item.id) !== clientId)];
-    renderClientsTable(state.clients);
-    await loadClientDetail(clientId);
   }
+  renderClientsTable(state.clients);
+  await loadClientDetail(clientId);
 
   const row = document.querySelector(`#clients-table .data-row[data-client-id="${clientId}"]`);
   row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -4512,6 +4535,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   const today = localYmd();
   const isTargetToday = targetDate === today;
   const reminderModeEnabled = isReminderModeEnabled();
+  const upcomingLimit = state.viewAll || reminderModeEnabled ? 500 : 160;
 
   if (showSkeleton) {
     // Show skeleton placeholders while data is loading
@@ -4524,8 +4548,8 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   // We still fetch the appointments list to calculate the true next upcoming day.
   const [dashboardResult, completedResult, upcomingResult] = await Promise.all([
     api(`/api/dashboard?date=${encodeURIComponent(targetDate)}`),
-    api('/api/appointments?status=completed'),
-    api('/api/appointments')
+    api('/api/appointments?status=completed&limit=60'),
+    api(`/api/appointments?from=${encodeURIComponent(today)}&limit=${upcomingLimit}`)
   ]);
 
   const { stats, types, insights, appointments: todayFromDashboard } = dashboardResult;
@@ -4538,44 +4562,41 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
     const status = String(a.status || '').toLowerCase();
     return status !== 'completed' && status !== 'cancelled';
   });
-  const allActiveAppointments = (upcomingResult?.appointments || [])
-    .filter((a) => {
-      const status = String(a.status || '').toLowerCase();
-      return status !== 'completed' && status !== 'cancelled';
-    })
-    .sort((a, b) => {
-      const aKey = `${a.date || ''} ${a.time || ''}`;
-      const bKey = `${b.date || ''} ${b.time || ''}`;
-      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
-    });
-  const reminderQueue = (upcomingResult?.appointments || [])
-    .filter((a) => {
-      if (String(a.source || '').toLowerCase() !== 'reminder') return false;
-      const status = String(a.status || '').toLowerCase();
-      if (status === 'completed' || status === 'cancelled') return false;
-      if (!isAtOrAfterNow(a.date, a.time)) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      const aKey = `${a.date || ''} ${a.time || ''}`;
-      const bKey = `${b.date || ''} ${b.time || ''}`;
-      return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
-    });
+  const weekEnd = addDays(parseYmd(targetDate) || new Date(`${targetDate}T00:00:00`), 6).toISOString().slice(0, 10);
+  const upcomingAppointments = Array.isArray(upcomingResult?.appointments) ? upcomingResult.appointments : [];
+  const allActiveAppointments = [];
+  const reminderQueue = [];
+  let reminderTodayCount = 0;
+  let reminderWeekCount = 0;
+  let reminderPendingCount = 0;
+
+  for (const appointment of upcomingAppointments) {
+    const source = String(appointment?.source || '').toLowerCase();
+    const status = String(appointment?.status || '').toLowerCase();
+    const dateValue = String(appointment?.date || '').slice(0, 10);
+    const isReminder = source === 'reminder';
+
+    if (isReminder) {
+      if (dateValue === targetDate) reminderTodayCount += 1;
+      if (dateValue >= targetDate && dateValue <= weekEnd) reminderWeekCount += 1;
+      if (status === 'pending') reminderPendingCount += 1;
+    }
+
+    if (status === 'completed' || status === 'cancelled') continue;
+    allActiveAppointments.push(appointment);
+
+    if (isReminder && isAtOrAfterNow(appointment.date, appointment.time)) {
+      reminderQueue.push(appointment);
+    }
+  }
   const nextReminder = reminderQueue[0] || null;
 
   const effectiveStats = reminderModeEnabled
-    ? (() => {
-      const reminders = (upcomingResult?.appointments || []).filter((a) => String(a.source || '').toLowerCase() === 'reminder');
-      const weekEnd = addDays(parseYmd(targetDate) || new Date(`${targetDate}T00:00:00`), 6).toISOString().slice(0, 10);
-      return {
-        today: reminders.filter((a) => String(a.date || '').slice(0, 10) === targetDate).length,
-        week: reminders.filter((a) => {
-          const d = String(a.date || '').slice(0, 10);
-          return d >= targetDate && d <= weekEnd;
-        }).length,
-        pending: reminders.filter((a) => String(a.status || '').toLowerCase() === 'pending').length
-      };
-    })()
+    ? {
+      today: reminderTodayCount,
+      week: reminderWeekCount,
+      pending: reminderPendingCount
+    }
     : stats;
 
   let activeAppointments = todayAppointments;
@@ -6399,11 +6420,12 @@ async function init() {
       state.apiOnline = true;
       return;
     }
-    await loadTypes();
-    await loadDashboard();
-    await loadAppointmentsTable();
-    await loadSettings();
-    await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
+    await Promise.all([
+      loadTypes(),
+      loadDashboard(state.selectedDate, { refreshDots: false }),
+      loadAppointmentsTable(),
+      loadSettings()
+    ]);
     await refreshCalendarDots({ force: true });
     await flushOfflineMutationQueue();
     state.apiOnline = true;
