@@ -86,6 +86,7 @@ const state = {
   currentUser: null,
   currentBusiness: null,
   reminderMode: getStoredBoolean('reminderMode'),
+  workspaceMode: 'appointments',
   browserNotificationsEnabled: getStoredBoolean('browserNotificationsEnabled'),
   calendarShowClientNames: getStoredBoolean('calendarShowClientNames'),
   dashboardStatsCollapsed: getStoredBoolean('dashboardStatsCollapsed'),
@@ -101,7 +102,10 @@ const state = {
   authResendCooldownUntil: 0,
   calendarDotsRequestId: 0,
   calendarWeekRequestId: 0,
-  searchRequestId: 0
+  searchRequestId: 0,
+  clients: [],
+  selectedClientId: null,
+  clientSearchTimer: null
 };
 
 const CALENDAR_MONTH_CACHE_TTL_MS = 120000;
@@ -112,6 +116,7 @@ const calendarMonthInFlight = new Map();
 const OFFLINE_MUTATION_QUEUE_KEY = 'intellischedule.offlineMutationQueue.v1';
 const AUTH_SNAPSHOT_KEY = 'intellischedule.authSnapshot.v1';
 const ACCENT_COLORS = ['green', 'blue', 'red', 'purple', 'amber'];
+const WORKSPACE_MODES = ['appointments', 'reminders', 'clients'];
 const MOBILE_NAV_MODE_KEY = 'mobileNavMode';
 const BROWSER_NOTIFICATIONS_KEY = 'browserNotificationsEnabled';
 const REMINDER_NOTIFIED_KEYS_STORAGE = 'intellischedule.reminderNotifiedKeys.v1';
@@ -131,6 +136,7 @@ const GLOBAL_SEARCH_SETTINGS_OPTIONS = [
   { label: 'Theme', targetId: 'settings-theme-light', sectionSelector: '#settings-section-appearance', keywords: ['theme', 'dark', 'light'] },
   { label: 'Accent Color', targetId: 'settings-section-appearance', sectionSelector: '#settings-section-appearance', keywords: ['accent', 'color', 'green', 'blue', 'red', 'purple', 'amber'] },
   { label: 'Reminder Mode', targetId: 'settings-reminder-mode', sectionSelector: '#settings-section-appearance', keywords: ['reminder', 'mode', 'appointments'] },
+  { label: 'Workspace Mode', targetId: 'settings-workspace-mode', sectionSelector: '#settings-section-appearance', keywords: ['workspace', 'mode', 'clients', 'reminders', 'appointments'] },
   { label: 'Mobile Navigation Mode', targetId: 'settings-mobile-nav-bottom-tabs', sectionSelector: '#settings-section-appearance', keywords: ['mobile', 'navigation', 'bottom', 'tabs', 'sidebar'] },
   { label: 'Calendar Client Names', targetId: 'settings-calendar-show-client-names', sectionSelector: '#settings-section-appearance', keywords: ['calendar', 'client', 'names', 'dots'] },
   { label: 'Owner Email Notifications', targetId: 'settings-notify-owner-email', sectionSelector: '#settings-section-appearance', keywords: ['notify', 'notification', 'owner', 'email'] },
@@ -148,6 +154,22 @@ function normalizeCalendarViewMode(value) {
 function normalizeAccentColor(value) {
   const color = String(value || '').trim();
   return ACCENT_COLORS.includes(color) ? color : 'green';
+}
+
+function normalizeWorkspaceMode(value) {
+  const mode = String(value || '').trim().toLowerCase();
+  return WORKSPACE_MODES.includes(mode) ? mode : 'appointments';
+}
+
+function getStoredWorkspaceMode(fallback = 'appointments') {
+  if (typeof localStorage === 'undefined') return normalizeWorkspaceMode(fallback);
+  try {
+    const raw = localStorage.getItem('workspaceMode');
+    if (raw) return normalizeWorkspaceMode(raw);
+    return normalizeWorkspaceMode(fallback);
+  } catch (_error) {
+    return normalizeWorkspaceMode(fallback);
+  }
 }
 
 function applyAccentColor(color) {
@@ -227,7 +249,29 @@ function collectBusinessHoursFromForm({ validate = true } = {}) {
 }
 
 function isReminderModeEnabled() {
-  return Boolean(state.reminderMode);
+  return String(state.workspaceMode || '').toLowerCase() === 'reminders';
+}
+
+function isClientModeEnabled() {
+  return String(state.workspaceMode || '').toLowerCase() === 'clients';
+}
+
+function setWorkspaceMode(mode, { persist = true } = {}) {
+  const normalized = normalizeWorkspaceMode(mode);
+  state.workspaceMode = normalized;
+  state.reminderMode = normalized === 'reminders';
+  if (persist) {
+    setStoredValue('workspaceMode', normalized);
+    setStoredValue('reminderMode', state.reminderMode);
+  }
+  const reminderToggle = document.getElementById('settings-reminder-mode');
+  if (reminderToggle) {
+    reminderToggle.checked = state.reminderMode;
+    reminderToggle.disabled = normalized === 'clients';
+  }
+  const workspaceSelect = document.getElementById('settings-workspace-mode');
+  if (workspaceSelect && workspaceSelect.value !== normalized) workspaceSelect.value = normalized;
+  applyReminderModeUi();
 }
 
 function getEntryWordPlural() {
@@ -268,7 +312,9 @@ function syncAppointmentDurationFieldVisibility() {
 
 function applyReminderModeUi() {
   const reminderMode = isReminderModeEnabled();
+  const clientMode = isClientModeEnabled();
   document.body.classList.toggle('reminder-mode', reminderMode);
+  document.body.classList.toggle('clients-mode', clientMode);
 
   const setText = (selector, value) => {
     const node = document.querySelector(selector);
@@ -289,20 +335,22 @@ function applyReminderModeUi() {
 
   const searchInput = document.getElementById('global-search');
   if (searchInput) {
-    searchInput.placeholder = reminderMode
-      ? 'Search reminders, notes, or types...'
-      : 'Search appointments, clients, or types...';
+    searchInput.placeholder = clientMode
+      ? 'Search clients, notes, or status...'
+      : (reminderMode
+        ? 'Search reminders, notes, or types...'
+        : 'Search appointments, clients, or types...');
   }
 
   const openCloseRow = document.getElementById('settings-open-close-row');
   const businessHoursSection = document.getElementById('settings-business-hours-section');
-  if (openCloseRow) openCloseRow.classList.toggle('hidden', reminderMode);
-  if (businessHoursSection) businessHoursSection.classList.toggle('hidden', reminderMode);
+  if (openCloseRow) openCloseRow.classList.toggle('hidden', reminderMode || clientMode);
+  if (businessHoursSection) businessHoursSection.classList.toggle('hidden', reminderMode || clientMode);
 
   const openInput = document.getElementById('settings-open-time');
   const closeInput = document.getElementById('settings-close-time');
-  if (openInput) openInput.disabled = reminderMode;
-  if (closeInput) closeInput.disabled = reminderMode;
+  if (openInput) openInput.disabled = reminderMode || clientMode;
+  if (closeInput) closeInput.disabled = reminderMode || clientMode;
 
   const scheduleCard = document.querySelector('.schedule-card');
   if (scheduleCard) {
@@ -312,7 +360,7 @@ function applyReminderModeUi() {
 
   const dashboardAiInsightsCard = document.querySelector('section[data-view="dashboard"] .card.ai-insights');
   if (dashboardAiInsightsCard) {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       dashboardAiInsightsCard.setAttribute('hidden', 'hidden');
       dashboardAiInsightsCard.classList.add('hidden');
     } else {
@@ -322,7 +370,7 @@ function applyReminderModeUi() {
   }
 
   document.querySelectorAll('.nav-item[data-view="ai"], .mobile-nav-item[data-view="ai"]').forEach((node) => {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       node.setAttribute('hidden', 'hidden');
       node.classList.add('hidden');
     } else {
@@ -332,7 +380,7 @@ function applyReminderModeUi() {
   });
   const aiView = document.querySelector('.app-view[data-view="ai"]');
   if (aiView) {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       aiView.setAttribute('hidden', 'hidden');
       aiView.classList.add('hidden');
     } else {
@@ -340,12 +388,12 @@ function applyReminderModeUi() {
       aiView.classList.remove('hidden');
     }
   }
-  if (reminderMode && getActiveView() === 'ai') {
+  if ((reminderMode || clientMode) && getActiveView() === 'ai') {
     setActiveView('dashboard');
   }
 
   document.querySelectorAll('.nav-item[data-view="types"], .mobile-nav-item[data-view="types"]').forEach((node) => {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       node.setAttribute('hidden', 'hidden');
       node.classList.add('hidden');
     } else {
@@ -355,7 +403,7 @@ function applyReminderModeUi() {
   });
   const typesView = document.querySelector('.app-view[data-view="types"]');
   if (typesView) {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       typesView.setAttribute('hidden', 'hidden');
       typesView.classList.add('hidden');
     } else {
@@ -366,7 +414,7 @@ function applyReminderModeUi() {
   const manageTypesBtn = document.getElementById('btn-manage-types');
   const dashboardTypesCard = manageTypesBtn?.closest('.card');
   if (dashboardTypesCard) {
-    if (reminderMode) {
+    if (reminderMode || clientMode) {
       dashboardTypesCard.setAttribute('hidden', 'hidden');
       dashboardTypesCard.classList.add('hidden');
     } else {
@@ -374,7 +422,47 @@ function applyReminderModeUi() {
       dashboardTypesCard.classList.remove('hidden');
     }
   }
-  if (reminderMode && getActiveView() === 'types') {
+  if ((reminderMode || clientMode) && getActiveView() === 'types') {
+    setActiveView('dashboard');
+  }
+
+  document.querySelectorAll('.nav-item[data-view="dashboard"], .mobile-nav-item[data-view="dashboard"]').forEach((node) => {
+    node.removeAttribute('hidden');
+    node.classList.remove('hidden');
+  });
+  const dashboardView = document.querySelector('.app-view[data-view="dashboard"]');
+  if (dashboardView) {
+    dashboardView.removeAttribute('hidden');
+    dashboardView.classList.remove('hidden');
+  }
+
+  document.querySelectorAll('.nav-item[data-view="appointments"], .mobile-nav-item[data-view="appointments"]').forEach((node) => {
+    if (clientMode) {
+      node.setAttribute('hidden', 'hidden');
+      node.classList.add('hidden');
+    } else {
+      node.removeAttribute('hidden');
+      node.classList.remove('hidden');
+    }
+  });
+  const appointmentsView = document.querySelector('.app-view[data-view="appointments"]');
+  if (appointmentsView) {
+    if (clientMode) {
+      appointmentsView.setAttribute('hidden', 'hidden');
+      appointmentsView.classList.add('hidden');
+    } else {
+      appointmentsView.removeAttribute('hidden');
+      appointmentsView.classList.remove('hidden');
+    }
+  }
+
+  const createBtn = document.getElementById('btn-new-appointment');
+  if (createBtn) {
+    createBtn.removeAttribute('hidden');
+    createBtn.classList.remove('hidden');
+  }
+
+  if (clientMode && getActiveView() === 'appointments') {
     setActiveView('dashboard');
   }
 
@@ -556,6 +644,17 @@ function formatMenuDate(dateStr) {
   const dt = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(dt.getTime())) return dateStr;
   return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatNoteTimestamp(value) {
+  const dt = new Date(value || '');
+  if (Number.isNaN(dt.getTime())) return 'Recently';
+  return dt.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
 }
 
 function localYmd(date = new Date()) {
@@ -759,6 +858,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   const defaultClientName = String(appointment?.clientName || '');
   const defaultReminderOffset = Number(appointment?.reminderOffsetMinutes == null ? 10 : appointment.reminderOffsetMinutes);
   const reminderModeEnabled = isReminderModeEnabled();
+  const clientModeEnabled = isClientModeEnabled();
   const defaultEntryMode = reminderModeEnabled
     ? 'reminder'
     : (String(appointment?.source || '').toLowerCase() === 'reminder' ? 'reminder' : 'appointment');
@@ -790,6 +890,9 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         <small>Time</small>
         <strong>${escapeHtml(toTime12(resolvedTime))}</strong>
       </div>
+    </div>
+    <div class="quick-create-client-context" id="quick-create-client-context">
+      <small>Client details will appear here when a matching client is found.</small>
     </div>
     <form class="quick-create-form">
       ${lockReminderMode ? '' : `
@@ -841,6 +944,10 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
         </div>
       </div>
       <div class="quick-create-actions">
+        ${(isEditing && defaultEntryMode !== 'reminder')
+      ? '<button type="button" class="btn-secondary quick-create-open-client">Client info</button>'
+      : ''
+    }
         ${isEditing ? '<button type="button" class="btn-secondary quick-create-delete">Delete</button>' : ''}
         <button type="button" class="btn-secondary quick-create-cancel">Cancel</button>
         <button type="submit" class="btn-primary quick-create-submit">${isEditing ? 'Save' : 'Create'}</button>
@@ -852,6 +959,16 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
 
   menu.querySelector('.quick-create-close')?.addEventListener('click', closeQuickCreateMenu);
   menu.querySelector('.quick-create-cancel')?.addEventListener('click', closeQuickCreateMenu);
+  menu.querySelector('.quick-create-open-client')?.addEventListener('click', async () => {
+    const currentName = String(menu.querySelector('input[name="clientName"]')?.value || appointment?.clientName || '').trim();
+    const target = appointment || { clientName: currentName, title: currentName };
+    closeQuickCreateMenu();
+    try {
+      await openClientFromAppointment(target);
+    } catch (error) {
+      showToast(error.message || 'Could not open client info.', 'error');
+    }
+  });
   menu.querySelector('.quick-create-delete')?.addEventListener('click', async () => {
     if (state.quickCreateAppointmentId == null) return;
     const isReminderDelete = defaultEntryMode === 'reminder';
@@ -897,6 +1014,55 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
   const typeGroup = menu.querySelector('.quick-create-type-group');
   const durationGroup = menu.querySelector('.quick-create-duration-group');
   const locationGroup = menu.querySelector('.quick-create-location-group');
+  const clientContext = menu.querySelector('#quick-create-client-context');
+  let clientContextRequestId = 0;
+  const renderClientContextState = (html) => {
+    if (!clientContext) return;
+    clientContext.innerHTML = html;
+  };
+  const refreshClientContext = async () => {
+    const requestId = ++clientContextRequestId;
+    const mode = String(entryModeInput?.value || 'appointment');
+    const name = String(entryInput?.value || '').trim();
+    if (mode === 'reminder') {
+      renderClientContextState('<small>Client details are hidden for reminders.</small>');
+      return;
+    }
+    if (!name || name.length < 2) {
+      renderClientContextState('<small>Type a client name to show saved client details.</small>');
+      return;
+    }
+    renderClientContextState('<small>Matching client...</small>');
+    try {
+      const payload = await api(`/api/clients?q=${encodeURIComponent(name)}`);
+      if (requestId !== clientContextRequestId) return;
+      const clients = Array.isArray(payload?.clients) ? payload.clients : [];
+      const exact = clients.find((item) => String(item.name || '').trim().toLowerCase() === name.toLowerCase())
+        || clients[0]
+        || null;
+      if (!exact?.id) {
+        renderClientContextState('<small>No saved client profile matched this name yet.</small>');
+        return;
+      }
+      const notesPayload = await api(`/api/clients/${Number(exact.id)}/notes`);
+      if (requestId !== clientContextRequestId) return;
+      const notes = Array.isArray(notesPayload?.notes) ? notesPayload.notes.slice(0, 2) : [];
+      const notesHtml = notes.length
+        ? notes.map((note) => `<div class="quick-create-client-note">${escapeHtml(String(note.note || ''))}</div>`).join('')
+        : '<div class="quick-create-client-note">No notes yet.</div>';
+      renderClientContextState(`
+        <div class="quick-create-client-head">
+          <strong>${escapeHtml(exact.name || '')}</strong>
+          <span>${escapeHtml(formatClientStage(exact.stage || 'new'))}</span>
+        </div>
+        <div class="quick-create-client-meta">${escapeHtml(exact.email || 'No email')} • ${escapeHtml(exact.phone || 'No phone')}</div>
+        <div class="quick-create-client-notes">${notesHtml}</div>
+      `);
+    } catch (_error) {
+      if (requestId !== clientContextRequestId) return;
+      renderClientContextState('<small>Could not load client details right now.</small>');
+    }
+  };
   const syncEntryModeUi = () => {
     if (lockReminderMode && entryModeInput) entryModeInput.value = 'reminder';
     const mode = String(entryModeInput?.value || 'appointment');
@@ -904,14 +1070,19 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     if (typeSelect) typeSelect.disabled = isReminder || !state.types.length;
     if (durationSelect) durationSelect.disabled = isReminder;
     if (locationSelect) locationSelect.disabled = isReminder;
-    if (typeGroup) typeGroup.classList.toggle('hidden', isReminder);
+    if (typeGroup) typeGroup.classList.toggle('hidden', isReminder || clientModeEnabled);
     if (durationGroup) durationGroup.classList.toggle('hidden', isReminder);
     if (locationGroup) locationGroup.classList.toggle('hidden', isReminder);
-    if (entryLabel) entryLabel.textContent = isReminder ? 'Reminder' : 'Client / Title';
-    if (entryInput) entryInput.placeholder = isReminder ? 'Reminder note or title' : 'Client or appointment title';
+    if (entryLabel) entryLabel.textContent = isReminder ? 'Reminder' : (clientModeEnabled ? 'Client Name' : 'Client / Title');
+    if (entryInput) {
+      entryInput.placeholder = isReminder
+        ? 'Reminder note or title'
+        : (clientModeEnabled ? 'Client name' : 'Client or appointment title');
+    }
     menu.querySelectorAll('.quick-entry-mode-btn[data-entry-mode]').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.entryMode === mode);
     });
+    void refreshClientContext();
   };
 
   menu.querySelectorAll('.quick-entry-mode-btn[data-entry-mode]').forEach((btn) => {
@@ -928,6 +1099,14 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     const selectedOption = typeSelect.options[typeSelect.selectedIndex];
     const suggested = Number(selectedOption?.dataset?.duration || 45);
     if (durationSelect) durationSelect.value = String(suggested);
+  });
+
+  entryInput?.addEventListener('blur', () => {
+    void refreshClientContext();
+  });
+
+  entryInput?.addEventListener('change', () => {
+    void refreshClientContext();
   });
 
   menu.querySelector('.quick-create-form')?.addEventListener('submit', async (event) => {
@@ -997,6 +1176,7 @@ async function openQuickCreateMenu(anchorEl, date, time, appointment = null) {
     }
   });
 
+  void refreshClientContext();
   menu.querySelector('input[name="clientName"]')?.focus();
 }
 
@@ -1395,8 +1575,14 @@ async function openDayMenu(anchorEl, date) {
               <strong>${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</strong>
               <span>${escapeHtml(a.clientName)} • ${escapeHtml(a.typeName)} • ${escapeHtml(a.status)}</span>
             </div>
+            <div class="day-menu-client-notes" data-client-notes-for="${a.id}">
+              <div class="day-menu-client-notes-state">Open actions to view client notes.</div>
+            </div>
             <div class="day-menu-item-actions-wrap">
-              <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
+              <div class="day-menu-top-actions">
+                <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
+                <button type="button" class="day-menu-open-client" data-appointment-id="${a.id}" aria-label="Open client info">Client info</button>
+              </div>
               <div class="day-menu-item-actions hidden" data-actions-for="${a.id}">
                 ${a.clientEmail
             ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email ${escapeHtml(getEntryWordSingularTitle().toLowerCase())} details">Email</button>`
@@ -1406,9 +1592,27 @@ async function openDayMenu(anchorEl, date) {
             ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Confirm</button>`
             : ''
           }
+                <button type="button" class="day-menu-note" data-appointment-id="${a.id}" aria-label="Add client note">Add note</button>
                 <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Edit</button>
                 <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
                 <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Delete</button>
+              </div>
+              <div class="day-menu-note-editor hidden" data-note-editor-for="${a.id}">
+                <textarea class="day-menu-note-input" rows="3" placeholder="Add a progress note..."></textarea>
+                <div class="day-menu-note-controls">
+                  <select class="day-menu-note-stage">
+                    <option value="">No stage change</option>
+                    <option value="new">New</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="waiting">Waiting</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                  <div class="day-menu-note-actions">
+                    <button type="button" class="day-menu-note-cancel" data-appointment-id="${a.id}">Cancel</button>
+                    <button type="button" class="day-menu-note-save" data-appointment-id="${a.id}">Save Note</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>`
@@ -1451,6 +1655,53 @@ async function openDayMenu(anchorEl, date) {
           target.classList.remove('hidden');
           btn.setAttribute('aria-expanded', 'true');
           btn.textContent = 'Hide actions';
+          const appointment = appointments.find((item) => Number(item.id) === Number(id));
+          const notesRoot = menu.querySelector(`.day-menu-client-notes[data-client-notes-for="${id}"]`);
+          if (appointment && notesRoot && !notesRoot.dataset.loaded) {
+            notesRoot.innerHTML = '<div class="day-menu-client-notes-state">Loading client profile...</div>';
+            void (async () => {
+              try {
+                const client = await findClientForAppointment(appointment);
+                if (!client?.id) {
+                  notesRoot.innerHTML = '<div class="day-menu-client-notes-state">No saved client profile yet for this appointment.</div>';
+                  notesRoot.dataset.loaded = '1';
+                  return;
+                }
+                const notesPayload = await api(`/api/clients/${Number(client.id)}/notes`);
+                const notes = Array.isArray(notesPayload?.notes) ? notesPayload.notes.slice(0, 2) : [];
+                if (!notes.length) {
+                  notesRoot.innerHTML = `
+                    <div class="day-menu-client-notes-head">
+                      <strong>${escapeHtml(client.name || 'Client')}</strong>
+                      <span>${escapeHtml(formatClientStage(client.stage || 'new'))}</span>
+                    </div>
+                    <div class="day-menu-client-notes-meta">${escapeHtml(client.email || 'No email')} • ${escapeHtml(client.phone || 'No phone')}</div>
+                    <div class="day-menu-client-notes-state">No client notes yet.</div>
+                  `;
+                } else {
+                  notesRoot.innerHTML = `
+                    <div class="day-menu-client-notes-head">
+                      <strong>${escapeHtml(client.name || 'Client')}</strong>
+                      <span>${escapeHtml(formatClientStage(client.stage || 'new'))}</span>
+                    </div>
+                    <div class="day-menu-client-notes-meta">${escapeHtml(client.email || 'No email')} • ${escapeHtml(client.phone || 'No phone')}</div>
+                    <div class="day-menu-client-notes-title">Recent notes</div>
+                    <div class="day-menu-client-notes-list">
+                      ${notes.map((item) => `
+                        <article class="day-menu-client-note-item">
+                          <p class="day-menu-client-note-text">${escapeHtml(String(item.note || ''))}</p>
+                          <small class="day-menu-client-note-meta">${escapeHtml(formatNoteTimestamp(item.createdAt || item.updatedAt || ''))}</small>
+                        </article>
+                      `).join('')}
+                    </div>
+                  `;
+                }
+                notesRoot.dataset.loaded = '1';
+              } catch (_error) {
+                notesRoot.innerHTML = '<div class="day-menu-client-notes-state">Could not load client notes.</div>';
+              }
+            })();
+          }
         }
       });
     });
@@ -1461,6 +1712,90 @@ async function openDayMenu(anchorEl, date) {
         const appointment = appointments.find((a) => Number(a.id) === id);
         closeDayMenu();
         startEditAppointment(appointment);
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-open-client').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.appointmentId);
+        const appointment = appointments.find((a) => Number(a.id) === id);
+        closeDayMenu();
+        try {
+          await openClientFromAppointment(appointment);
+        } catch (error) {
+          showToast(error.message || 'Could not open client info.', 'error');
+        }
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-note').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.appointmentId;
+        if (!id) return;
+        const editor = menu.querySelector(`.day-menu-note-editor[data-note-editor-for="${id}"]`);
+        if (!editor) return;
+        const opening = editor.classList.contains('hidden');
+        menu.querySelectorAll('.day-menu-note-editor').forEach((node) => node.classList.add('hidden'));
+        if (opening) {
+          editor.classList.remove('hidden');
+          editor.querySelector('.day-menu-note-input')?.focus();
+        }
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-note-cancel').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.appointmentId;
+        if (!id) return;
+        const editor = menu.querySelector(`.day-menu-note-editor[data-note-editor-for="${id}"]`);
+        if (!editor) return;
+        editor.classList.add('hidden');
+        const input = editor.querySelector('.day-menu-note-input');
+        if (input) input.value = '';
+        const stage = editor.querySelector('.day-menu-note-stage');
+        if (stage) stage.value = '';
+      });
+    });
+
+    menu.querySelectorAll('.day-menu-note-save').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = Number(btn.dataset.appointmentId);
+        if (!Number.isFinite(id) || id <= 0) return;
+        const appointment = appointments.find((item) => Number(item.id) === id);
+        if (!appointment) return;
+        const editor = menu.querySelector(`.day-menu-note-editor[data-note-editor-for="${id}"]`);
+        const input = editor?.querySelector('.day-menu-note-input');
+        const stage = editor?.querySelector('.day-menu-note-stage');
+        const note = String(input?.value || '').trim();
+        if (!note) {
+          showToast('Enter a note first.', 'info');
+          return;
+        }
+
+        const oldText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        try {
+          const client = await ensureClientForAppointment(appointment);
+          if (!client?.id) throw new Error('Could not resolve client for this appointment.');
+          await api(`/api/clients/${Number(client.id)}/notes`, {
+            method: 'POST',
+            body: JSON.stringify({
+              note,
+              stage: String(stage?.value || '')
+            })
+          });
+          if (input) input.value = '';
+          if (stage) stage.value = '';
+          editor?.classList.add('hidden');
+          showToast('Client note added.', 'success');
+          void loadClients().catch(swallowBackgroundAsyncError);
+        } catch (error) {
+          showToast(error.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = oldText;
+        }
       });
     });
 
@@ -1738,10 +2073,7 @@ function toTimeCompact(time24 = '09:00') {
 
 function getCalendarPreviewLabel(appointment = {}) {
   const fallback = getEntryWordSingularTitle();
-  if (state.calendarShowClientNames) {
-    return appointment.clientName || appointment.typeName || appointment.title || fallback;
-  }
-  return appointment.typeName || appointment.title || appointment.clientName || fallback;
+  return appointment.clientName || appointment.typeName || appointment.title || fallback;
 }
 
 function normalizeAppointmentLocation(value = '') {
@@ -1884,6 +2216,7 @@ async function refreshAfterSync() {
     await loadTypes();
     await loadDashboard();
     await loadAppointmentsTable();
+    await loadClients();
     await loadSettings();
   } catch (_error) {
     // Ignore refresh errors; queue replay already handled.
@@ -2131,6 +2464,7 @@ function applyViewSelection(activeView) {
 function resolveView(view) {
   const views = [...document.querySelectorAll('.app-view')];
   const availableViews = new Set(views.map((section) => section.dataset.view).filter(Boolean));
+  if (isClientModeEnabled() && view !== 'clients' && view !== 'settings' && view !== 'dashboard') view = 'dashboard';
   if (isReminderModeEnabled() && view === 'ai') view = 'dashboard';
   if (isReminderModeEnabled() && view === 'types') view = 'dashboard';
   if (view === 'calendar') view = 'dashboard';
@@ -2167,6 +2501,9 @@ function setActiveView(view, options = {}) {
     typeof window !== 'undefined' && /^https?:$/i.test(window.location?.protocol || '');
   if (activeView === 'appointments' && canAutoLoadAppointments && !skipAppointmentsReload) {
     void loadAppointmentsTable().catch(swallowBackgroundAsyncError);
+  }
+  if (activeView === 'clients' && canAutoLoadAppointments) {
+    void loadClients().catch(swallowBackgroundAsyncError);
   }
 }
 
@@ -2436,7 +2773,7 @@ function renderCalendarGrid() {
 }
 
 function getCalendarDisplayRangeMinutes() {
-  if (isReminderModeEnabled()) {
+  if (isReminderModeEnabled() || isClientModeEnabled()) {
     return { start: 0, end: 24 * 60 };
   }
   const defaultOpen = '08:00';
@@ -3692,6 +4029,243 @@ function renderAppointmentsTable(appointments = []) {
   });
 }
 
+function formatClientStage(stage = '') {
+  const normalized = String(stage || '').trim().toLowerCase();
+  if (normalized === 'in_progress') return 'In Progress';
+  if (normalized === 'on_hold') return 'On Hold';
+  if (!normalized) return 'New';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function renderClientDetail(client = null, notes = [], appointments = []) {
+  const root = document.getElementById('client-detail-panel');
+  if (!root) return;
+  if (!client) {
+    root.innerHTML = '<div class="empty-state">Select a client to view details.</div>';
+    return;
+  }
+
+  const upcoming = appointments
+    .filter((item) => isAtOrAfterNow(item.date || '', item.time || '09:00'))
+    .sort((a, b) => {
+      const aKey = `${String(a.date || '')} ${String(a.time || '')}`;
+      const bKey = `${String(b.date || '')} ${String(b.time || '')}`;
+      return aKey.localeCompare(bKey);
+    })[0] || null;
+
+  const nextAppointmentLabel = upcoming
+    ? `${formatScheduleDate(upcoming.date || '')} • ${toTime12(upcoming.time || '09:00')}`
+    : 'No upcoming appointment';
+
+  const notesHtml = notes.length
+    ? `<div class="client-note-list">${notes.map((item) => `
+      <article class="client-note-item">
+        <p>${escapeHtml(item.note || '')}</p>
+        <small>${escapeHtml(formatScheduleDate(String(item.createdAt || '').slice(0, 10)))}</small>
+      </article>
+    `).join('')}</div>`
+    : '<div class="empty-state">No notes yet.</div>';
+
+  const appointmentsHtml = appointments.length
+    ? `<div class="client-note-list">${appointments.slice(0, 8).map((item) => `
+      <article class="client-note-item client-appointment-item">
+        <p><strong>${escapeHtml(item.typeName || 'Appointment')}</strong></p>
+        <small>${escapeHtml(formatScheduleDate(item.date || ''))} • ${escapeHtml(toTime12(item.time || '09:00'))} • ${escapeHtml(formatClientStage(item.status || 'pending'))}</small>
+      </article>
+    `).join('')}</div>`
+    : '<div class="empty-state">No related appointments yet.</div>';
+
+  root.innerHTML = `
+    <div class="client-detail-summary">
+      <div class="client-detail-head">
+        <strong>${escapeHtml(client.name || '')}</strong>
+        <span class="client-stage-pill">${escapeHtml(formatClientStage(client.stage))}</span>
+      </div>
+      <div class="client-detail-progress">${escapeHtml(client.progressSummary || 'No progress summary yet.')}</div>
+      <div class="client-detail-stats">
+        <div class="client-detail-stat">
+          <span>Email</span>
+          <strong>${escapeHtml(client.email || 'No email')}</strong>
+        </div>
+        <div class="client-detail-stat">
+          <span>Phone</span>
+          <strong>${escapeHtml(client.phone || 'No phone')}</strong>
+        </div>
+        <div class="client-detail-stat">
+          <span>Next</span>
+          <strong>${escapeHtml(nextAppointmentLabel)}</strong>
+        </div>
+        <div class="client-detail-stat">
+          <span>History</span>
+          <strong>${notes.length} notes • ${appointments.length} appointments</strong>
+        </div>
+      </div>
+    </div>
+    <h3>Recent Notes</h3>
+    ${notesHtml}
+    <h3 style="margin-top:14px;">Appointment History</h3>
+    ${appointmentsHtml}
+  `;
+}
+
+function renderClientsTable(clients = []) {
+  const root = document.getElementById('clients-table');
+  if (!root) return;
+  if (!clients.length) {
+    root.innerHTML = '<div class="empty-state">No clients found.</div>';
+    renderClientDetail(null, [], []);
+    return;
+  }
+
+  root.innerHTML = clients.map((client) => `
+    <div class="data-row ${Number(client.id) === Number(state.selectedClientId) ? 'active' : ''}" data-client-id="${Number(client.id)}">
+      <div>
+        <strong class="client-name">${escapeHtml(client.name || '')}</strong>
+        <span class="client-note-preview">${escapeHtml(client.lastNote || client.progressSummary || 'No notes yet')}</span>
+      </div>
+      <div>${escapeHtml(formatClientStage(client.stage))}</div>
+      <div>${client.nextAppointmentDate
+    ? `${escapeHtml(formatScheduleDate(client.nextAppointmentDate))} • ${escapeHtml(toTime12(client.nextAppointmentTime || '09:00'))}`
+    : '<span class="client-note-preview">No upcoming</span>'
+}</div>
+    </div>
+  `).join('');
+
+  root.querySelectorAll('.data-row[data-client-id]').forEach((row) => {
+    row.addEventListener('click', async () => {
+      const clientId = Number(row.dataset.clientId);
+      if (!Number.isFinite(clientId) || clientId <= 0) return;
+      state.selectedClientId = clientId;
+      document.getElementById('client-note-form')?.setAttribute('data-client-id', String(clientId));
+      renderClientsTable(state.clients);
+      await loadClientDetail(clientId);
+    });
+  });
+}
+
+async function loadClientDetail(clientId = state.selectedClientId) {
+  const selectedId = Number(clientId);
+  if (!Number.isFinite(selectedId) || selectedId <= 0) {
+    renderClientDetail(null, [], []);
+    return;
+  }
+
+  const client = state.clients.find((item) => Number(item.id) === selectedId) || null;
+  if (!client) {
+    renderClientDetail(null, [], []);
+    return;
+  }
+
+  const [notesPayload, appointmentsPayload] = await Promise.all([
+    api(`/api/clients/${selectedId}/notes`),
+    api(`/api/clients/${selectedId}/appointments`)
+  ]);
+  renderClientDetail(client, notesPayload?.notes || [], appointmentsPayload?.appointments || []);
+}
+
+async function loadClients() {
+  const q = String(document.getElementById('clients-search')?.value || '').trim();
+  const stage = String(document.getElementById('clients-stage-filter')?.value || '').trim();
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (stage) params.set('stage', stage);
+  const query = params.toString();
+
+  renderSkeleton(document.getElementById('clients-table'), 5);
+  const payload = await api(`/api/clients${query ? `?${query}` : ''}`);
+  state.clients = Array.isArray(payload?.clients) ? payload.clients : [];
+
+  if (!state.clients.some((item) => Number(item.id) === Number(state.selectedClientId))) {
+    state.selectedClientId = state.clients[0]?.id || null;
+  }
+  document.getElementById('client-note-form')?.setAttribute('data-client-id', state.selectedClientId ? String(state.selectedClientId) : '');
+
+  renderClientsTable(state.clients);
+  if (state.selectedClientId) {
+    await loadClientDetail(state.selectedClientId);
+  } else {
+    renderClientDetail(null, [], []);
+  }
+}
+
+async function ensureClientForAppointment(appointment = {}) {
+  const name = String(appointment.clientName || appointment.title || '').trim() || 'Client';
+  const email = String(appointment.clientEmail || '').trim();
+  const queryTerm = email || name;
+  if (queryTerm && queryTerm.length >= 2) {
+    const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}`);
+    const clients = Array.isArray(payload?.clients) ? payload.clients : [];
+    const exact = clients.find((item) => {
+      const itemName = String(item.name || '').trim().toLowerCase();
+      const itemEmail = String(item.email || '').trim().toLowerCase();
+      if (email && itemEmail === email.toLowerCase()) return true;
+      return itemName === name.toLowerCase();
+    });
+    if (exact) return exact;
+  }
+
+  const created = await api('/api/clients', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      email: email || '',
+      stage: 'in_progress'
+    })
+  });
+  return created?.client || null;
+}
+
+async function findClientForAppointment(appointment = {}) {
+  const name = String(appointment.clientName || appointment.title || '').trim();
+  const email = String(appointment.clientEmail || '').trim();
+  const queryTerm = email || name;
+  if (!queryTerm || queryTerm.length < 2) return null;
+
+  const payload = await api(`/api/clients?q=${encodeURIComponent(queryTerm)}`);
+  const clients = Array.isArray(payload?.clients) ? payload.clients : [];
+  return clients.find((item) => {
+    const itemName = String(item.name || '').trim().toLowerCase();
+    const itemEmail = String(item.email || '').trim().toLowerCase();
+    if (email && itemEmail === email.toLowerCase()) return true;
+    return itemName === name.toLowerCase();
+  }) || null;
+}
+
+async function openClientFromAppointment(appointment = null) {
+  if (!appointment) return;
+  const client = await findClientForAppointment(appointment);
+  if (!client?.id) {
+    showToast('No saved client profile found for this appointment yet.', 'info');
+    return;
+  }
+
+  const clientId = Number(client.id);
+  if (!Number.isFinite(clientId) || clientId <= 0) return;
+
+  const searchInput = document.getElementById('clients-search');
+  if (searchInput) {
+    searchInput.value = String(client.name || client.email || '').trim();
+  }
+  const stageFilter = document.getElementById('clients-stage-filter');
+  if (stageFilter) stageFilter.value = '';
+
+  state.selectedClientId = clientId;
+  document.getElementById('client-note-form')?.setAttribute('data-client-id', String(clientId));
+
+  setActiveView('clients');
+  await loadClients();
+
+  if (!state.clients.some((item) => Number(item.id) === clientId)) {
+    state.clients = [client, ...state.clients.filter((item) => Number(item.id) !== clientId)];
+    renderClientsTable(state.clients);
+    await loadClientDetail(clientId);
+  }
+
+  const row = document.querySelector(`#clients-table .data-row[data-client-id="${clientId}"]`);
+  row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  showToast('Client info opened.', 'success');
+}
+
 async function loadTypes() {
   const { types } = await api('/api/types');
   state.types = types;
@@ -3954,12 +4528,47 @@ async function submitSettings(e) {
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     data.businessHours = collectBusinessHoursFromForm();
     data.reminderMode = isReminderModeEnabled();
+    data.workspaceMode = normalizeWorkspaceMode(state.workspaceMode);
     const result = await queueAwareMutation('/api/settings', { method: 'PUT', body: JSON.stringify(data) }, {
       allowOfflineQueue: true,
       description: 'Settings update'
     });
     if (result.queued) return;
     showToast('Settings saved', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function submitClient(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const payload = Object.fromEntries(new FormData(form).entries());
+  try {
+    await api('/api/clients', { method: 'POST', body: JSON.stringify(payload) });
+    form.reset();
+    showToast('Client saved.', 'success');
+    await loadClients();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function submitClientNote(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const clientId = Number(form.getAttribute('data-client-id') || state.selectedClientId);
+  if (!Number.isFinite(clientId) || clientId <= 0) {
+    showToast('Select a client first.', 'info');
+    return;
+  }
+
+  const payload = Object.fromEntries(new FormData(form).entries());
+  try {
+    await api(`/api/clients/${clientId}/notes`, { method: 'POST', body: JSON.stringify(payload) });
+    form.reset();
+    showToast('Note added.', 'success');
+    await loadClients();
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -4004,8 +4613,9 @@ async function loadSettings() {
   const { settings } = await api('/api/settings');
   const form = document.getElementById('settings-form');
   if (!form) return;
-  state.reminderMode = settings.reminder_mode === true || settings.reminder_mode === 1;
-  setStoredValue('reminderMode', state.reminderMode);
+  const fallbackServerMode = settings.reminder_mode === true || settings.reminder_mode === 1 ? 'reminders' : 'appointments';
+  const serverWorkspaceMode = normalizeWorkspaceMode(settings.workspace_mode || fallbackServerMode);
+  setWorkspaceMode(serverWorkspaceMode, { persist: true });
   form.businessName.value = settings.business_name || '';
   form.ownerEmail.value = settings.owner_email || '';
   form.timezone.value = settings.timezone || 'America/Los_Angeles';
@@ -4039,7 +4649,12 @@ async function loadSettings() {
   }
 
   const reminderToggle = document.getElementById('settings-reminder-mode');
-  if (reminderToggle) reminderToggle.checked = state.reminderMode;
+  if (reminderToggle) {
+    reminderToggle.checked = state.reminderMode;
+    reminderToggle.disabled = isClientModeEnabled();
+  }
+  const workspaceModeSelect = document.getElementById('settings-workspace-mode');
+  if (workspaceModeSelect) workspaceModeSelect.value = normalizeWorkspaceMode(state.workspaceMode);
   const browserNotifToggle = document.getElementById('settings-browser-notifications');
   if (browserNotifToggle) {
     browserNotifToggle.checked = Boolean(state.browserNotificationsEnabled);
@@ -4974,6 +5589,19 @@ function bindForms() {
   document.getElementById('appointment-form')?.addEventListener('submit', submitAppointment);
   document.getElementById('type-form')?.addEventListener('submit', submitType);
   document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
+  document.getElementById('client-form')?.addEventListener('submit', submitClient);
+  document.getElementById('client-note-form')?.addEventListener('submit', submitClientNote);
+  document.getElementById('btn-refresh-clients')?.addEventListener('click', () => {
+    void loadClients().catch(swallowBackgroundAsyncError);
+  });
+  const queueClientSearch = () => {
+    if (state.clientSearchTimer) clearTimeout(state.clientSearchTimer);
+    state.clientSearchTimer = setTimeout(() => {
+      void loadClients().catch(swallowBackgroundAsyncError);
+    }, 220);
+  };
+  document.getElementById('clients-search')?.addEventListener('input', queueClientSearch);
+  document.getElementById('clients-stage-filter')?.addEventListener('change', queueClientSearch);
   document.getElementById('btn-export-data')?.addEventListener('click', exportBusinessData);
   document.getElementById('btn-import-data')?.addEventListener('click', () => {
     document.getElementById('import-data-file')?.click();
@@ -5129,14 +5757,13 @@ function bindForms() {
 
   document.getElementById('settings-reminder-mode')?.addEventListener('change', async (e) => {
     const checked = Boolean(e.currentTarget?.checked);
-    const previous = state.reminderMode;
-    state.reminderMode = checked;
-    setStoredValue('reminderMode', checked);
-    applyReminderModeUi();
+    const previousMode = state.workspaceMode;
+    const nextMode = checked ? 'reminders' : 'appointments';
+    setWorkspaceMode(nextMode, { persist: true });
     try {
       const result = await queueAwareMutation('/api/settings', {
         method: 'PUT',
-        body: JSON.stringify({ reminderMode: checked })
+        body: JSON.stringify({ reminderMode: checked, workspaceMode: nextMode })
       }, {
         allowOfflineQueue: true,
         description: 'Reminder mode update'
@@ -5147,10 +5774,38 @@ function bindForms() {
       await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
       await refreshCalendarDots({ force: true });
     } catch (error) {
-      state.reminderMode = previous;
-      setStoredValue('reminderMode', previous);
-      if (e.currentTarget) e.currentTarget.checked = previous;
-      applyReminderModeUi();
+      setWorkspaceMode(previousMode, { persist: true });
+      showToast(error.message, 'error');
+    }
+  });
+
+  document.getElementById('settings-workspace-mode')?.addEventListener('change', async (e) => {
+    const nextMode = normalizeWorkspaceMode(e.currentTarget?.value || 'appointments');
+    const previousMode = state.workspaceMode;
+    setWorkspaceMode(nextMode, { persist: true });
+    try {
+      const reminderEnabled = nextMode === 'reminders';
+      const result = await queueAwareMutation('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ reminderMode: reminderEnabled, workspaceMode: nextMode })
+      }, {
+        allowOfflineQueue: true,
+        description: 'Workspace mode update'
+      });
+      if (!result.queued) {
+        showToast(
+          nextMode === 'clients'
+            ? 'Client mode enabled.'
+            : (reminderEnabled ? 'Reminder mode enabled' : 'Appointment mode enabled'),
+          'success'
+        );
+      }
+      if (nextMode === 'clients') setActiveView('dashboard');
+      await loadDashboard(state.selectedDate, { refreshDots: false, showSkeleton: false });
+      await refreshCalendarDots({ force: true });
+      if (nextMode === 'clients') await loadClients();
+    } catch (error) {
+      setWorkspaceMode(previousMode, { persist: true });
       showToast(error.message, 'error');
     }
   });
@@ -5368,6 +6023,8 @@ async function init() {
   }
   const preferredView = getStoredViewPreference();
   state.calendarViewMode = getStoredCalendarViewMode();
+  state.workspaceMode = getStoredWorkspaceMode(state.reminderMode ? 'reminders' : 'appointments');
+  state.reminderMode = state.workspaceMode === 'reminders';
   const selectedDate = parseYmd(state.selectedDate);
   if (selectedDate) state.calendarDate = selectedDate;
   bindAuthUi();

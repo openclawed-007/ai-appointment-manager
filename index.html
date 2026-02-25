@@ -48,6 +48,15 @@
                     </svg>
                     <span>Appointments</span>
                 </a>
+                <a href="#" class="nav-item" data-view="clients" id="nav-clients">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <span>Clients</span>
+                </a>
                 <a href="#" class="nav-item" data-view="types" id="nav-types">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -376,6 +385,114 @@
                             <button class="btn-text" type="button" id="btn-refresh-appointments">Refresh</button>
                         </div>
                         <div class="appointment-types-list" id="appointments-table"></div>
+                    </div>
+                </section>
+
+                <!-- ═══ Clients ═══ -->
+                <section class="app-view" data-view="clients">
+                    <h1 class="sr-only">Clients</h1>
+                    <div class="dashboard-grid two-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Add Client</h2>
+                            </div>
+                            <form class="modal-form" id="client-form">
+                                <div class="form-group">
+                                    <label for="client-name">Name</label>
+                                    <input id="client-name" name="name" required placeholder="Client name" maxlength="200" />
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="client-email">Email</label>
+                                        <input id="client-email" name="email" type="email" placeholder="name@email.com" maxlength="320" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="client-phone">Phone</label>
+                                        <input id="client-phone" name="phone" placeholder="+1 555 000 0000" maxlength="60" />
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="client-stage">Stage</label>
+                                        <select id="client-stage" name="stage">
+                                            <option value="new">New</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="waiting">Waiting</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="on_hold">On Hold</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="client-progress-summary">Progress Summary</label>
+                                        <input id="client-progress-summary" name="progressSummary" placeholder="Where you're up to..." maxlength="1000" />
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Save Client</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Client List</h2>
+                                <button class="btn-text" type="button" id="btn-refresh-clients">Refresh</button>
+                            </div>
+                            <div class="form-row" style="padding: 0 20px 14px;">
+                                <div class="form-group">
+                                    <label for="clients-search">Search</label>
+                                    <input id="clients-search" placeholder="Name, email, or phone..." />
+                                </div>
+                                <div class="form-group">
+                                    <label for="clients-stage-filter">Stage</label>
+                                    <select id="clients-stage-filter">
+                                        <option value="">All</option>
+                                        <option value="new">New</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="waiting">Waiting</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="on_hold">On Hold</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="appointment-types-list" id="clients-table">
+                                <div class="empty-state">No clients yet.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-grid two-col">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Client Details</h2>
+                            </div>
+                            <div id="client-detail-panel" class="client-detail-panel">
+                                <div class="empty-state">Select a client to view details.</div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Quick Note</h2>
+                            </div>
+                            <form class="modal-form" id="client-note-form">
+                                <div class="form-group">
+                                    <label for="client-note-text">Note</label>
+                                    <textarea id="client-note-text" name="note" rows="5" placeholder="Add progress notes..." maxlength="5000" required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="client-note-stage">Optional Stage Change</label>
+                                    <select id="client-note-stage" name="stage">
+                                        <option value="">No change</option>
+                                        <option value="new">New</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="waiting">Waiting</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="on_hold">On Hold</option>
+                                    </select>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Add Note</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </section>
 
@@ -762,6 +879,19 @@
                                 <div class="settings-toggle-list">
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
+                                            <strong>Workspace mode</strong>
+                                            <small>Switch between Appointments, Reminders, or Clients-only UI.</small>
+                                        </div>
+                                        <div class="settings-toggle-select">
+                                            <select id="settings-workspace-mode" aria-label="Workspace mode">
+                                                <option value="appointments">Appointments</option>
+                                                <option value="reminders">Reminders</option>
+                                                <option value="clients">Clients</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="settings-toggle-item">
+                                        <div class="settings-toggle-copy">
                                             <strong>Reminder mode</strong>
                                             <small>Use reminder wording and show full-day calendar hours.</small>
                                         </div>
@@ -1031,6 +1161,15 @@
                     <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span>Appts</span>
+            </a>
+            <a href="#" class="mobile-nav-item" data-view="clients" aria-label="Clients">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span>Clients</span>
             </a>
             <a href="#" class="mobile-nav-item" data-view="types" aria-label="Types and Services">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

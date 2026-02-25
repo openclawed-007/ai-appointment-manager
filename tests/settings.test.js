@@ -127,6 +127,26 @@ describe('Settings API', () => {
     expect(disableRes.body.settings.reminder_mode).toBe(false);
   });
 
+  it('PUT /api/settings persists workspace mode per business', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent);
+
+    const setClients = await put(agent, '/api/settings').send({ workspaceMode: 'clients' });
+    expect(setClients.statusCode).toBe(200);
+    expect(setClients.body.settings.workspace_mode).toBe('clients');
+    expect(setClients.body.settings.reminder_mode).toBe(false);
+
+    const setReminders = await put(agent, '/api/settings').send({ workspaceMode: 'reminders' });
+    expect(setReminders.statusCode).toBe(200);
+    expect(setReminders.body.settings.workspace_mode).toBe('reminders');
+    expect(setReminders.body.settings.reminder_mode).toBe(true);
+
+    const fresh = await agent.get('/api/settings');
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.body.settings.workspace_mode).toBe('reminders');
+    expect(fresh.body.settings.reminder_mode).toBe(true);
+  });
+
   it('PUT /api/settings updates business open and close hours', async () => {
     const agent = request.agent(app);
     await loginAndVerify(agent);

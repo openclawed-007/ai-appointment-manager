@@ -156,6 +156,21 @@
     line-height: 1.4;
 }
 
+.settings-toggle-select {
+    width: min(180px, 46%);
+    flex-shrink: 0;
+}
+
+.settings-toggle-select select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 0.78rem;
+}
+
 /* ── Modern Business Hours UI ── */
 .business-hours-group {
     margin-top: var(--spacing-sm);

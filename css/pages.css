@@ -103,6 +103,137 @@
     cursor: wait;
 }
 
+/* ── Clients ── */
+#clients-table .data-row {
+    grid-template-columns: minmax(180px, 1.2fr) minmax(110px, 0.7fr) minmax(120px, 0.8fr);
+    cursor: pointer;
+}
+
+#clients-table .data-row.active {
+    background: rgba(120, 145, 255, 0.12);
+    border: 1px solid rgba(120, 145, 255, 0.25);
+}
+
+.client-name {
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.client-note-preview {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.client-detail-panel {
+    padding: 0 20px 20px;
+}
+
+.client-detail-summary {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-raised);
+    padding: 12px;
+}
+
+.client-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.client-detail-head strong {
+    font-size: 0.95rem;
+}
+
+.client-stage-pill {
+    border: 1px solid var(--border-strong);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    white-space: nowrap;
+}
+
+.client-detail-progress {
+    color: var(--text-secondary);
+    font-size: 0.79rem;
+    line-height: 1.45;
+}
+
+.client-detail-stats {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.client-detail-stat {
+    display: grid;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-surface);
+    padding: 8px;
+}
+
+.client-detail-stat span {
+    color: var(--text-muted);
+    font-size: 0.67rem;
+}
+
+.client-detail-stat strong {
+    color: var(--text);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.client-note-list {
+    display: grid;
+    gap: 10px;
+}
+
+.client-note-item {
+    display: grid;
+    gap: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+}
+
+.client-note-item p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.client-note-item small {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+
+.client-appointment-item p {
+    color: var(--text);
+}
+
+@media (max-width: 700px) {
+    .client-detail-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* ── Booking Page ── */
 .booking-shell {
     min-height: 100vh;
