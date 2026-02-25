@@ -172,18 +172,25 @@
                 <!-- ═══ Dashboard ═══ -->
                 <section class="app-view active" data-view="dashboard">
                     <h1 class="sr-only">Dashboard</h1>
+                    
+                    <div class="page-header">
+                        <div class="page-header-main">
+                            <h2>Dashboard</h2>
+                            <p class="page-subtitle">Your scheduling overview, daily metrics, and insights at a glance.</p>
+                        </div>
+                        <div class="page-header-actions">
+                            <button class="btn-text stats-toggle-btn" id="btn-toggle-stats" type="button"
+                                aria-expanded="true" aria-controls="dashboard-stats-grid">
+                                <span data-stats-toggle-label>Hide overview</span>
+                                <svg class="stats-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Stats Row -->
-                    <div class="stats-toolbar">
-                        <button class="btn-text stats-toggle-btn" id="btn-toggle-stats" type="button"
-                            aria-expanded="true" aria-controls="dashboard-stats-grid">
-                            <span data-stats-toggle-label>Hide overview</span>
-                            <svg class="stats-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                        </button>
-                    </div>
                     <div class="stats-grid" id="dashboard-stats-grid">
                         <div class="stat-card stat-today" id="stat-card-today">
                             <div class="stat-accent"></div>
@@ -379,42 +386,68 @@
                 <!-- ═══ Appointments ═══ -->
                 <section class="app-view" data-view="appointments">
                     <h1 class="sr-only">Appointments</h1>
-                    <div class="card">
-                        <div class="card-header">
+                    <div class="page-header">
+                        <div class="page-header-main">
                             <h2>All Appointments</h2>
-                            <button class="btn-text" type="button" id="btn-refresh-appointments">Refresh</button>
+                            <p class="page-subtitle">View your entire schedule history and upcoming bookings.</p>
                         </div>
-                        <div class="appointment-types-list" id="appointments-table"></div>
+                        <div class="page-header-actions">
+                            <button class="btn-text" type="button" id="btn-refresh-appointments">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="split-view-content">
+                        <!-- Left Pane: List -->
+                        <div class="split-list-pane">
+                            <div class="card split-list-card">
+                                <div class="split-table-container appointment-types-list" id="appointments-table" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Right Pane: Details -->
+                        <div class="split-detail-pane">
+                            <div id="appointment-detail-panel-wrapper" class="split-detail-panel-wrapper">
+                                <div class="card empty-detail-card">
+                                    <div class="empty-state">Select an appointment to view details.</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
                 <!-- ═══ Clients ═══ -->
                 <section class="app-view" data-view="clients">
                     <h1 class="sr-only">Clients</h1>
-                    <div class="dashboard-grid two-col">
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Add Client</h2>
-                            </div>
-                            <form class="modal-form" id="client-form">
-                                <div class="form-group">
-                                    <label for="client-name">Name</label>
-                                    <input id="client-name" name="name" required placeholder="Client name" maxlength="200" />
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="client-email">Email</label>
-                                        <input id="client-email" name="email" type="email" placeholder="name@email.com" maxlength="320" />
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="client-phone">Phone</label>
-                                        <input id="client-phone" name="phone" placeholder="+1 555 000 0000" maxlength="60" />
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="client-stage">Stage</label>
-                                        <select id="client-stage" name="stage">
+                    
+                    <div class="page-header">
+                        <div class="page-header-main">
+                            <h2>Manage Clients</h2>
+                            <p class="page-subtitle">View and manage your client base, notes, and progress.</p>
+                        </div>
+                        <div class="page-header-actions">
+                            <button class="btn-text" type="button" id="btn-refresh-clients">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                Refresh
+                            </button>
+                            <button class="btn-primary" type="button" id="btn-show-add-client">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Add Client
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="split-view-content">
+                        <!-- Left Pane: Search and List -->
+                        <div class="split-list-pane">
+                            <div class="card split-list-card">
+                                <div class="card-header split-search-header">
+                                    <div class="split-search-wrapper">
+                                        <input id="clients-search" placeholder="Search name, email, or phone..." />
+                                        <select id="clients-stage-filter">
+                                            <option value="">All Stages</option>
                                             <option value="new">New</option>
                                             <option value="in_progress">In Progress</option>
                                             <option value="waiting">Waiting</option>
@@ -422,76 +455,67 @@
                                             <option value="on_hold">On Hold</option>
                                         </select>
                                     </div>
+                                </div>
+                                <div class="split-table-container" id="clients-table">
+                                    <div class="empty-state">No clients yet.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Pane: Details, Notes and History -->
+                        <div class="split-detail-pane">
+                            <div id="client-detail-panel-wrapper" class="split-detail-panel-wrapper">
+                                <!-- Initially empty/placeholder state -->
+                                <div class="card empty-detail-card">
+                                    <div class="empty-state">Select a client to view details.</div>
+                                </div>
+                            </div>
+
+                            <!-- Hidden Form for Add/Edit (Will be shown via JS or in a modal) -->
+                            <div id="client-form-container" class="card client-form-card" style="display: none;">
+                                <div class="card-header">
+                                    <h2 id="client-form-title">Add Client</h2>
+                                    <button class="btn-icon-close" id="btn-close-client-form">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                                <form class="modal-form" id="client-form">
+                                    <input type="hidden" name="id" id="client-id" />
                                     <div class="form-group">
-                                        <label for="client-progress-summary">Progress Summary</label>
-                                        <input id="client-progress-summary" name="progressSummary" placeholder="Where you're up to..." maxlength="1000" />
+                                        <label for="client-name">Name</label>
+                                        <input id="client-name" name="name" required placeholder="Client name" maxlength="200" />
                                     </div>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-primary">Save Client</button>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Client List</h2>
-                                <button class="btn-text" type="button" id="btn-refresh-clients">Refresh</button>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="client-email">Email</label>
+                                            <input id="client-email" name="email" type="email" placeholder="name@email.com" maxlength="320" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="client-phone">Phone</label>
+                                            <input id="client-phone" name="phone" placeholder="+1 555 000 0000" maxlength="60" />
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="client-stage">Stage</label>
+                                            <select id="client-stage" name="stage">
+                                                <option value="new">New</option>
+                                                <option value="in_progress">In Progress</option>
+                                                <option value="waiting">Waiting</option>
+                                                <option value="completed">Completed</option>
+                                                <option value="on_hold">On Hold</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="client-progress-summary">Progress Summary</label>
+                                            <input id="client-progress-summary" name="progressSummary" placeholder="Where you're up to..." maxlength="1000" />
+                                        </div>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn-primary" id="btn-save-client">Save Client</button>
+                                    </div>
+                                </form>
                             </div>
-                            <div class="form-row" style="padding: 0 20px 14px;">
-                                <div class="form-group">
-                                    <label for="clients-search">Search</label>
-                                    <input id="clients-search" placeholder="Name, email, or phone..." />
-                                </div>
-                                <div class="form-group">
-                                    <label for="clients-stage-filter">Stage</label>
-                                    <select id="clients-stage-filter">
-                                        <option value="">All</option>
-                                        <option value="new">New</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="waiting">Waiting</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="on_hold">On Hold</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="appointment-types-list" id="clients-table">
-                                <div class="empty-state">No clients yet.</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="dashboard-grid two-col">
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Client Details</h2>
-                            </div>
-                            <div id="client-detail-panel" class="client-detail-panel">
-                                <div class="empty-state">Select a client to view details.</div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Quick Note</h2>
-                            </div>
-                            <form class="modal-form" id="client-note-form">
-                                <div class="form-group">
-                                    <label for="client-note-text">Note</label>
-                                    <textarea id="client-note-text" name="note" rows="5" placeholder="Add progress notes..." maxlength="5000" required></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label for="client-note-stage">Optional Stage Change</label>
-                                    <select id="client-note-stage" name="stage">
-                                        <option value="">No change</option>
-                                        <option value="new">New</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="waiting">Waiting</option>
-                                        <option value="completed">Completed</option>
-                                        <option value="on_hold">On Hold</option>
-                                    </select>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-primary">Add Note</button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 </section>
@@ -499,51 +523,67 @@
                 <!-- ═══ Types & Services ═══ -->
                 <section class="app-view" data-view="types">
                     <h1 class="sr-only">Types & Services</h1>
-                    <div class="dashboard-grid two-col">
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Create Appointment Type</h2>
-                            </div>
-                            <p class="types-helper">Add a service once, then reuse it when creating bookings.</p>
-                            <form class="modal-form" id="type-form">
-                                <div class="form-group">
-                                    <label for="type-name">Name</label>
-                                    <input id="type-name" name="name" required placeholder="e.g. Haircut" />
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="type-duration">Duration (min)</label>
-                                        <input id="type-duration" name="durationMinutes" type="number" value="30"
-                                            min="5" />
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="type-price">Price (£)</label>
-                                        <input id="type-price" name="priceGbp" type="number" value="0" min="0"
-                                            step="1" />
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="type-location">Location Mode</label>
-                                    <select id="type-location" name="locationMode">
-                                        <option value="office">Office</option>
-                                        <option value="on-premises">On premises</option>
-                                        <option value="virtual">Virtual</option>
-                                        <option value="phone">Phone</option>
-                                        <option value="hybrid" selected>Hybrid</option>
-                                    </select>
-                                </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn-primary">Create Type</button>
-                                </div>
-                            </form>
+                    <div class="page-header">
+                        <div class="page-header-main">
+                            <h2>Manage Services</h2>
+                            <p class="page-subtitle">Configure the types of appointments and services you offer.</p>
                         </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>Current Types</h2>
+                    </div>
+                    <div class="split-view-content">
+                        <!-- Left Pane: Types List -->
+                        <div class="split-list-pane">
+                            <div class="card split-list-card">
+                                <div class="card-header">
+                                    <h2>Current Types</h2>
+                                </div>
+                                <p class="types-helper" style="margin-bottom: 8px;">Review active services and remove outdated entries.</p>
+                                <div class="split-table-container appointment-types-list" id="type-admin-list" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
                             </div>
-                            <p class="types-helper">Review active services, bookings count, and remove outdated entries.
-                            </p>
-                            <div class="appointment-types-list" id="type-admin-list"></div>
+                        </div>
+
+                        <!-- Right Pane: Add/Edit Form -->
+                        <div class="split-detail-pane">
+                            <div class="card client-form-card">
+                                <div class="card-header">
+                                    <h2 id="type-form-title">Create Appointment Type</h2>
+                                    <button class="btn-icon-close" id="btn-cancel-type-edit" style="display: none;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </button>
+                                </div>
+                                <p class="types-helper">Add a service once, then reuse it when creating bookings.</p>
+                                <form class="modal-form" id="type-form">
+                                    <input type="hidden" name="id" id="type-id" />
+                                    <div class="form-group">
+                                        <label for="type-name">Name</label>
+                                        <input id="type-name" name="name" required placeholder="e.g. Haircut" />
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="type-duration">Duration (min)</label>
+                                            <input id="type-duration" name="durationMinutes" type="number" value="30"
+                                                min="5" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="type-price">Price (£)</label>
+                                            <input id="type-price" name="priceGbp" type="number" value="0" min="0"
+                                                step="1" />
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="type-location">Location Mode</label>
+                                        <select id="type-location" name="locationMode">
+                                            <option value="office">Office</option>
+                                            <option value="on-premises">On premises</option>
+                                            <option value="virtual">Virtual</option>
+                                            <option value="phone">Phone</option>
+                                            <option value="hybrid" selected>Hybrid</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn-primary">Create Type</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -551,11 +591,16 @@
                 <!-- ═══ AI Assistant ═══ -->
                 <section class="app-view" data-view="ai">
                     <h1 class="sr-only">AI Assistant</h1>
-                    <div class="card ai-insights">
-                        <div class="card-header">
-                            <h2>AI Assistant Feed</h2>
-                            <span class="badge pulse">Live</span>
+                    <div class="page-header">
+                        <div class="page-header-main">
+                            <h2>AI Insights Feed</h2>
+                            <p class="page-subtitle">Real-time predictive analysis, scheduling optimization, and anomalies.</p>
                         </div>
+                        <div class="page-header-actions">
+                            <span class="badge pulse">Live Monitoring</span>
+                        </div>
+                    </div>
+                    <div class="card ai-insights">
                         <div class="insights-list" id="ai-full-list"></div>
                     </div>
                 </section>
@@ -563,6 +608,12 @@
                 <!-- ═══ Settings ═══ -->
                 <section class="app-view" data-view="settings">
                     <h1 class="sr-only">Settings</h1>
+                    <div class="page-header">
+                        <div class="page-header-main">
+                            <h2>Workspace Settings</h2>
+                            <p class="page-subtitle">Configure your business profile, operating hours, and appearance.</p>
+                        </div>
+                    </div>
                     <div class="settings-page">
 
                         <!-- ── Section 1: Business Profile ── -->

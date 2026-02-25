@@ -273,7 +273,7 @@
 }
 
 .btn-primary {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: var(--spacing-sm);
     padding: 10px 20px;
@@ -341,10 +341,16 @@
     cursor: pointer;
     transition: color var(--transition-fast);
     font-family: var(--font-display);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
 }
 
 .btn-text:hover {
     color: var(--gold-light);
+    background: var(--bg-raised);
 }
 
 .account-chip {

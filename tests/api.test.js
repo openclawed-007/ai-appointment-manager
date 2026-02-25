@@ -193,6 +193,41 @@ describe('API smoke', () => {
     expect(deleteRes.body.ok).toBe(true);
   });
 
+  it('archives clients on delete and excludes them from active client routes', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const unique = Date.now();
+    const createClient = await post(agent, '/api/clients').send({
+      name: `Archive Client ${unique}`,
+      email: `archive-client-${unique}@example.com`,
+      stage: 'new'
+    });
+    expect(createClient.statusCode).toBe(201);
+    const clientId = createClient.body.client.id;
+
+    const noteRes = await post(agent, `/api/clients/${clientId}/notes`).send({
+      note: 'Client note before archive',
+      stage: 'in_progress'
+    });
+    expect(noteRes.statusCode).toBe(201);
+
+    const archiveRes = await del(agent, `/api/clients/${clientId}`);
+    expect(archiveRes.statusCode).toBe(200);
+    expect(archiveRes.body.success).toBe(true);
+    expect(archiveRes.body.archived).toBe(true);
+
+    const listRes = await agent.get('/api/clients');
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.body.clients.some((c) => Number(c.id) === Number(clientId))).toBe(false);
+
+    const notesAfterArchive = await agent.get(`/api/clients/${clientId}/notes`);
+    expect(notesAfterArchive.statusCode).toBe(404);
+
+    const archiveAgain = await del(agent, `/api/clients/${clientId}`);
+    expect(archiveAgain.statusCode).toBe(404);
+  });
+
   it('supports reminder offset create/update validation and persistence', async () => {
     const agent = request.agent(app);
     await loginAndVerify(agent, adminEmail, adminPassword);

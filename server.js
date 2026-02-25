@@ -1268,6 +1268,21 @@ app.put('/api/clients/:id', async (req, res) => {
   res.json({ client: rowToClient(row) });
 });
 
+app.delete('/api/clients/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid client id' });
+
+  // Archive instead of hard-deleting so historical appointment data stays intact.
+  const result = await dbRun(
+    'UPDATE clients SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND business_id = ? AND archived_at IS NULL',
+    'UPDATE clients SET archived_at = NOW(), updated_at = NOW() WHERE id = $1 AND business_id = $2 AND archived_at IS NULL',
+    [id, businessId]
+  );
+  if (!result?.changes) return res.status(404).json({ error: 'client not found' });
+  res.json({ success: true, archived: true });
+});
+
 app.get('/api/clients/:id/notes', async (req, res) => {
   const businessId = req.auth.businessId;
   const clientId = Number(req.params.id);

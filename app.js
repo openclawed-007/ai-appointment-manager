@@ -327,7 +327,7 @@ function applyReminderModeUi() {
 
   setText('#nav-appointments span', entryPluralTitle);
   setText('.mobile-nav-item[data-view="appointments"] span', reminderMode ? 'Reminders' : 'Appts');
-  setText('section[data-view="appointments"] .card-header h2', `All ${entryPluralTitle}`);
+  setText('section[data-view="appointments"] .page-header-main h2', `All ${entryPluralTitle}`);
   setText('#btn-new-appointment span', `New ${entrySingularTitle}`);
   setText('#stat-card-today .stat-hint', `${entryPlural} today`);
   setText('#stat-card-week .stat-hint', reminderMode ? 'scheduled this week' : 'booked this week');
@@ -3828,6 +3828,9 @@ function renderTypes(types = []) {
                 </span>
               </div>
               <div class="type-admin-card__actions">
+                <button class="btn-edit-type" type="button" aria-label="Edit Type" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); transition: all var(--transition-fast);">
+                  <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
+                </button>
                 <button class="btn-delete-type" type="button" aria-label="Delete Type">
                   <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>
@@ -3839,6 +3842,13 @@ function renderTypes(types = []) {
   if (root) root.innerHTML = html;
   if (adminRoot) {
     adminRoot.innerHTML = adminHtml;
+    
+    adminRoot.querySelectorAll('.btn-edit-type').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const typeId = btn.closest('.type-admin-card')?.dataset.typeId;
+        if (typeId) setTypeFormForEditing(typeId);
+      });
+    });
 
     adminRoot.querySelectorAll('.btn-delete-type').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -3892,140 +3902,246 @@ function renderInsights(insights = []) {
 
 function renderAppointmentsTable(appointments = []) {
   const root = document.getElementById('appointments-table');
-  const reminderModeEnabled = isReminderModeEnabled();
   if (!root) return;
+  
+  // Store appointments in state so detail view can access them
+  state.appointments = appointments;
+
   if (!appointments.length) {
     root.innerHTML = `<div class="empty-state">No ${getEntryWordPlural()} found.</div>`;
+    renderAppointmentDetail(null);
     return;
   }
 
   root.innerHTML = appointments
-    .map(
-      (a) => {
-        const statusClass = `status-${(a.status || 'pending').toLowerCase()}`;
-        return `
-      <div class="data-row" data-id="${a.id}">
-        <div>
-          <strong class="client-name">${escapeHtml(a.clientName)}</strong>
-          <div class="appointment-type-tag">${escapeHtml(a.typeName)}</div>
-        </div>
-        <div class="appointment-date-cell">${escapeHtml(formatScheduleDate(a.date))}</div>
-        <div class="appointment-time-cell">${toTime12(a.time)}</div>
-        <div><span class="status-badge ${statusClass}">${escapeHtml(a.status)}</span></div>
-        <div class="row-actions">
-          ${reminderModeEnabled
-            ? ''
-            : (
-              a.clientEmail
-                ? '<button class="btn-secondary btn-email" type="button" title="Send Email">Email</button>'
-                : '<button class="btn-secondary btn-email" type="button" disabled>No Email</button>'
-            )
-          }
-          ${reminderModeEnabled || a.status !== 'pending'
-            ? ''
-            : '<button class="btn-secondary btn-confirm-booking" type="button">Confirm</button>'
-          }
-          <button class="btn-secondary btn-complete" type="button" ${a.status === 'completed' || a.status === 'cancelled' ? 'disabled' : ''}>${reminderModeEnabled ? 'Done' : 'Complete'}</button>
-          ${reminderModeEnabled
-            ? ''
-            : `<button class="btn-secondary btn-cancel" type="button" ${a.status === 'cancelled' ? 'disabled' : ''}>${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>`
-          }
-          <button class="btn-secondary btn-delete" type="button">${reminderModeEnabled ? 'Delete Reminder' : 'Delete'}</button>
-        </div>
-      </div>`;
-      }
-    )
+    .map((a) => {
+      const statusClass = `status-${(a.status || 'pending').toLowerCase()}`;
+      const isActive = Number(a.id) === Number(state.selectedAppointmentId) ? 'active' : '';
+      return `
+        <div class="data-row ${isActive}" data-id="${a.id}">
+          <div>
+            <strong class="client-name">${escapeHtml(a.clientName)}</strong>
+            <div class="appointment-type-tag" style="margin-top: 4px;">${escapeHtml(a.typeName)}</div>
+          </div>
+          <div style="text-align: right;">
+            <span class="status-badge ${statusClass}" style="margin-bottom: 4px; display: inline-block;">${escapeHtml(a.status)}</span>
+            <div class="client-note-preview">
+                ${escapeHtml(formatScheduleDate(a.date))} • ${toTime12(a.time)}
+            </div>
+          </div>
+        </div>`;
+    })
     .join('');
 
-  root.querySelectorAll('.btn-email').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (btn.disabled) return;
-      const id = btn.closest('.data-row')?.dataset.id;
-      if (!id) return;
-      await openEmailComposerMenu(id);
-    });
-  });
-
-  root.querySelectorAll('.btn-complete').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (btn.disabled) return;
-      const id = btn.closest('.data-row')?.dataset.id;
-      try {
-        const result = await queueAwareMutation(`/api/appointments/${id}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'completed' })
-        }, {
-          allowOfflineQueue: true,
-          description: reminderModeEnabled ? 'Reminder completion' : 'Appointment completion'
-        });
-        if (result.queued) return;
-        showToast(reminderModeEnabled ? 'Reminder marked done' : 'Appointment marked completed', 'success');
-        await loadAppointmentsTable();
-        await loadDashboard();
-      } catch (error) {
-        showToast(error.message, 'error');
+  root.querySelectorAll('.data-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      const id = Number(row.dataset.id);
+      if (!Number.isFinite(id) || id <= 0) return;
+      state.selectedAppointmentId = id;
+      
+      // Update active state in UI immediately
+      root.querySelectorAll('.data-row').forEach(r => r.classList.remove('active'));
+      row.classList.add('active');
+      
+      const appointment = state.appointments.find(a => Number(a.id) === id);
+      renderAppointmentDetail(appointment);
+      
+      // Auto-scroll to detail panel on narrow screens
+      if (window.innerWidth <= 1024) {
+        document.getElementById('appointment-detail-panel-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     });
   });
+  
+  // Render first item's details if nothing selected or selection is invalid
+  if (!state.selectedAppointmentId || !appointments.some(a => Number(a.id) === Number(state.selectedAppointmentId))) {
+    state.selectedAppointmentId = appointments[0]?.id || null;
+    if (state.selectedAppointmentId) {
+       const firstRow = root.querySelector('.data-row');
+       if (firstRow) firstRow.classList.add('active');
+       renderAppointmentDetail(appointments[0]);
+    } else {
+       renderAppointmentDetail(null);
+    }
+  } else {
+    const appointment = appointments.find(a => Number(a.id) === Number(state.selectedAppointmentId));
+    renderAppointmentDetail(appointment);
+  }
+}
 
-  root.querySelectorAll('.btn-confirm-booking').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+function renderAppointmentDetail(appointment = null) {
+  const root = document.getElementById('appointment-detail-panel-wrapper');
+  if (!root) return;
+  if (!appointment) {
+    root.innerHTML = `<div class="card empty-detail-card"><div class="empty-state">Select an appointment to view details.</div></div>`;
+    return;
+  }
+
+  const reminderModeEnabled = isReminderModeEnabled();
+  const statusClass = `status-${(appointment.status || 'pending').toLowerCase()}`;
+  
+  let actionsHtml = `
+    <button class="btn-secondary btn-sm btn-edit" data-id="${appointment.id}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
+      Edit
+    </button>
+  `;
+  
+  if (!reminderModeEnabled) {
+      if (appointment.clientEmail) {
+          actionsHtml += `
+            <button class="btn-secondary btn-sm btn-email" data-id="${appointment.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              Email
+            </button>
+          `;
+      }
+      if (appointment.status === 'pending') {
+          actionsHtml += `
+            <button class="btn-secondary btn-sm btn-confirm-booking" data-id="${appointment.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Confirm
+            </button>
+          `;
+      }
+  }
+
+  if (appointment.status !== 'completed' && appointment.status !== 'cancelled') {
+      actionsHtml += `
+        <button class="btn-secondary btn-sm btn-complete" data-id="${appointment.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          ${reminderModeEnabled ? 'Done' : 'Complete'}
+        </button>
+      `;
+  }
+
+  if (!reminderModeEnabled && appointment.status !== 'cancelled') {
+      actionsHtml += `
+        <button class="btn-secondary btn-sm btn-cancel" data-id="${appointment.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+          Cancel
+        </button>
+      `;
+  }
+
+  actionsHtml += `
+    <button class="btn-secondary btn-sm btn-danger btn-delete" data-id="${appointment.id}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      Delete
+    </button>
+  `;
+
+  root.innerHTML = `
+    <div class="card detail-panel-header-card">
+      <div class="detail-panel-top-actions" style="flex-wrap: wrap; justify-content: flex-end;">
+        ${actionsHtml}
+      </div>
+
+      <div class="detail-panel-summary">
+        <div class="detail-panel-head">
+          <strong>${escapeHtml(appointment.clientName || 'Unnamed Client')}</strong>
+          <span class="status-badge ${statusClass}">${escapeHtml(appointment.status)}</span>
+        </div>
+        <div class="detail-panel-progress">${escapeHtml(appointment.typeName || 'General Appointment')}</div>
+        <div class="detail-panel-stats">
+          <div class="detail-panel-stat">
+            <span>Date</span>
+            <strong>${escapeHtml(formatScheduleDate(appointment.date))}</strong>
+          </div>
+          <div class="detail-panel-stat">
+            <span>Time</span>
+            <strong>${escapeHtml(formatEntryTimeRange(appointment))}</strong>
+          </div>
+          ${!reminderModeEnabled && appointment.clientEmail ? `
+          <div class="detail-panel-stat">
+            <span>Email</span>
+            <strong>${escapeHtml(appointment.clientEmail)}</strong>
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+    
+    ${appointment.notes ? `
+    <div class="card" style="margin-top: 16px;">
+        <div class="card-header">
+            <h2>Notes</h2>
+        </div>
+        <div style="padding: 16px;">
+            <p style="white-space: pre-wrap; margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5;">${escapeHtml(appointment.notes)}</p>
+        </div>
+    </div>` : ''}
+  `;
+
+  // Attach listeners
+  root.querySelector('.btn-edit')?.addEventListener('click', () => startEditAppointment(appointment));
+  
+  root.querySelector('.btn-email')?.addEventListener('click', async () => {
+      await openEmailComposerMenu(appointment.id);
+  });
+  
+  root.querySelector('.btn-complete')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
       if (btn.disabled) return;
-      const id = btn.closest('.data-row')?.dataset.id;
-      const originalText = btn.textContent;
+      try {
+        const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'completed' })
+        }, { allowOfflineQueue: true });
+        if (result.queued) return;
+        showToast('Marked as completed', 'success');
+        await loadAppointmentsTable();
+        await loadDashboard();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+  });
+
+  root.querySelector('.btn-confirm-booking')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      const originalText = btn.innerHTML;
       btn.disabled = true;
       btn.classList.add('is-busy');
-      btn.textContent = 'Confirming...';
+      btn.innerHTML = 'Confirming...';
       try {
-        const result = await queueAwareMutation(`/api/appointments/${id}/status`, {
+        const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
           method: 'PATCH',
           body: JSON.stringify({ status: 'confirmed' })
-        }, {
-          allowOfflineQueue: true,
-          description: 'Appointment confirmation'
-        });
+        }, { allowOfflineQueue: true });
         if (result.queued) {
           btn.classList.remove('is-busy');
-          btn.textContent = 'Queued';
+          btn.innerHTML = 'Queued';
           return;
         }
         showToast('Appointment confirmed!', 'success');
         await loadAppointmentsTable();
         await loadDashboard();
         await refreshCalendarDots({ force: true });
-      } catch (error) {
-        showToast(error.message, 'error');
+      } catch (err) {
+        showToast(err.message, 'error');
         btn.disabled = false;
         btn.classList.remove('is-busy');
-        btn.textContent = originalText;
+        btn.innerHTML = originalText;
       }
-    });
   });
 
-  root.querySelectorAll('.btn-cancel').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (btn.disabled) return;
-      const id = btn.closest('.data-row')?.dataset.id;
-      await openCancelReasonMenu(id);
-    });
+  root.querySelector('.btn-cancel')?.addEventListener('click', async () => {
+      await openCancelReasonMenu(appointment.id);
   });
 
-  root.querySelectorAll('.btn-delete').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.closest('.data-row')?.dataset.id;
-      try {
-        const result = await queueAwareMutation(`/api/appointments/${id}`, { method: 'DELETE' }, {
-          allowOfflineQueue: true,
-          description: reminderModeEnabled ? 'Reminder deletion' : 'Appointment deletion'
-        });
-        if (result.queued) return;
-        showToast(reminderModeEnabled ? 'Reminder deleted' : 'Appointment deleted', 'success');
-        await loadAppointmentsTable();
-        await loadDashboard();
-      } catch (error) {
-        showToast(error.message, 'error');
+  root.querySelector('.btn-delete')?.addEventListener('click', async () => {
+      if (await confirmDialog('Delete', `Are you sure you want to delete this ${reminderModeEnabled ? 'reminder' : 'appointment'}?`)) {
+          try {
+            const result = await queueAwareMutation(`/api/appointments/${appointment.id}`, { method: 'DELETE' }, { allowOfflineQueue: true });
+            if (result.queued) return;
+            showToast('Deleted successfully', 'success');
+            state.selectedAppointmentId = null;
+            await loadAppointmentsTable();
+            await loadDashboard();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
       }
-    });
   });
 }
 
@@ -4038,10 +4154,10 @@ function formatClientStage(stage = '') {
 }
 
 function renderClientDetail(client = null, notes = [], appointments = []) {
-  const root = document.getElementById('client-detail-panel');
+  const root = document.getElementById('client-detail-panel-wrapper');
   if (!root) return;
   if (!client) {
-    root.innerHTML = '<div class="empty-state">Select a client to view details.</div>';
+    root.innerHTML = `<div class="card empty-detail-card"><div class="empty-state">Select a client to view details.</div></div>`;
     return;
   }
 
@@ -4067,7 +4183,7 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     : '<div class="empty-state">No notes yet.</div>';
 
   const appointmentsHtml = appointments.length
-    ? `<div class="client-note-list">${appointments.slice(0, 8).map((item) => `
+    ? `<div class="client-note-list">${appointments.slice(0, 5).map((item) => `
       <article class="client-note-item client-appointment-item">
         <p><strong>${escapeHtml(item.typeName || 'Appointment')}</strong></p>
         <small>${escapeHtml(formatScheduleDate(item.date || ''))} • ${escapeHtml(toTime12(item.time || '09:00'))} • ${escapeHtml(formatClientStage(item.status || 'pending'))}</small>
@@ -4076,36 +4192,110 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     : '<div class="empty-state">No related appointments yet.</div>';
 
   root.innerHTML = `
-    <div class="client-detail-summary">
-      <div class="client-detail-head">
-        <strong>${escapeHtml(client.name || '')}</strong>
-        <span class="client-stage-pill">${escapeHtml(formatClientStage(client.stage))}</span>
+    <div class="card detail-panel-header-card">
+      <div class="detail-panel-top-actions">
+        <button class="btn-secondary btn-sm" id="btn-edit-client" data-id="${client.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
+          Edit
+        </button>
+        <button class="btn-secondary btn-sm" id="btn-book-for-client" data-name="${escapeHtml(client.name)}" data-email="${escapeHtml(client.email || '')}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          Book
+        </button>
+        <button class="btn-secondary btn-sm btn-danger" id="btn-delete-client" data-id="${client.id}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete
+        </button>
       </div>
-      <div class="client-detail-progress">${escapeHtml(client.progressSummary || 'No progress summary yet.')}</div>
-      <div class="client-detail-stats">
-        <div class="client-detail-stat">
-          <span>Email</span>
-          <strong>${escapeHtml(client.email || 'No email')}</strong>
+
+      <div class="detail-panel-summary">
+        <div class="detail-panel-head">
+          <strong>${escapeHtml(client.name || '')}</strong>
+          <span class="client-stage-pill">${escapeHtml(formatClientStage(client.stage))}</span>
         </div>
-        <div class="client-detail-stat">
-          <span>Phone</span>
-          <strong>${escapeHtml(client.phone || 'No phone')}</strong>
-        </div>
-        <div class="client-detail-stat">
-          <span>Next</span>
-          <strong>${escapeHtml(nextAppointmentLabel)}</strong>
-        </div>
-        <div class="client-detail-stat">
-          <span>History</span>
-          <strong>${notes.length} notes • ${appointments.length} appointments</strong>
+        <div class="detail-panel-progress">${escapeHtml(client.progressSummary || 'No progress summary yet.')}</div>
+        <div class="detail-panel-stats">
+          <div class="detail-panel-stat">
+            <span>Email</span>
+            <strong>${escapeHtml(client.email || 'No email')}</strong>
+          </div>
+          <div class="detail-panel-stat">
+            <span>Phone</span>
+            <strong>${escapeHtml(client.phone || 'No phone')}</strong>
+          </div>
+          <div class="detail-panel-stat">
+            <span>Next Appointment</span>
+            <strong>${escapeHtml(nextAppointmentLabel)}</strong>
+          </div>
         </div>
       </div>
     </div>
-    <h3>Recent Notes</h3>
-    ${notesHtml}
-    <h3 style="margin-top:14px;">Appointment History</h3>
-    ${appointmentsHtml}
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Activity & Notes</h2>
+        </div>
+        
+        <form class="modal-form" id="client-note-form" data-client-id="${client.id}" style="border-bottom: 1px solid var(--border); border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <textarea id="client-note-text" name="note" rows="2" placeholder="Write a new progress note..." maxlength="5000" required></textarea>
+            </div>
+            <div class="form-row" style="margin-bottom: 12px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="client-note-stage" style="font-size: 0.65rem;">Update Stage (Optional)</label>
+                    <select id="client-note-stage" name="stage">
+                        <option value="">No change</option>
+                        <option value="new">New</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="waiting">Waiting</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                    </select>
+                </div>
+                <div class="form-actions" style="border-top: none; padding-top: 0; align-items: flex-end;">
+                    <button type="submit" class="btn-primary">Post Note</button>
+                </div>
+            </div>
+        </form>
+
+        <div style="padding: var(--spacing-lg); background: var(--bg-base); border-bottom-left-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl);">
+            <h3 style="font-size: 0.85rem; margin-bottom: 10px; color: var(--text-secondary);">Recent Notes</h3>
+            ${notesHtml}
+            <h3 style="font-size: 0.85rem; margin-top: 20px; margin-bottom: 10px; color: var(--text-secondary);">Recent Appointments</h3>
+            ${appointmentsHtml}
+        </div>
+    </div>
   `;
+
+  // Attach listeners to the newly rendered detail actions
+  document.getElementById('btn-edit-client')?.addEventListener('click', () => {
+    showClientForm(client);
+  });
+
+  document.getElementById('btn-delete-client')?.addEventListener('click', async () => {
+    if (await confirmDialog('Archive Client', `Are you sure you want to archive ${client.name}? This will hide them from active lists.`)) {
+      try {
+        await api(`/api/clients/${client.id}`, { method: 'DELETE' });
+        showToast('Client archived.', 'success');
+        state.selectedClientId = null;
+        await loadClients();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+  });
+
+  document.getElementById('btn-book-for-client')?.addEventListener('click', () => {
+    openNewAppointmentModalForDate(localYmd());
+    const form = document.getElementById('appointment-form');
+    if (form) {
+      form.clientName.value = client.name || '';
+      form.clientEmail.value = client.email || '';
+      updateAppointmentPreview();
+    }
+  });
+
+  document.getElementById('client-note-form')?.addEventListener('submit', submitClientNote);
 }
 
 function renderClientsTable(clients = []) {
@@ -4123,11 +4313,12 @@ function renderClientsTable(clients = []) {
         <strong class="client-name">${escapeHtml(client.name || '')}</strong>
         <span class="client-note-preview">${escapeHtml(client.lastNote || client.progressSummary || 'No notes yet')}</span>
       </div>
-      <div>${escapeHtml(formatClientStage(client.stage))}</div>
-      <div>${client.nextAppointmentDate
-    ? `${escapeHtml(formatScheduleDate(client.nextAppointmentDate))} • ${escapeHtml(toTime12(client.nextAppointmentTime || '09:00'))}`
-    : '<span class="client-note-preview">No upcoming</span>'
-}</div>
+      <div style="text-align: right;">
+        <span class="client-stage-pill" style="font-size: 0.6rem; padding: 2px 8px;">${escapeHtml(formatClientStage(client.stage))}</span>
+        <div class="client-note-preview" style="margin-top: 4px;">
+            ${client.nextAppointmentDate ? formatScheduleDate(client.nextAppointmentDate) : 'No upcoming'}
+        </div>
+      </div>
     </div>
   `).join('');
 
@@ -4136,11 +4327,55 @@ function renderClientsTable(clients = []) {
       const clientId = Number(row.dataset.clientId);
       if (!Number.isFinite(clientId) || clientId <= 0) return;
       state.selectedClientId = clientId;
-      document.getElementById('client-note-form')?.setAttribute('data-client-id', String(clientId));
+      
+      // Hide form if it was open
+      document.getElementById('client-form-container').style.display = 'none';
+      document.getElementById('client-detail-panel-wrapper').style.display = 'flex';
+
       renderClientsTable(state.clients);
       await loadClientDetail(clientId);
+      
+      // Auto-scroll to detail panel on narrow screens
+      if (window.innerWidth <= 1024) {
+        document.getElementById('client-detail-panel-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   });
+}
+
+function showClientForm(client = null) {
+  const container = document.getElementById('client-form-container');
+  const detailWrapper = document.getElementById('client-detail-panel-wrapper');
+  const form = document.getElementById('client-form');
+  const title = document.getElementById('client-form-title');
+  const saveBtn = document.getElementById('btn-save-client');
+
+  if (!container || !detailWrapper || !form) return;
+
+  form.reset();
+  if (client) {
+    title.textContent = 'Edit Client';
+    saveBtn.textContent = 'Update Client';
+    document.getElementById('client-id').value = client.id;
+    document.getElementById('client-name').value = client.name || '';
+    document.getElementById('client-email').value = client.email || '';
+    document.getElementById('client-phone').value = client.phone || '';
+    document.getElementById('client-stage').value = client.stage || 'new';
+    document.getElementById('client-progress-summary').value = client.progressSummary || '';
+  } else {
+    title.textContent = 'Add Client';
+    saveBtn.textContent = 'Save Client';
+    document.getElementById('client-id').value = '';
+    document.getElementById('client-stage').value = 'new';
+  }
+
+  detailWrapper.style.display = 'none';
+  container.style.display = 'block';
+
+  // Auto-scroll to the form on narrow screens
+  if (window.innerWidth <= 1024) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 async function loadClientDetail(clientId = state.selectedClientId) {
@@ -4495,10 +4730,17 @@ async function submitAppointment(e) {
 async function submitType(e) {
   e.preventDefault();
   const form = e.currentTarget;
-  const data = Object.fromEntries(new FormData(form).entries());
+  const formData = new FormData(form);
+  const id = formData.get('id');
+  const data = Object.fromEntries(formData.entries());
+  
+  const isEditing = id && Number(id) > 0;
+  const url = isEditing ? `/api/types/${id}` : '/api/types';
+  const method = isEditing ? 'PUT' : 'POST';
+
   try {
-    const result = await queueAwareMutation('/api/types', {
-      method: 'POST',
+    const result = await queueAwareMutation(url, {
+      method,
       body: JSON.stringify({
         name: data.name,
         durationMinutes: Number(data.durationMinutes || 30),
@@ -4507,18 +4749,59 @@ async function submitType(e) {
       })
     }, {
       allowOfflineQueue: true,
-      description: 'Type creation'
+      description: isEditing ? 'Type update' : 'Type creation'
     });
     if (result.queued) {
-      form.reset();
+      resetTypeForm();
       return;
     }
-    form.reset();
-    showToast('Type created', 'success');
+    resetTypeForm();
+    showToast(isEditing ? 'Type updated' : 'Type created', 'success');
     await loadTypes();
     await loadDashboard();
   } catch (error) {
     showToast(error.message, 'error');
+  }
+}
+
+function resetTypeForm() {
+  const form = document.getElementById('type-form');
+  const title = document.getElementById('type-form-title');
+  const cancelBtn = document.getElementById('btn-cancel-type-edit');
+  const submitBtn = form?.querySelector('button[type="submit"]');
+  if (form) {
+      form.reset();
+      document.getElementById('type-id').value = '';
+  }
+  if (title) title.textContent = 'Create Appointment Type';
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (submitBtn) submitBtn.textContent = 'Create Type';
+}
+
+function setTypeFormForEditing(typeId) {
+  const type = state.types.find(t => Number(t.id) === Number(typeId));
+  if (!type) return;
+
+  const form = document.getElementById('type-form');
+  const title = document.getElementById('type-form-title');
+  const cancelBtn = document.getElementById('btn-cancel-type-edit');
+  const submitBtn = form?.querySelector('button[type="submit"]');
+
+  if (form) {
+      document.getElementById('type-id').value = type.id;
+      document.getElementById('type-name').value = type.name || '';
+      document.getElementById('type-duration').value = type.durationMinutes || 30;
+      document.getElementById('type-price').value = (Number(type.priceCents) || 0) / 100;
+      document.getElementById('type-location').value = type.locationMode || 'hybrid';
+  }
+  
+  if (title) title.textContent = 'Edit Appointment Type';
+  if (cancelBtn) cancelBtn.style.display = 'flex';
+  if (submitBtn) submitBtn.textContent = 'Update Type';
+
+  // Scroll to form on narrow screens
+  if (window.innerWidth <= 1024) {
+    form?.closest('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
@@ -4543,21 +4826,38 @@ async function submitSettings(e) {
 async function submitClient(e) {
   e.preventDefault();
   const form = e.currentTarget;
-  const payload = Object.fromEntries(new FormData(form).entries());
+  const formData = new FormData(form);
+  const id = formData.get('id');
+  const payload = Object.fromEntries(formData.entries());
+  
+  const isEditing = id && Number(id) > 0;
+  const url = isEditing ? `/api/clients/${id}` : '/api/clients';
+  const method = isEditing ? 'PUT' : 'POST';
+
   try {
-    await api('/api/clients', { method: 'POST', body: JSON.stringify(payload) });
+    const result = await api(url, { method, body: JSON.stringify(payload) });
     form.reset();
-    showToast('Client saved.', 'success');
+    showToast(isEditing ? 'Client updated.' : 'Client saved.', 'success');
+    closeClientForm();
+    
+    if (!isEditing && result?.client?.id) {
+        state.selectedClientId = result.client.id;
+    }
     await loadClients();
   } catch (error) {
     showToast(error.message, 'error');
   }
 }
 
+function closeClientForm() {
+    document.getElementById('client-form-container').style.display = 'none';
+    document.getElementById('client-detail-panel-wrapper').style.display = 'flex';
+}
+
 async function submitClientNote(e) {
   e.preventDefault();
   const form = e.currentTarget;
-  const clientId = Number(form.getAttribute('data-client-id') || state.selectedClientId);
+  const clientId = Number(form.dataset.clientId || state.selectedClientId);
   if (!Number.isFinite(clientId) || clientId <= 0) {
     showToast('Select a client first.', 'info');
     return;
@@ -4568,7 +4868,10 @@ async function submitClientNote(e) {
     await api(`/api/clients/${clientId}/notes`, { method: 'POST', body: JSON.stringify(payload) });
     form.reset();
     showToast('Note added.', 'success');
-    await loadClients();
+    // Reload details to show the new note
+    await loadClientDetail(clientId);
+    // Also reload the list to update the "last note" preview
+    void loadClients().catch(swallowBackgroundAsyncError);
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -5591,6 +5894,18 @@ function bindForms() {
   document.getElementById('settings-form')?.addEventListener('submit', submitSettings);
   document.getElementById('client-form')?.addEventListener('submit', submitClient);
   document.getElementById('client-note-form')?.addEventListener('submit', submitClientNote);
+
+  document.getElementById('btn-show-add-client')?.addEventListener('click', () => {
+    showClientForm(null);
+  });
+  document.getElementById('btn-close-client-form')?.addEventListener('click', () => {
+    closeClientForm();
+  });
+  
+  document.getElementById('btn-cancel-type-edit')?.addEventListener('click', () => {
+    resetTypeForm();
+  });
+
   document.getElementById('btn-refresh-clients')?.addEventListener('click', () => {
     void loadClients().catch(swallowBackgroundAsyncError);
   });

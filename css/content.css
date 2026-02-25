@@ -1,10 +1,4 @@
 /* ── Stats ── */
-.stats-toolbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: var(--spacing-sm);
-}
-
 .stats-toggle-btn {
     display: inline-flex;
     align-items: center;
