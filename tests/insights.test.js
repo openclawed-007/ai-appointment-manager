@@ -52,10 +52,10 @@ describe('createInsights (integration with sqlite)', () => {
     process.env.DATABASE_URL = '';
     process.env.NODE_ENV = 'test';
 
-    const dbModule = require('../lib/db');
+    const dbModule = require('../src/lib/db');
     await dbModule.initDb();
     sqlite = dbModule.sqlite();
-    ({ createInsights } = require('../lib/insights'));
+    ({ createInsights } = require('../src/lib/insights'));
   });
 
   it('detects upward booking momentum', async () => {

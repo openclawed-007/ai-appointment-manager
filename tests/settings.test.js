@@ -30,7 +30,7 @@ let db;
 let boot;
 const adminEmail    = 'settings-owner@example.com';
 const adminPassword = 'SettingsTest123!';
-const appModule = require('../app.js');
+const appModule = require('../public/app.js');
 
 beforeAll(async () => {
   fs.mkdirSync(testDbDir, { recursive: true });
@@ -52,7 +52,7 @@ beforeAll(async () => {
     if (k.includes('server') || k.includes('lib/')) delete require.cache[k];
   });
 
-  const mod = require('../server');
+  const mod = require('../src/server');
   app  = mod.app;
   db   = mod.db;
   boot = mod.boot;
@@ -262,7 +262,7 @@ describe('Settings API', () => {
     const auth = await loginAndVerify(agent);
     const businessId = Number(auth?.user?.businessId || auth?.business?.id || 1);
 
-    const { dbRun } = require('../lib/db');
+    const { dbRun } = require('../src/lib/db');
     await dbRun(
       'DELETE FROM business_settings WHERE business_id = ?',
       'DELETE FROM business_settings WHERE business_id = $1',
@@ -702,7 +702,7 @@ describe('index.html — settings page structure', () => {
   let document;
 
   beforeAll(() => {
-    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
     dom = new JSDOM(html);
     document = dom.window.document;
   });
@@ -945,11 +945,11 @@ describe('app.js exported helpers', () => {
 // 8. CSS partial — settings.css exists and contains expected rules
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('css/settings.css', () => {
+describe('public/css/settings.css', () => {
   let css;
 
   beforeAll(() => {
-    css = fs.readFileSync(path.join(__dirname, '..', 'css', 'settings.css'), 'utf8');
+    css = fs.readFileSync(path.join(__dirname, '..', 'public', 'css', 'settings.css'), 'utf8');
   });
 
   it('file exists and is non-empty', () => {
@@ -1002,14 +1002,14 @@ describe('css/settings.css', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. styles.css — imports settings.css
+// 8. public/styles.css — imports settings.css
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('styles.css', () => {
+describe('public/styles.css', () => {
   let styles;
 
   beforeAll(() => {
-    styles = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+    styles = fs.readFileSync(path.join(__dirname, '..', 'public', 'styles.css'), 'utf8');
   });
 
   it("imports 'css/settings.css'", () => {

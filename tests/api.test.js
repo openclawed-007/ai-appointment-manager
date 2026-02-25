@@ -36,7 +36,7 @@ beforeAll(async () => {
   process.env.SMTP_USER = '';
   process.env.SMTP_PASS = '';
 
-  const mod = require('../server');
+  const mod = require('../src/server');
   app = mod.app;
   db = mod.db;
   boot = mod.boot;

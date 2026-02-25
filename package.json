@@ -2,11 +2,11 @@
   "name": "intellischedule",
   "version": "1.0.0",
   "description": "AI-powered appointment management that is simple to set up and use.",
-  "main": "server.js",
+  "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
     "test": "vitest run",
     "accounts:manage": "node scripts/manage-accounts.js"
   },

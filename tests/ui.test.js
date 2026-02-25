@@ -2,7 +2,7 @@ const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
 
-const { toTime12, escapeHtml, monthLabel, setActiveView } = require('../app.js');
+const { toTime12, escapeHtml, monthLabel, setActiveView } = require('../public/app.js');
 
 describe('UI helpers and tab behavior', () => {
   it('formats 24h time correctly', () => {
@@ -47,7 +47,7 @@ describe('UI helpers and tab behavior', () => {
   });
 
   it('index contains key interactive controls', () => {
-    const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
     expect(index.includes('id="btn-view-all"')).toBe(true);
     expect(index.includes('id="btn-manage-types"')).toBe(true);
     expect(index.includes('data-view="settings"')).toBe(true);
@@ -56,7 +56,7 @@ describe('UI helpers and tab behavior', () => {
   });
 
   it('index contains reminder mode and browser notification controls', () => {
-    const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
     expect(index.includes('id="settings-reminder-mode"')).toBe(true);
     expect(index.includes('id="settings-browser-notifications"')).toBe(true);
     expect(index.includes('id="btn-test-browser-notification"')).toBe(true);
@@ -64,7 +64,7 @@ describe('UI helpers and tab behavior', () => {
   });
 
   it('app source applies reminder-mode hiding for AI and types navigation/views', () => {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
     expect(source.includes('.nav-item[data-view="ai"], .mobile-nav-item[data-view="ai"]')).toBe(true);
     expect(source.includes('.app-view[data-view="ai"]')).toBe(true);
     expect(source.includes('.nav-item[data-view="types"], .mobile-nav-item[data-view="types"]')).toBe(true);
@@ -73,7 +73,7 @@ describe('UI helpers and tab behavior', () => {
   });
 
   it('app source wires browser notification toggle and test button', () => {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
     expect(source.includes("const BROWSER_NOTIFICATIONS_KEY = 'browserNotificationsEnabled'")).toBe(true);
     expect(source.includes("document.getElementById('settings-browser-notifications')?.addEventListener('change'")).toBe(true);
     expect(source.includes("document.getElementById('btn-test-browser-notification')?.addEventListener('click'")).toBe(true);

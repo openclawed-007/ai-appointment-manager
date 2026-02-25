@@ -6,7 +6,7 @@ const Database = require('better-sqlite3');
 const { Pool } = require('pg');
 
 const USE_POSTGRES = Boolean(process.env.DATABASE_URL);
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'data.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'data.db');
 
 let sqlite = null;
 let pgPool = null;

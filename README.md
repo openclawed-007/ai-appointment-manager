@@ -33,6 +33,7 @@ Sleek appointment management software with:
 ### Backend
 - Express API with **Postgres-first** architecture (`pg`) and SQLite fallback
 - Modular server architecture with separated concerns
+- Route/module map: see [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md)
 - Security: Helmet headers, CSRF protection, rate limiting
 - Endpoints:
   - `GET /api/health` - Health check with DB status
