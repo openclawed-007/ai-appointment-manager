@@ -331,7 +331,6 @@ function applyReminderModeUi() {
   setText('#btn-new-appointment span', `New ${entrySingularTitle}`);
   setText('#stat-card-today .stat-hint', `${entryPlural} today`);
   setText('#stat-card-week .stat-hint', reminderMode ? 'scheduled this week' : 'booked this week');
-  setText('#stat-card-pending .stat-hint', reminderMode ? 'awaiting completion' : 'awaiting confirmation');
 
   const searchInput = document.getElementById('global-search');
   if (searchInput) {
@@ -356,17 +355,6 @@ function applyReminderModeUi() {
   if (scheduleCard) {
     scheduleCard.removeAttribute('hidden');
     scheduleCard.classList.remove('hidden');
-  }
-
-  const dashboardAiInsightsCard = document.querySelector('section[data-view="dashboard"] .card.ai-insights');
-  if (dashboardAiInsightsCard) {
-    if (reminderMode || clientMode) {
-      dashboardAiInsightsCard.setAttribute('hidden', 'hidden');
-      dashboardAiInsightsCard.classList.add('hidden');
-    } else {
-      dashboardAiInsightsCard.removeAttribute('hidden');
-      dashboardAiInsightsCard.classList.remove('hidden');
-    }
   }
 
   document.querySelectorAll('.nav-item[data-view="ai"], .mobile-nav-item[data-view="ai"]').forEach((node) => {
@@ -1566,8 +1554,14 @@ async function openDayMenu(anchorEl, date) {
 
   try {
     const { appointments } = await api(`/api/appointments?date=${encodeURIComponent(date)}`);
+    const visibleAppointments = (Array.isArray(appointments) ? appointments : []).filter((item) => {
+      const status = String(item?.status || '').toLowerCase();
+      const source = String(item?.source || '').toLowerCase();
+      if (status === 'completed' || status === 'cancelled') return false;
+      return status === 'confirmed' || source === 'reminder';
+    });
     if (state.dayMenuDate !== date) return;
-    const items = appointments
+    const items = visibleAppointments
       .map(
         (a) => `
           <div class="day-menu-item">
@@ -1655,7 +1649,7 @@ async function openDayMenu(anchorEl, date) {
           target.classList.remove('hidden');
           btn.setAttribute('aria-expanded', 'true');
           btn.textContent = 'Hide actions';
-          const appointment = appointments.find((item) => Number(item.id) === Number(id));
+          const appointment = visibleAppointments.find((item) => Number(item.id) === Number(id));
           const notesRoot = menu.querySelector(`.day-menu-client-notes[data-client-notes-for="${id}"]`);
           if (appointment && notesRoot && !notesRoot.dataset.loaded) {
             notesRoot.innerHTML = '<div class="day-menu-client-notes-state">Loading client profile...</div>';
@@ -1709,7 +1703,7 @@ async function openDayMenu(anchorEl, date) {
     menu.querySelectorAll('.day-menu-edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = Number(btn.dataset.appointmentId);
-        const appointment = appointments.find((a) => Number(a.id) === id);
+        const appointment = visibleAppointments.find((a) => Number(a.id) === id);
         closeDayMenu();
         startEditAppointment(appointment);
       });
@@ -1718,7 +1712,7 @@ async function openDayMenu(anchorEl, date) {
     menu.querySelectorAll('.day-menu-open-client').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = Number(btn.dataset.appointmentId);
-        const appointment = appointments.find((a) => Number(a.id) === id);
+        const appointment = visibleAppointments.find((a) => Number(a.id) === id);
         closeDayMenu();
         try {
           await openClientFromAppointment(appointment);
@@ -1761,7 +1755,7 @@ async function openDayMenu(anchorEl, date) {
       btn.addEventListener('click', async () => {
         const id = Number(btn.dataset.appointmentId);
         if (!Number.isFinite(id) || id <= 0) return;
-        const appointment = appointments.find((item) => Number(item.id) === id);
+        const appointment = visibleAppointments.find((item) => Number(item.id) === id);
         if (!appointment) return;
         const editor = menu.querySelector(`.day-menu-note-editor[data-note-editor-for="${id}"]`);
         const input = editor?.querySelector('.day-menu-note-input');
@@ -2482,7 +2476,7 @@ function applyInitialViewPreference(view) {
 
 function setActiveView(view, options = {}) {
   if (!view) return;
-  const { skipAppointmentsReload = false } = options || {};
+  const { skipAppointmentsReload = false, skipClientsReload = false } = options || {};
   const activeView = resolveView(view);
   if (!activeView) return;
   closeQuickCreateMenu();
@@ -2502,7 +2496,7 @@ function setActiveView(view, options = {}) {
   if (activeView === 'appointments' && canAutoLoadAppointments && !skipAppointmentsReload) {
     void loadAppointmentsTable().catch(swallowBackgroundAsyncError);
   }
-  if (activeView === 'clients' && canAutoLoadAppointments) {
+  if (activeView === 'clients' && canAutoLoadAppointments && !skipClientsReload) {
     void loadClients().catch(swallowBackgroundAsyncError);
   }
 }
@@ -2703,7 +2697,6 @@ function bindDashboardStatsToggle() {
   });
 
   document.getElementById('stat-card-pending')?.addEventListener('click', async () => {
-    if (!isReminderModeEnabled()) return;
     const next = state.nextReminder;
     if (!next?.date) return;
     await focusCalendarOnDate(next.date, { time: next.time, openMenu: false });
@@ -3467,48 +3460,51 @@ function bindAppointmentFormEnhancements() {
 
 function renderStats(stats = {}, options = {}) {
   const reminderModeEnabled = isReminderModeEnabled();
-  const nextReminder = options.nextReminder || null;
-  state.nextReminder = reminderModeEnabled ? nextReminder : null;
+  const nextUpcoming = options.nextUpcoming || options.nextReminder || null;
+  const pendingCount = Number(stats.pending || 0);
+  const hasPending = pendingCount > 0;
+  state.nextReminder = hasPending ? null : nextUpcoming;
   document.getElementById('stat-today').textContent = stats.today ?? 0;
   document.getElementById('stat-week').textContent = stats.week ?? 0;
 
   const pendingLabel = document.querySelector('#stat-card-pending .stat-label');
   const pendingValue = document.getElementById('stat-pending');
   const pendingHint = document.querySelector('#stat-card-pending .stat-hint');
-  if (reminderModeEnabled) {
+  const pendingCard = document.getElementById('stat-card-pending');
+  if (hasPending) {
+    if (pendingLabel) pendingLabel.textContent = 'Pending';
+    pendingValue?.classList.remove('is-reminder-title');
+    if (pendingValue) pendingValue.textContent = pendingCount;
+    pendingCard?.classList.remove('is-clickable');
+    if (pendingHint) pendingHint.textContent = reminderModeEnabled ? 'awaiting completion' : 'awaiting confirmation';
+  } else {
     if (pendingLabel) pendingLabel.textContent = 'Upcoming';
     pendingValue?.classList.add('is-reminder-title');
-    document.getElementById('stat-card-pending')?.classList.toggle('is-clickable', Boolean(nextReminder?.date));
-    if (nextReminder?.date && nextReminder?.time) {
-      const reminderText = String(
-        nextReminder.clientName || nextReminder.title || nextReminder.typeName || 'Reminder'
+    pendingCard?.classList.toggle('is-clickable', Boolean(nextUpcoming?.date));
+    if (nextUpcoming?.date && nextUpcoming?.time) {
+      const upcomingText = String(
+        nextUpcoming.clientName || nextUpcoming.title || nextUpcoming.typeName || (reminderModeEnabled ? 'Reminder' : 'Appointment')
       ).trim();
-      const shortReminderText = reminderText.length > 72 ? `${reminderText.slice(0, 69)}...` : reminderText;
-      const relative = formatUpcomingRelative(nextReminder.date, nextReminder.time);
-      if (pendingValue) pendingValue.textContent = `${relative} • ${shortReminderText}`;
+      const shortUpcomingText = upcomingText.length > 52 ? `${upcomingText.slice(0, 49)}...` : upcomingText;
+      const relative = formatUpcomingRelative(nextUpcoming.date, nextUpcoming.time);
+      if (pendingValue) pendingValue.textContent = `${relative} • ${shortUpcomingText}`;
       if (pendingHint) {
-        if (String(nextReminder.date).slice(0, 10) === localYmd()) {
+        if (String(nextUpcoming.date).slice(0, 10) === localYmd()) {
           pendingHint.textContent = 'Today';
         } else {
-          const dt = new Date(`${String(nextReminder.date).slice(0, 10)}T00:00:00`);
-          const dayLabel = Number.isNaN(dt.getTime())
-            ? String(nextReminder.date).slice(0, 10)
+          const dt = new Date(`${String(nextUpcoming.date).slice(0, 10)}T00:00:00`);
+          pendingHint.textContent = Number.isNaN(dt.getTime())
+            ? String(nextUpcoming.date).slice(0, 10)
             : dt.toLocaleDateString('en-US', { weekday: 'long' });
-          pendingHint.textContent = dayLabel;
         }
       }
     } else {
       if (pendingValue) pendingValue.textContent = '--';
-      if (pendingHint) pendingHint.textContent = 'No upcoming reminder';
+      if (pendingHint) pendingHint.textContent = 'No upcoming scheduled.';
     }
-  } else {
-    if (pendingLabel) pendingLabel.textContent = 'Pending';
-    pendingValue?.classList.remove('is-reminder-title');
-    document.getElementById('stat-card-pending')?.classList.remove('is-clickable');
-    if (pendingValue) pendingValue.textContent = stats.pending ?? 0;
   }
 
-  state.unreadNotifications = Number(stats.pending || 0);
+  state.unreadNotifications = pendingCount;
   renderNotificationDots(state.unreadNotifications);
 }
 
@@ -3806,38 +3802,40 @@ function renderTypes(types = []) {
       : types
         .map(
           (t) => `
-            <div class="type-admin-card" data-type-id="${t.id}">
-              <div class="type-admin-card__head">
-                <div class="type-admin-card__identity">
-                  <span class="type-color" style="background:${escapeHtml(t.color)}"></span>
-                  <div>
-                    <strong>${escapeHtml(t.name)}</strong>
-                    <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
-                  </div>
-                </div>
-                <span class="pill">Active</span>
-              </div>
-              <div class="type-admin-card__meta">
-                <span class="type-meta-item">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  ${escapeHtml(t.locationMode)}
+	            <div class="type-admin-card" data-type-id="${t.id}">
+	              <div class="type-admin-card__head">
+	                <div class="type-admin-card__identity">
+	                  <span class="type-color" style="background:${escapeHtml(t.color)}"></span>
+	                  <div>
+	                    <strong>${escapeHtml(t.name)}</strong>
+	                    <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
+	                  </div>
+	                </div>
+	                <div class="type-admin-card__head-right">
+	                  <span class="pill">Active</span>
+	                  <div class="type-admin-card__actions">
+	                    <button class="btn-edit-type" type="button" aria-label="Edit Type" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); transition: all var(--transition-fast);">
+	                      <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
+	                    </button>
+	                    <button class="btn-delete-type" type="button" aria-label="Delete Type">
+	                      <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+	                    </button>
+	                  </div>
+	                </div>
+	              </div>
+	              <div class="type-admin-card__meta">
+	                <span class="type-meta-item">
+	                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+	                  ${escapeHtml(t.locationMode)}
                 </span>
                 <span class="type-meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                   ${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}
                 </span>
               </div>
-              <div class="type-admin-card__actions">
-                <button class="btn-edit-type" type="button" aria-label="Edit Type" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); transition: all var(--transition-fast);">
-                  <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
-                </button>
-                <button class="btn-delete-type" type="button" aria-label="Delete Type">
-                  <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                </button>
-              </div>
-            </div>`
-        )
-        .join('');
+	            </div>`
+	        )
+	        .join('');
 
   if (root) root.innerHTML = html;
   if (adminRoot) {
@@ -3894,9 +3892,7 @@ function renderInsights(insights = []) {
         )
         .join('');
 
-  const root = document.getElementById('insights-list');
   const fullRoot = document.getElementById('ai-full-list');
-  if (root) root.innerHTML = html;
   if (fullRoot) fullRoot.innerHTML = html;
 }
 
@@ -4130,7 +4126,7 @@ function renderAppointmentDetail(appointment = null) {
   });
 
   root.querySelector('.btn-delete')?.addEventListener('click', async () => {
-      if (await confirmDialog('Delete', `Are you sure you want to delete this ${reminderModeEnabled ? 'reminder' : 'appointment'}?`)) {
+      if (await showConfirm('Delete', `Are you sure you want to delete this ${reminderModeEnabled ? 'reminder' : 'appointment'}?`)) {
           try {
             const result = await queueAwareMutation(`/api/appointments/${appointment.id}`, { method: 'DELETE' }, { allowOfflineQueue: true });
             if (result.queued) return;
@@ -4273,7 +4269,7 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
   });
 
   document.getElementById('btn-delete-client')?.addEventListener('click', async () => {
-    if (await confirmDialog('Archive Client', `Are you sure you want to archive ${client.name}? This will hide them from active lists.`)) {
+    if (await showConfirm('Archive Client', `Are you sure you want to archive ${client.name}? This will hide them from active lists.`)) {
       try {
         await api(`/api/clients/${client.id}`, { method: 'DELETE' });
         showToast('Client archived.', 'success');
@@ -4455,6 +4451,13 @@ async function findClientForAppointment(appointment = {}) {
   if (Number.isFinite(directClientId) && directClientId > 0) {
     const byId = state.clients.find((item) => Number(item.id) === directClientId);
     if (byId) return byId;
+    try {
+      const payload = await api(`/api/clients/${directClientId}`);
+      const direct = payload?.client || null;
+      if (direct?.id) return direct;
+    } catch (_error) {
+      // Fall back to name/email lookup when direct ID fetch is unavailable.
+    }
   }
 
   const name = String(appointment.clientName || appointment.title || '').trim();
@@ -4484,7 +4487,7 @@ async function openClientFromAppointment(appointment = null) {
   if (!appointment) return;
 
   // Switch immediately so mobile users see progress without waiting on network.
-  setActiveView('clients');
+  setActiveView('clients', { skipClientsReload: true });
   const clientFormContainer = document.getElementById('client-form-container');
   if (clientFormContainer) clientFormContainer.style.display = 'none';
   const detailWrapper = document.getElementById('client-detail-panel-wrapper');
@@ -4540,7 +4543,6 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
   if (showSkeleton) {
     // Show skeleton placeholders while data is loading
     renderSkeleton(document.getElementById('timeline-list'), 3);
-    renderSkeleton(document.getElementById('insights-list'), 4);
   }
 
   // Fetch dashboard data + completed appointments in parallel.
@@ -4589,6 +4591,8 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       reminderQueue.push(appointment);
     }
   }
+  const upcomingQueue = allActiveAppointments.filter((item) => isAtOrAfterNow(item?.date, item?.time));
+  const nextUpcoming = upcomingQueue[0] || allActiveAppointments[0] || null;
   const nextReminder = reminderQueue[0] || null;
 
   const effectiveStats = reminderModeEnabled
@@ -4645,7 +4649,7 @@ async function loadDashboard(targetDate = state.selectedDate, options = {}) {
       return aKey < bKey ? 1 : -1;
     });
 
-  renderStats(effectiveStats, { nextReminder });
+  renderStats(effectiveStats, { nextReminder, nextUpcoming });
   renderTimeline(activeAppointments, {
     emptyMessage: reminderModeEnabled
       ? 'No upcoming reminders.'

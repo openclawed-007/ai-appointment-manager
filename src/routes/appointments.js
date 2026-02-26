@@ -40,6 +40,10 @@ app.get('/api/calendar/month', async (req, res) => {
        WHERE a.business_id = ?
          AND a.date >= ?
          AND a.date < ?
+         AND (
+           a.status = 'confirmed'
+           OR a.source = 'reminder'
+         )
          AND a.status != 'completed'
          AND a.status != 'cancelled'
        ORDER BY a.date ASC, a.time ASC`
@@ -73,6 +77,10 @@ app.get('/api/calendar/month', async (req, res) => {
        WHERE a.business_id = $1
          AND a.date >= $2
          AND a.date < $3
+         AND (
+           a.status = 'confirmed'
+           OR a.source = 'reminder'
+         )
          AND a.status != 'completed'
          AND a.status != 'cancelled'
        ORDER BY a.date ASC, a.time ASC`,

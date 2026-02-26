@@ -272,6 +272,20 @@ app.post('/api/clients', async (req, res) => {
   res.status(201).json({ client: rowToClient(row) });
 });
 
+app.get('/api/clients/:id', async (req, res) => {
+  const businessId = req.auth.businessId;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid client id' });
+
+  const row = await dbGet(
+    'SELECT * FROM clients WHERE id = ? AND business_id = ? AND archived_at IS NULL',
+    'SELECT * FROM clients WHERE id = $1 AND business_id = $2 AND archived_at IS NULL',
+    [id, businessId]
+  );
+  if (!row) return res.status(404).json({ error: 'client not found' });
+  res.json({ client: rowToClient(row) });
+});
+
 app.put('/api/clients/:id', async (req, res) => {
   const businessId = req.auth.businessId;
   const id = Number(req.params.id);

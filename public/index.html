@@ -176,7 +176,7 @@
                     <div class="page-header">
                         <div class="page-header-main">
                             <h2>Dashboard</h2>
-                            <p class="page-subtitle">Your scheduling overview, daily metrics, and insights at a glance.</p>
+                            <p class="page-subtitle">Your scheduling overview and daily metrics at a glance.</p>
                         </div>
                         <div class="page-header-actions">
                             <button class="btn-text stats-toggle-btn" id="btn-toggle-stats" type="button"
@@ -341,9 +341,9 @@
                         </div>
                     </div>
 
-                    <!-- Types + AI Insights -->
+                    <!-- Types -->
                     <div class="dashboard-grid two-col">
-                        <div class="card">
+                        <div class="card" style="grid-column: 1 / -1;">
                             <div class="card-header">
                                 <h2>Appointment Types</h2>
                                 <div class="card-header-actions">
@@ -359,25 +359,6 @@
                             </div>
                             <div class="appointment-types-list" id="type-list">
                                 <div class="empty-state">Loading appointment types…</div>
-                            </div>
-                        </div>
-
-                        <div class="card ai-insights">
-                            <div class="card-header">
-                                <h2>AI Insights</h2>
-                                <div class="card-header-actions">
-                                    <span class="badge pulse">Live</span>
-                                    <button class="icon-btn small collapse-toggle-btn" type="button"
-                                        data-collapse-target="#insights-list" data-collapse-storage="home.insights"
-                                        aria-expanded="true" aria-label="Collapse insights panel">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="6 15 12 9 18 15" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="insights-list" id="insights-list">
-                                <div class="empty-state">AI insights will appear here as data comes in.</div>
                             </div>
                         </div>
                     </div>
