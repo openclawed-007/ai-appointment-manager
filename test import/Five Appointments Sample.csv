@@ -1,0 +1,6 @@
+name,email,date,time,duration,location,notes,title,source,status
+Alex Morgan,alex.morgan@example.com,2026-07-21,09:00,60,office,Initial consultation,Consultation,owner,confirmed
+Jamie Lee,jamie.lee@example.com,2026-07-21,10:30,30,virtual,Quick follow-up call,Follow-up,owner,confirmed
+Taylor Smith,taylor.smith@example.com,2026-07-22,11:00,45,office,Needs paperwork review,Review,owner,pending
+Chris Patel,chris.patel@example.com,2026-07-22,13:30,60,on-premises,On-site visit requested,Site Visit,owner,confirmed
+Morgan Chen,morgan.chen@example.com,2026-07-23,15:00,30,phone,Reminder to discuss options,Reminder,reminder,confirmed

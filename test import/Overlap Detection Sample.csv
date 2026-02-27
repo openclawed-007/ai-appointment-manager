@@ -1,0 +1,12 @@
+name,email,date,time,duration,location,notes,title,source,status
+Olivia Reed,olivia.reed@example.com,2026-07-21,09:00,60,office,Exact overlap with existing 9:00 slot,Consultation,owner,confirmed
+Noah Price,noah.price@example.com,2026-07-21,09:30,30,virtual,Partial overlap with 9:00-10:00 slot,Follow-up,owner,confirmed
+Emma Clark,emma.clark@example.com,2026-07-21,10:30,30,office,Exact overlap with existing 10:30 slot,Review,owner,confirmed
+Liam Scott,liam.scott@example.com,2026-07-22,14:30,30,phone,Should import no overlap,Quick Call,owner,confirmed
+Ava Turner,ava.turner@example.com,2026-07-23,15:00,30,office,Exact overlap with reminder slot,Reminder,reminder,confirmed
+Mason Hall,mason.hall@example.com,2026-07-24,09:00,45,on-premises,Should import on free day,Site Visit,owner,pending
+Isla Ward,isla.ward@example.com,2026-07-21,11:00,30,office,Should import after morning slots,Check-in,owner,confirmed
+Ethan Brooks,ethan.brooks@example.com,2026-07-22,11:15,30,virtual,Overlaps with 11:00-11:45 booking,Follow-up,owner,confirmed
+Sophia Diaz,sophia.diaz@example.com,2026-07-23,15:15,30,phone,Overlaps with 15:00-15:30 reminder,Reminder Call,reminder,confirmed
+Lucas Perry,lucas.perry@example.com,2026-07-24,09:30,30,office,May overlap with newly imported 09:00-09:45 row,Consultation,owner,pending
+Mia Foster,mia.foster@example.com,2026-07-25,10:00,60,on-premises,Should import on clear day,Site Visit,owner,confirmed

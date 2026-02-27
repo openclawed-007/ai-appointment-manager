@@ -147,8 +147,7 @@
                         </svg>
                         <span class="notification-dot hidden" id="notification-dot-mobile" data-notification-dot></span>
                     </button>
-                    <button class="icon-btn mobile-auth-btn" id="btn-logout-mobile" type="button"
-                        aria-label="Logout">
+                    <button class="icon-btn mobile-auth-btn" id="btn-logout-mobile" type="button" aria-label="Logout">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                             <polyline points="16 17 21 12 16 7" />
@@ -172,7 +171,7 @@
                 <!-- ═══ Dashboard ═══ -->
                 <section class="app-view active" data-view="dashboard">
                     <h1 class="sr-only">Dashboard</h1>
-                    
+
                     <div class="page-header">
                         <div class="page-header-main">
                             <h2>Dashboard</h2>
@@ -270,15 +269,13 @@
                                             data-calendar-view="day" role="tab" aria-selected="false">Day</button>
                                         <button type="button" class="calendar-view-btn" id="calendar-view-week"
                                             data-calendar-view="week" role="tab" aria-selected="false">Week</button>
-                                        <button type="button" class="calendar-view-btn active"
-                                            id="calendar-view-month" data-calendar-view="month" role="tab"
-                                            aria-selected="true">Month</button>
+                                        <button type="button" class="calendar-view-btn active" id="calendar-view-month"
+                                            data-calendar-view="month" role="tab" aria-selected="true">Month</button>
                                     </div>
                                     <button class="icon-btn small desktop-only" type="button" id="btn-calendar-expand"
                                         aria-label="Toggle calendar width">
-                                        <svg class="expand-icon" viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                            stroke-linejoin="round">
+                                        <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M8 3H5a2 2 0 0 0-2 2v3" />
                                             <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
                                             <path d="M3 16v3a2 2 0 0 0 2 2h3" />
@@ -374,17 +371,22 @@
                         </div>
                         <div class="page-header-actions">
                             <button class="btn-text" type="button" id="btn-refresh-appointments">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
                                 Refresh
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="split-view-content">
                         <!-- Left Pane: List -->
                         <div class="split-list-pane">
                             <div class="card split-list-card">
-                                <div class="split-table-container appointment-types-list" id="appointments-table" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
+                                <div class="split-table-container appointment-types-list" id="appointments-table"
+                                    style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
                             </div>
                         </div>
 
@@ -402,7 +404,7 @@
                 <!-- ═══ Clients ═══ -->
                 <section class="app-view" data-view="clients">
                     <h1 class="sr-only">Clients</h1>
-                    
+
                     <div class="page-header">
                         <div class="page-header-main">
                             <h2>Manage Clients</h2>
@@ -410,11 +412,19 @@
                         </div>
                         <div class="page-header-actions">
                             <button class="btn-text" type="button" id="btn-refresh-clients">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
                                 Refresh
                             </button>
                             <button class="btn-primary" type="button" id="btn-show-add-client">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
                                 Add Client
                             </button>
                         </div>
@@ -457,23 +467,30 @@
                                 <div class="card-header">
                                     <h2 id="client-form-title">Add Client</h2>
                                     <button class="btn-icon-close" id="btn-close-client-form">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
                                     </button>
                                 </div>
                                 <form class="modal-form" id="client-form">
                                     <input type="hidden" name="id" id="client-id" />
                                     <div class="form-group">
                                         <label for="client-name">Name</label>
-                                        <input id="client-name" name="name" required placeholder="Client name" maxlength="200" />
+                                        <input id="client-name" name="name" required placeholder="Client name"
+                                            maxlength="200" />
                                     </div>
                                     <div class="form-row">
                                         <div class="form-group">
                                             <label for="client-email">Email</label>
-                                            <input id="client-email" name="email" type="email" placeholder="name@email.com" maxlength="320" />
+                                            <input id="client-email" name="email" type="email"
+                                                placeholder="name@email.com" maxlength="320" />
                                         </div>
                                         <div class="form-group">
                                             <label for="client-phone">Phone</label>
-                                            <input id="client-phone" name="phone" placeholder="+1 555 000 0000" maxlength="60" />
+                                            <input id="client-phone" name="phone" placeholder="+1 555 000 0000"
+                                                maxlength="60" />
                                         </div>
                                     </div>
                                     <div class="form-row">
@@ -489,11 +506,13 @@
                                         </div>
                                         <div class="form-group">
                                             <label for="client-progress-summary">Progress Summary</label>
-                                            <input id="client-progress-summary" name="progressSummary" placeholder="Where you're up to..." maxlength="1000" />
+                                            <input id="client-progress-summary" name="progressSummary"
+                                                placeholder="Where you're up to..." maxlength="1000" />
                                         </div>
                                     </div>
                                     <div class="form-actions">
-                                        <button type="submit" class="btn-primary" id="btn-save-client">Save Client</button>
+                                        <button type="submit" class="btn-primary" id="btn-save-client">Save
+                                            Client</button>
                                     </div>
                                 </form>
                             </div>
@@ -517,8 +536,10 @@
                                 <div class="card-header">
                                     <h2>Current Types</h2>
                                 </div>
-                                <p class="types-helper" style="margin-bottom: 8px;">Review active services and remove outdated entries.</p>
-                                <div class="split-table-container appointment-types-list" id="type-admin-list" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
+                                <p class="types-helper" style="margin-bottom: 8px;">Review active services and remove
+                                    outdated entries.</p>
+                                <div class="split-table-container appointment-types-list" id="type-admin-list"
+                                    style="padding: 12px; display: flex; flex-direction: column; gap: 8px;"></div>
                             </div>
                         </div>
 
@@ -528,7 +549,11 @@
                                 <div class="card-header">
                                     <h2 id="type-form-title">Create Appointment Type</h2>
                                     <button class="btn-icon-close" id="btn-cancel-type-edit" style="display: none;">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
                                     </button>
                                 </div>
                                 <p class="types-helper">Add a service once, then reuse it when creating bookings.</p>
@@ -575,7 +600,8 @@
                     <div class="page-header">
                         <div class="page-header-main">
                             <h2>AI Insights Feed</h2>
-                            <p class="page-subtitle">Real-time predictive analysis, scheduling optimization, and anomalies.</p>
+                            <p class="page-subtitle">Real-time predictive analysis, scheduling optimization, and
+                                anomalies.</p>
                         </div>
                         <div class="page-header-actions">
                             <span class="badge pulse">Live Monitoring</span>
@@ -592,7 +618,8 @@
                     <div class="page-header">
                         <div class="page-header-main">
                             <h2>Workspace Settings</h2>
-                            <p class="page-subtitle">Configure your business profile, operating hours, and appearance.</p>
+                            <p class="page-subtitle">Configure your business profile, operating hours, and appearance.
+                            </p>
                         </div>
                     </div>
                     <div class="settings-page">
@@ -611,8 +638,9 @@
                                     <p>Your business identity, contact details, and timezone.</p>
                                 </div>
                                 <button type="button" class="icon-btn small collapse-toggle-btn"
-                                    data-collapse-target="#settings-section-profile" data-collapse-storage="settings.profile"
-                                    aria-expanded="true" aria-label="Collapse Business Profile section">
+                                    data-collapse-target="#settings-section-profile"
+                                    data-collapse-storage="settings.profile" aria-expanded="true"
+                                    aria-label="Collapse Business Profile section">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <polyline points="6 15 12 9 18 15" />
                                     </svg>
@@ -937,9 +965,11 @@
                                     <div class="settings-toggle-item">
                                         <div class="settings-toggle-copy">
                                             <strong>Desktop reminder notifications</strong>
-                                            <small>Show browser notifications on this device when reminders are due.</small>
+                                            <small>Show browser notifications on this device when reminders are
+                                                due.</small>
                                             <div style="margin-top:8px;">
-                                                <button type="button" class="btn-secondary" id="btn-test-browser-notification">Test Notification</button>
+                                                <button type="button" class="btn-secondary"
+                                                    id="btn-test-browser-notification">Test Notification</button>
                                             </div>
                                         </div>
                                         <label class="toggle-switch">
@@ -1133,9 +1163,12 @@
                                         <div class="settings-utility-item">
                                             <div class="settings-utility-copy">
                                                 <strong>AI Appointment Import</strong>
-                                                <small>Upload CSV, JSON, TXT, or ICS and AI will convert/import non-overlapping appointments.</small>
-                                                <span class="ai-import-quota-indicator" id="ai-import-quota-indicator" aria-live="polite">
-                                                    <strong class="ai-import-quota-value" id="ai-import-quota-value">Remaining today: -- / 3</strong>
+                                                <small>Upload CSV, JSON, TXT, or ICS and AI will convert/import
+                                                    non-overlapping appointments.</small>
+                                                <span class="ai-import-quota-indicator" id="ai-import-quota-indicator"
+                                                    aria-live="polite">
+                                                    <strong class="ai-import-quota-value"
+                                                        id="ai-import-quota-value">Remaining today: -- / 3</strong>
                                                 </span>
                                             </div>
                                             <div class="settings-utility-action">

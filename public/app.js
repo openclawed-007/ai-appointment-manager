@@ -2850,10 +2850,10 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
               data-appointment-source="${escapeHtml(a.source || 'owner')}">
               <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
               <span class="week-event-time">${escapeHtml(
-                isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0
-                  ? toTimeCompact(a.time)
-                  : `${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}`
-              )}</span>
+          isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0
+            ? toTimeCompact(a.time)
+            : `${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}`
+        )}</span>
             </div>
           `).join('');
       return `
@@ -3443,15 +3443,15 @@ function bindAppointmentFormEnhancements() {
   dateInput?.addEventListener('change', () => {
     if (!timeInput || !dateInput?.value) return;
     const selectedDate = dateInput.value;
-      if (selectedDate !== localYmd(new Date())) return;
-      if (!timeInput.value) return;
-      const now = roundToNextQuarterHour(new Date());
-      const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      if (timeInput.value < current) {
-        timeInput.value = current;
-      }
-      syncTimeBuilderFromInput(form);
-      updateAppointmentPreview();
+    if (selectedDate !== localYmd(new Date())) return;
+    if (!timeInput.value) return;
+    const now = roundToNextQuarterHour(new Date());
+    const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    if (timeInput.value < current) {
+      timeInput.value = current;
+    }
+    syncTimeBuilderFromInput(form);
+    updateAppointmentPreview();
   });
 
   setAppointmentDefaults();
@@ -3834,13 +3834,13 @@ function renderTypes(types = []) {
                 </span>
               </div>
 	            </div>`
-	        )
-	        .join('');
+        )
+        .join('');
 
   if (root) root.innerHTML = html;
   if (adminRoot) {
     adminRoot.innerHTML = adminHtml;
-    
+
     adminRoot.querySelectorAll('.btn-edit-type').forEach((btn) => {
       btn.addEventListener('click', () => {
         const typeId = btn.closest('.type-admin-card')?.dataset.typeId;
@@ -3899,7 +3899,7 @@ function renderInsights(insights = []) {
 function renderAppointmentsTable(appointments = []) {
   const root = document.getElementById('appointments-table');
   if (!root) return;
-  
+
   // Store appointments in state so detail view can access them
   state.appointments = appointments;
 
@@ -3934,30 +3934,30 @@ function renderAppointmentsTable(appointments = []) {
       const id = Number(row.dataset.id);
       if (!Number.isFinite(id) || id <= 0) return;
       state.selectedAppointmentId = id;
-      
+
       // Update active state in UI immediately
       root.querySelectorAll('.data-row').forEach(r => r.classList.remove('active'));
       row.classList.add('active');
-      
+
       const appointment = state.appointments.find(a => Number(a.id) === id);
       renderAppointmentDetail(appointment);
-      
+
       // Auto-scroll to detail panel on narrow screens
       if (window.innerWidth <= 1024) {
         document.getElementById('appointment-detail-panel-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     });
   });
-  
+
   // Render first item's details if nothing selected or selection is invalid
   if (!state.selectedAppointmentId || !appointments.some(a => Number(a.id) === Number(state.selectedAppointmentId))) {
     state.selectedAppointmentId = appointments[0]?.id || null;
     if (state.selectedAppointmentId) {
-       const firstRow = root.querySelector('.data-row');
-       if (firstRow) firstRow.classList.add('active');
-       renderAppointmentDetail(appointments[0]);
+      const firstRow = root.querySelector('.data-row');
+      if (firstRow) firstRow.classList.add('active');
+      renderAppointmentDetail(appointments[0]);
     } else {
-       renderAppointmentDetail(null);
+      renderAppointmentDetail(null);
     }
   } else {
     const appointment = appointments.find(a => Number(a.id) === Number(state.selectedAppointmentId));
@@ -3975,35 +3975,35 @@ function renderAppointmentDetail(appointment = null) {
 
   const reminderModeEnabled = isReminderModeEnabled();
   const statusClass = `status-${(appointment.status || 'pending').toLowerCase()}`;
-  
+
   let actionsHtml = `
     <button class="btn-secondary btn-sm btn-edit" data-id="${appointment.id}">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
       Edit
     </button>
   `;
-  
+
   if (!reminderModeEnabled) {
-      if (appointment.clientEmail) {
-          actionsHtml += `
+    if (appointment.clientEmail) {
+      actionsHtml += `
             <button class="btn-secondary btn-sm btn-email" data-id="${appointment.id}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
               Email
             </button>
           `;
-      }
-      if (appointment.status === 'pending') {
-          actionsHtml += `
+    }
+    if (appointment.status === 'pending') {
+      actionsHtml += `
             <button class="btn-secondary btn-sm btn-confirm-booking" data-id="${appointment.id}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
               Confirm
             </button>
           `;
-      }
+    }
   }
 
   if (appointment.status !== 'completed' && appointment.status !== 'cancelled') {
-      actionsHtml += `
+    actionsHtml += `
         <button class="btn-secondary btn-sm btn-complete" data-id="${appointment.id}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
           ${reminderModeEnabled ? 'Done' : 'Complete'}
@@ -4012,7 +4012,7 @@ function renderAppointmentDetail(appointment = null) {
   }
 
   if (!reminderModeEnabled && appointment.status !== 'cancelled') {
-      actionsHtml += `
+    actionsHtml += `
         <button class="btn-secondary btn-sm btn-cancel" data-id="${appointment.id}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
           Cancel
@@ -4070,74 +4070,74 @@ function renderAppointmentDetail(appointment = null) {
 
   // Attach listeners
   root.querySelector('.btn-edit')?.addEventListener('click', () => startEditAppointment(appointment));
-  
+
   root.querySelector('.btn-email')?.addEventListener('click', async () => {
-      await openEmailComposerMenu(appointment.id);
+    await openEmailComposerMenu(appointment.id);
   });
-  
+
   root.querySelector('.btn-complete')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      if (btn.disabled) return;
-      try {
-        const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'completed' })
-        }, { allowOfflineQueue: true });
-        if (result.queued) return;
-        showToast('Marked as completed', 'success');
-        await loadAppointmentsTable();
-        await loadDashboard();
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    try {
+      const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' })
+      }, { allowOfflineQueue: true });
+      if (result.queued) return;
+      showToast('Marked as completed', 'success');
+      await loadAppointmentsTable();
+      await loadDashboard();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   });
 
   root.querySelector('.btn-confirm-booking')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      if (btn.disabled) return;
-      const originalText = btn.innerHTML;
-      btn.disabled = true;
-      btn.classList.add('is-busy');
-      btn.innerHTML = 'Confirming...';
-      try {
-        const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'confirmed' })
-        }, { allowOfflineQueue: true });
-        if (result.queued) {
-          btn.classList.remove('is-busy');
-          btn.innerHTML = 'Queued';
-          return;
-        }
-        showToast('Appointment confirmed!', 'success');
-        await loadAppointmentsTable();
-        await loadDashboard();
-        await refreshCalendarDots({ force: true });
-      } catch (err) {
-        showToast(err.message, 'error');
-        btn.disabled = false;
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.classList.add('is-busy');
+    btn.innerHTML = 'Confirming...';
+    try {
+      const result = await queueAwareMutation(`/api/appointments/${appointment.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'confirmed' })
+      }, { allowOfflineQueue: true });
+      if (result.queued) {
         btn.classList.remove('is-busy');
-        btn.innerHTML = originalText;
+        btn.innerHTML = 'Queued';
+        return;
       }
+      showToast('Appointment confirmed!', 'success');
+      await loadAppointmentsTable();
+      await loadDashboard();
+      await refreshCalendarDots({ force: true });
+    } catch (err) {
+      showToast(err.message, 'error');
+      btn.disabled = false;
+      btn.classList.remove('is-busy');
+      btn.innerHTML = originalText;
+    }
   });
 
   root.querySelector('.btn-cancel')?.addEventListener('click', async () => {
-      await openCancelReasonMenu(appointment.id);
+    await openCancelReasonMenu(appointment.id);
   });
 
   root.querySelector('.btn-delete')?.addEventListener('click', async () => {
-      if (await showConfirm('Delete', `Are you sure you want to delete this ${reminderModeEnabled ? 'reminder' : 'appointment'}?`)) {
-          try {
-            const result = await queueAwareMutation(`/api/appointments/${appointment.id}`, { method: 'DELETE' }, { allowOfflineQueue: true });
-            if (result.queued) return;
-            showToast('Deleted successfully', 'success');
-            state.selectedAppointmentId = null;
-            await loadAppointmentsTable();
-            await loadDashboard();
-          } catch (err) {
-            showToast(err.message, 'error');
-          }
+    if (await showConfirm('Delete', `Are you sure you want to delete this ${reminderModeEnabled ? 'reminder' : 'appointment'}?`)) {
+      try {
+        const result = await queueAwareMutation(`/api/appointments/${appointment.id}`, { method: 'DELETE' }, { allowOfflineQueue: true });
+        if (result.queued) return;
+        showToast('Deleted successfully', 'success');
+        state.selectedAppointmentId = null;
+        await loadAppointmentsTable();
+        await loadDashboard();
+      } catch (err) {
+        showToast(err.message, 'error');
       }
+    }
   });
 }
 
@@ -4323,14 +4323,14 @@ function renderClientsTable(clients = []) {
       const clientId = Number(row.dataset.clientId);
       if (!Number.isFinite(clientId) || clientId <= 0) return;
       state.selectedClientId = clientId;
-      
+
       // Hide form if it was open
       document.getElementById('client-form-container').style.display = 'none';
       document.getElementById('client-detail-panel-wrapper').style.display = 'flex';
 
       renderClientsTable(state.clients);
       await loadClientDetail(clientId);
-      
+
       // Auto-scroll to detail panel on narrow screens
       if (window.innerWidth <= 1024) {
         document.getElementById('client-detail-panel-wrapper')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4758,7 +4758,7 @@ async function submitType(e) {
   const formData = new FormData(form);
   const id = formData.get('id');
   const data = Object.fromEntries(formData.entries());
-  
+
   const isEditing = id && Number(id) > 0;
   const url = isEditing ? `/api/types/${id}` : '/api/types';
   const method = isEditing ? 'PUT' : 'POST';
@@ -4795,8 +4795,8 @@ function resetTypeForm() {
   const cancelBtn = document.getElementById('btn-cancel-type-edit');
   const submitBtn = form?.querySelector('button[type="submit"]');
   if (form) {
-      form.reset();
-      document.getElementById('type-id').value = '';
+    form.reset();
+    document.getElementById('type-id').value = '';
   }
   if (title) title.textContent = 'Create Appointment Type';
   if (cancelBtn) cancelBtn.style.display = 'none';
@@ -4813,13 +4813,13 @@ function setTypeFormForEditing(typeId) {
   const submitBtn = form?.querySelector('button[type="submit"]');
 
   if (form) {
-      document.getElementById('type-id').value = type.id;
-      document.getElementById('type-name').value = type.name || '';
-      document.getElementById('type-duration').value = type.durationMinutes || 30;
-      document.getElementById('type-price').value = (Number(type.priceCents) || 0) / 100;
-      document.getElementById('type-location').value = type.locationMode || 'hybrid';
+    document.getElementById('type-id').value = type.id;
+    document.getElementById('type-name').value = type.name || '';
+    document.getElementById('type-duration').value = type.durationMinutes || 30;
+    document.getElementById('type-price').value = (Number(type.priceCents) || 0) / 100;
+    document.getElementById('type-location').value = type.locationMode || 'hybrid';
   }
-  
+
   if (title) title.textContent = 'Edit Appointment Type';
   if (cancelBtn) cancelBtn.style.display = 'flex';
   if (submitBtn) submitBtn.textContent = 'Update Type';
@@ -4854,7 +4854,7 @@ async function submitClient(e) {
   const formData = new FormData(form);
   const id = formData.get('id');
   const payload = Object.fromEntries(formData.entries());
-  
+
   const isEditing = id && Number(id) > 0;
   const url = isEditing ? `/api/clients/${id}` : '/api/clients';
   const method = isEditing ? 'PUT' : 'POST';
@@ -4864,9 +4864,9 @@ async function submitClient(e) {
     form.reset();
     showToast(isEditing ? 'Client updated.' : 'Client saved.', 'success');
     closeClientForm();
-    
+
     if (!isEditing && result?.client?.id) {
-        state.selectedClientId = result.client.id;
+      state.selectedClientId = result.client.id;
     }
     await loadClients();
   } catch (error) {
@@ -4875,8 +4875,8 @@ async function submitClient(e) {
 }
 
 function closeClientForm() {
-    document.getElementById('client-form-container').style.display = 'none';
-    document.getElementById('client-detail-panel-wrapper').style.display = 'flex';
+  document.getElementById('client-form-container').style.display = 'none';
+  document.getElementById('client-detail-panel-wrapper').style.display = 'flex';
 }
 
 async function submitClientNote(e) {
@@ -5926,7 +5926,7 @@ function bindForms() {
   document.getElementById('btn-close-client-form')?.addEventListener('click', () => {
     closeClientForm();
   });
-  
+
   document.getElementById('btn-cancel-type-edit')?.addEventListener('click', () => {
     resetTypeForm();
   });

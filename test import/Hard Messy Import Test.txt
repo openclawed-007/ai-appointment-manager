@@ -1,0 +1,40 @@
+INTAKE DUMP - do not trust formatting
+owner: brad | tz maybe PST? | copied from phone notes + old crm export
+
+---
+# first block looked like this in email thread:
+"Can you put Alex M in for Tue July 21st at 9am (1hr) @ office?"
+mail: alex.m@example.com
+service maybe consultation / first meet
+
+---
+calendar scrap:
+21/07/2026 10:30 - Jamie Lee - 30m - virtual - jamie.lee@example.com - follow up
+
+---
+THIS ONE has weird punctuation
+Taylor Smith ; 2026.07.22 ; 11:00 ; 45min ; office ; review docs ; taylor@sample.com
+
+---
+possible duplicate??
+Chris Patel 22-07-2026 13:30 60m on-premises chris.patel@example.com
+and then someone wrote again: "Chris P @ 1:30pm Jul 22 onsite (same as above)"
+
+---
+reminder-ish note from sticky pad:
+"Morgan Chen call reminder Thurs 23rd Jul 3:00pm, 30 mins, phone ok" morgan.chen@example.com
+
+---
+bad / maybe invalid line:
+No date person: "Sam maybe next month morning"
+
+---
+another one with words only:
+Book Mia Foster for Friday July 25 2026 at ten in the morning for one hour onsite, email mia.foster@example.com.
+
+---
+conflict candidates against existing schedule:
+Olivia Reed 2026-07-21 09:00 60 office olivia.reed@example.com
+Noah Price 2026-07-21 09:30 30 virtual noah.price@example.com
+
+end of file
