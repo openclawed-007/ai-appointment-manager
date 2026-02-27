@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { hashPassword } = require('./security');
 const { dbRun, dbGet, getBusinessById, slugifyBusinessName, COLORS } = require('./db');
 
 const SESSION_COOKIE = 'sid';
@@ -12,12 +13,6 @@ const LOGIN_RESEND_COOLDOWN_SECONDS = 30;
 const PASSWORD_RESET_HOURS = 1;
 
 // ── Crypto helpers ──────────────────────────────────────────────────────────
-
-function hashPassword(password = '') {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  return `${salt}:${hash}`;
-}
 
 function validatePasswordStrength(password = '') {
   const value = String(password || '');

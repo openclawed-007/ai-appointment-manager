@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 const { Pool } = require('pg');
+const { hashPassword } = require('./security');
 
 const USE_POSTGRES = Boolean(process.env.DATABASE_URL);
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'data', 'data.db');
@@ -73,13 +74,6 @@ function slugifyBusinessName(input = '') {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return base || 'business';
-}
-
-function hashPassword(password = '') {
-  const crypto = require('crypto');
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
-  return `${salt}:${hash}`;
 }
 
 async function initDb() {

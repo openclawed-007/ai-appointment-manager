@@ -18,6 +18,7 @@ function registerAppointmentRoutes(app, deps) {
     getMonthDateRange,
     resolveBusinessHoursForDate,
     dbAll,
+    isValidEmailFormat,
     sendEmail,
     fmtTime,
     buildBrandedEmailHtml,
@@ -147,6 +148,8 @@ app.get('/api/appointments', async (req, res) => {
     if (limitValue) {
       sql += ' LIMIT ?';
       params.push(limitValue);
+    } else if (searchQuery) {
+      sql += ' LIMIT 100';
     }
     const rows = getSqlite().prepare(sql).all(...params).map((r) => {
       const appt = rowToAppointment(r);
@@ -401,6 +404,9 @@ app.put('/api/appointments/:id', async (req, res) => {
   if (!date) return res.status(400).json({ error: 'date is required' });
   if (!time) return res.status(400).json({ error: 'time is required' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+  if (clientEmail && !isValidEmailFormat(clientEmail)) {
+    return res.status(400).json({ error: 'clientEmail must be a valid email address' });
+  }
 
   let selectedType = null;
   if (typeId != null) {

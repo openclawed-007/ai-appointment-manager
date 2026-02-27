@@ -2,6 +2,7 @@
 
 const { USE_POSTGRES, sqlite: getSqlite, pgPool: getPgPool, dbGet, dbAll, rowToAppointment, getSettings } = require('./db');
 const { fmtTime, sendEmail, buildBrandedEmailHtml } = require('./email');
+const { isValidEmailFormat } = require('./security');
 
 function parseTimeOrThrow(timeValue) {
   const match = String(timeValue || '').match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
@@ -29,6 +30,16 @@ function minutesToTimeString(minutesFromMidnight = 540) {
   const h = Math.floor(safeMinutes / 60);
   const m = safeMinutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function isBeforeNow(dateYmd = '', time24 = '09:00', now = new Date()) {
+  const normalizedDate = String(dateYmd || '').slice(0, 10);
+  const normalizedTime = String(time24 || '').slice(0, 5);
+  const target = new Date(`${normalizedDate}T${normalizedTime}:00`);
+  if (Number.isNaN(target.getTime())) return false;
+  const safeNow = new Date(now);
+  safeNow.setSeconds(0, 0);
+  return target.getTime() < safeNow.getTime();
 }
 
 function dateLockKey(dateValue = '') {
@@ -114,11 +125,16 @@ async function getAvailableSlots({ businessId, date, durationMinutes, openTime =
 
   const lastStart = windowEndMinutes - requestedDuration;
   const slots = [];
+  const now = new Date();
+  const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayMinutes = now.getHours() * 60 + now.getMinutes();
+  const isToday = String(date) === todayYmd;
   for (
     let slotStart = windowStartMinutes;
     slotStart <= lastStart;
     slotStart += PUBLIC_SLOT_INTERVAL_MINUTES
   ) {
+    if (isToday && slotStart < todayMinutes) continue;
     const slotEnd = slotStart + requestedDuration;
     const overlaps = blockers.some((b) => slotStart < b.end && slotEnd > b.start);
     if (!overlaps) slots.push(minutesToTimeString(slotStart));
@@ -146,6 +162,7 @@ async function createAppointment(payload = {}) {
   if (!clientName?.trim()) throw new Error('clientName is required');
   if (String(clientName).trim().length > 200) throw new Error('clientName is too long (max 200 characters)');
   if (clientEmail && String(clientEmail).length > 320) throw new Error('clientEmail is too long');
+  if (clientEmail && !isValidEmailFormat(clientEmail)) throw new Error('clientEmail must be a valid email address');
   if (notes && String(notes).length > 5000) throw new Error('notes is too long (max 5000 characters)');
   if (title && String(title).length > 500) throw new Error('title is too long (max 500 characters)');
 
@@ -165,6 +182,9 @@ async function createAppointment(payload = {}) {
 
   const resolvedSource = source || 'owner';
   const isReminderEntry = String(resolvedSource).toLowerCase() === 'reminder';
+  if (String(resolvedSource).toLowerCase() === 'public' && !isReminderEntry && isBeforeNow(date, time)) {
+    throw new Error('Public bookings cannot be created in the past.');
+  }
   const resolvedDuration = isReminderEntry
     ? 0
     : Number(durationMinutes || type?.duration_minutes || 45);

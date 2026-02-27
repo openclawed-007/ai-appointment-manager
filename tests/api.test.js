@@ -77,6 +77,18 @@ async function loginAndVerify(agent, email, password) {
   return verifyRes.body;
 }
 
+function localYmd(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toMinutes(time24 = '00:00') {
+  const [h, m] = String(time24).split(':').map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
 describe('API smoke', () => {
   it('health should be ok', async () => {
     const res = await request(app).get('/api/health');
@@ -226,6 +238,54 @@ describe('API smoke', () => {
 
     const archiveAgain = await del(agent, `/api/clients/${clientId}`);
     expect(archiveAgain.statusCode).toBe(404);
+  });
+
+  it('rejects invalid clientEmail for appointment create and update', async () => {
+    const agent = request.agent(app);
+    await loginAndVerify(agent, adminEmail, adminPassword);
+
+    const typeRes = await post(agent, '/api/types').send({
+      name: `Email Type ${Date.now()}`,
+      durationMinutes: 30,
+      priceCents: 2500,
+      locationMode: 'office'
+    });
+    expect(typeRes.statusCode).toBe(201);
+
+    const badCreate = await post(agent, '/api/appointments').send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Bad Email Create',
+      clientEmail: 'not-an-email',
+      date: '2026-03-22',
+      time: '09:30',
+      durationMinutes: 30,
+      location: 'office'
+    });
+    expect(badCreate.statusCode).toBe(400);
+    expect(String(badCreate.body.error || '')).toContain('clientEmail');
+
+    const goodCreate = await post(agent, '/api/appointments').send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Good Email',
+      clientEmail: 'good@example.com',
+      date: '2026-03-22',
+      time: '10:30',
+      durationMinutes: 30,
+      location: 'office'
+    });
+    expect(goodCreate.statusCode).toBe(201);
+
+    const badUpdate = await put(agent, `/api/appointments/${goodCreate.body.appointment.id}`).send({
+      typeId: typeRes.body.type.id,
+      clientName: 'Bad Email Update',
+      clientEmail: 'still-not-an-email',
+      date: '2026-03-22',
+      time: '11:00',
+      durationMinutes: 30,
+      location: 'office'
+    });
+    expect(badUpdate.statusCode).toBe(400);
+    expect(String(badUpdate.body.error || '')).toContain('clientEmail');
   });
 
   it('supports reminder offset create/update validation and persistence', async () => {
@@ -560,6 +620,87 @@ describe('API smoke', () => {
     expect(closedDayRes.body.dayKey).toBe('sun');
     expect(closedDayRes.body.closed).toBe(true);
     expect(closedDayRes.body.availableSlots).toEqual([]);
+  });
+
+  it('rejects past public bookings from API requests', async () => {
+    const unique = Date.now();
+    const agent = request.agent(app);
+    const verified = await signupAndVerify(agent, {
+      businessName: `Past Public ${unique}`,
+      name: 'Past Public Owner',
+      email: `past-public-${unique}@example.com`,
+      password: 'PastPublic123!',
+      timezone: 'America/Los_Angeles'
+    });
+
+    const typeRes = await post(agent, '/api/types').send({
+      name: `Past Public Type ${unique}`,
+      durationMinutes: 30,
+      priceCents: 3000,
+      locationMode: 'office'
+    });
+    expect(typeRes.statusCode).toBe(201);
+
+    const bookingRes = await request(app).post('/api/public/bookings').set(CSRF).send({
+      businessSlug: verified.business.slug,
+      typeId: typeRes.body.type.id,
+      clientName: 'Old Booking',
+      clientEmail: `old-booking-${unique}@example.com`,
+      date: '2000-01-01',
+      time: '09:00',
+      notes: 'Should be blocked'
+    });
+
+    expect(bookingRes.statusCode).toBe(400);
+    expect(String(bookingRes.body.error || '').toLowerCase()).toContain('past');
+  });
+
+  it('filters past slots for today on public available-slots endpoint', async () => {
+    const unique = Date.now();
+    const agent = request.agent(app);
+    const verified = await signupAndVerify(agent, {
+      businessName: `Today Slots ${unique}`,
+      name: 'Today Slots Owner',
+      email: `today-slots-${unique}@example.com`,
+      password: 'TodaySlots123!',
+      timezone: 'America/Los_Angeles'
+    });
+
+    const typeRes = await post(agent, '/api/types').send({
+      name: `Today Slots Type ${unique}`,
+      durationMinutes: 15,
+      priceCents: 1500,
+      locationMode: 'office'
+    });
+    expect(typeRes.statusCode).toBe(201);
+
+    const hoursRes = await put(agent, '/api/settings').send({
+      openTime: '00:00',
+      closeTime: '23:59',
+      businessHours: {
+        mon: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        tue: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        wed: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        thu: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        fri: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        sat: { closed: false, openTime: '00:00', closeTime: '23:59' },
+        sun: { closed: false, openTime: '00:00', closeTime: '23:59' }
+      }
+    });
+    expect(hoursRes.statusCode).toBe(200);
+
+    const requestStartedAt = new Date();
+    const today = localYmd(requestStartedAt);
+    const minSlotMinutes = Math.ceil((requestStartedAt.getHours() * 60 + requestStartedAt.getMinutes()) / 15) * 15;
+    const slotsRes = await request(app).get(
+      `/api/public/available-slots?businessSlug=${encodeURIComponent(verified.business.slug)}&date=${today}&typeId=${typeRes.body.type.id}`
+    );
+
+    expect(slotsRes.statusCode).toBe(200);
+    expect(Array.isArray(slotsRes.body.availableSlots)).toBe(true);
+    slotsRes.body.availableSlots.forEach((slot) => {
+      expect(toMinutes(slot)).toBeGreaterThanOrEqual(minSlotMinutes);
+    });
   });
 
   it('rejects weak signup passwords', async () => {

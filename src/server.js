@@ -22,6 +22,7 @@ const {
 } = require('./lib/db');
 
 const { fmtTime, buildBrandedEmailHtml, buildCancellationEmailHtml, sendEmail } = require('./lib/email');
+const { isValidEmailFormat } = require('./lib/security');
 const {
   createAppointment,
   assertNoOverlap,
@@ -367,6 +368,7 @@ registerAppointmentRoutes(app, {
   getMonthDateRange,
   resolveBusinessHoursForDate,
   dbAll,
+  isValidEmailFormat,
   sendEmail,
   fmtTime,
   buildBrandedEmailHtml,
