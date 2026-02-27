@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'intellischedule-static-v9';
+const STATIC_CACHE = 'intellischedule-static-v10';
 const RUNTIME_CACHE = 'intellischedule-runtime-v4';
 
 const APP_SHELL = [
@@ -7,8 +7,6 @@ const APP_SHELL = [
   '/booking.html',
   '/reset-password.html',
   '/styles.css',
-  '/app.js',
-  '/app-main.js',
   '/js/state.js',
   '/js/utils.js',
   '/js/app-core.js',

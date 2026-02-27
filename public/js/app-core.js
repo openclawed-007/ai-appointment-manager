@@ -1,6 +1,6 @@
 const appStateCore = (() => {
   if (typeof module !== 'undefined' && module.exports) {
-    return require('./js/state');
+    return require('./state');
   }
   if (typeof window !== 'undefined' && window.AppStateCore) {
     return window.AppStateCore;
@@ -26,7 +26,7 @@ const {
 const BROWSER_NOTIFICATIONS_KEY = 'browserNotificationsEnabled';
 const appUtils = (() => {
   if (typeof module !== 'undefined' && module.exports) {
-    return require('./js/utils');
+    return require('./utils');
   }
   if (typeof window !== 'undefined' && window.AppUtils) {
     return window.AppUtils;
