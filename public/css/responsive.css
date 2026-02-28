@@ -84,6 +84,52 @@
         width: 15px;
         height: 15px;
     }
+
+    /* Large mobile / small tablet week view keeps compact chip layout */
+    .calendar-grid.google-like {
+        grid-template-columns: 40px repeat(7, minmax(0, 1fr));
+    }
+
+    .week-slot {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .week-slot-content {
+        display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        align-items: flex-start;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .week-event-chip {
+        width: auto;
+        max-width: 100%;
+        flex: 0 1 auto;
+        border-radius: 8px;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .week-slot.has-single-event .week-slot-content {
+        align-items: flex-start;
+    }
+
+    .week-slot.has-single-event .week-event-chip {
+        width: auto;
+        max-width: 100%;
+        min-height: 0;
+        padding: 2px 7px 2px 8px;
+        border-radius: 8px;
+        gap: 4px;
+    }
+
+    .week-event-time {
+        display: none;
+    }
 }
 
 @media (max-width: 768px) {
