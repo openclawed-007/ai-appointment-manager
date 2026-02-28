@@ -318,11 +318,11 @@
         color: var(--text-muted);
     }
 
-    /* Month cells — keep readable height but match desktop visual style */
+    /* Month cells — keep true squares on mobile so tap/selection stays aligned */
     .day-cell {
-        aspect-ratio: 1 / 1.1;
-        padding: 5px 4px 6px;
-        min-height: 78px;
+        aspect-ratio: 1 / 1;
+        padding: 4px;
+        min-height: 0;
         align-items: center;
         justify-content: flex-start;
         border-radius: var(--radius-sm);
@@ -363,10 +363,10 @@
         box-shadow: 0 2px 8px color-mix(in oklab, var(--gold) 35%, transparent);
     }
 
-    /* Selected: subtle background only — no circle */
+    /* Selected: subtle background + crisp inset ring for reliable tap target alignment */
     .day-cell.selected {
         background: var(--gold-dim);
-        box-shadow: none;
+        box-shadow: inset 0 0 0 2px var(--gold);
     }
 
     /* Month events match desktop: no card backgrounds */
