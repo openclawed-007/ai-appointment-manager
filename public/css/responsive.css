@@ -886,29 +886,45 @@
         width: calc(100vw - 12px);
         max-height: calc(100dvh - 12px);
         padding: 0;
-        border-radius: var(--radius-lg);
+        border-radius: 16px;
+        border: 1px solid color-mix(in oklab, var(--border-strong) 70%, transparent);
+        background: color-mix(in oklab, var(--bg-surface) 94%, black);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
     }
 
     .day-menu-header {
-        padding: 12px 14px 8px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        padding: 12px 14px 10px;
+        background: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+        backdrop-filter: blur(6px);
+        border-bottom: 1px solid var(--border);
     }
 
     .day-menu-header h3 {
-        font-size: 0.86rem;
+        font-size: 0.9rem;
     }
 
     .day-menu-actions {
+        position: sticky;
+        top: 52px;
+        z-index: 1;
         padding: 8px 14px;
+        background: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+        backdrop-filter: blur(6px);
+        border-bottom: 1px solid var(--border);
     }
 
     .day-menu-list {
-        padding: 0 14px 14px;
-        gap: 6px;
+        padding: 10px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+        gap: 8px;
     }
 
     .day-menu-item {
-        padding: 10px 12px;
-        gap: 6px;
+        padding: 11px 12px;
+        gap: 7px;
+        border-radius: 12px;
     }
 
     .day-menu-item-time {
@@ -916,19 +932,26 @@
     }
 
     .day-menu-item-client {
-        font-size: 0.76rem;
+        font-size: 0.78rem;
     }
 
     .day-menu-item-type {
-        font-size: 0.68rem;
+        font-size: 0.69rem;
     }
 
-    .day-menu-top-actions {
-        flex-wrap: wrap;
-    }
-
+    .day-menu-top-actions,
     .day-menu-item-actions {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .day-menu-top-actions button,
+    .day-menu-item-actions button,
+    .day-menu-show-actions {
+        min-height: 32px;
+        width: 100%;
+        padding: 6px 8px;
     }
 
     .quick-create-menu {

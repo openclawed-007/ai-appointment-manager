@@ -520,27 +520,16 @@ function bindCalendarNav() {
 
       const eventCard = event.target.closest('.week-event-chip[data-appointment-id]');
       if (eventCard) {
-        const appointmentId = Number(eventCard.dataset.appointmentId);
-        if (!Number.isFinite(appointmentId) || appointmentId <= 0) return;
-        const appointment = {
-          id: appointmentId,
-          typeId: eventCard.dataset.appointmentTypeId ? Number(eventCard.dataset.appointmentTypeId) : null,
-          clientName: String(eventCard.dataset.appointmentClientName || ''),
-          date: String(eventCard.dataset.appointmentDate || ''),
-          time: String(eventCard.dataset.appointmentTime || '').slice(0, 5),
-          durationMinutes: Number(eventCard.dataset.appointmentDuration || 45),
-          reminderOffsetMinutes: Number(eventCard.dataset.appointmentReminderOffset == null ? 10 : eventCard.dataset.appointmentReminderOffset),
-          location: String(eventCard.dataset.appointmentLocation || 'office'),
-          source: String(eventCard.dataset.appointmentSource || 'owner')
-        };
-        if (!appointment.date || !appointment.time) return;
-        state.selectedDate = appointment.date;
+        const date = String(eventCard.dataset.appointmentDate || '');
+        const time = String(eventCard.dataset.appointmentTime || '').slice(0, 5);
+        if (!date) return;
+        state.selectedDate = date;
         state.viewAll = false;
         const btn = document.getElementById('btn-view-all');
         if (btn) btn.textContent = 'View All';
-        closeDayMenu();
         closeQuickCreateMenu();
-        startEditAppointment(appointment);
+        void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
+        void openDayMenu(eventCard, date, { prefillTime: /^\d{2}:\d{2}$/.test(time) ? time : '' }).catch(swallowBackgroundAsyncError);
         updateTimeGridSelectionUi();
         return;
       }

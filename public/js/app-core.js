@@ -1453,7 +1453,19 @@ function positionDayMenu(anchorEl, menu) {
 
   const menuRect = menu.getBoundingClientRect();
   const isNarrowScreen = vw <= 768;
-  let left = isNarrowScreen ? (vw - menuRect.width) / 2 : rect.left;
+
+  if (isNarrowScreen) {
+    const sideInset = 6;
+    const bottomInset = 6;
+    const safeTop = 8;
+    const left = sideInset;
+    const top = Math.max(safeTop, vh - menuRect.height - bottomInset);
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    return;
+  }
+
+  let left = rect.left;
   let top = rect.bottom + 8;
 
   if (left + menuRect.width > vw - margin) left = vw - menuRect.width - margin;
