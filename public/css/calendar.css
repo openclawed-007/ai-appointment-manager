@@ -435,12 +435,12 @@
     flex-wrap: wrap;
     gap: 3px;
     align-content: start;
-    align-items: start;
+    align-items: flex-start;
     min-height: 44px;
 }
 
 .week-slot.has-single-event .week-slot-content {
-    align-items: stretch;
+    align-items: flex-start;
 }
 
 .week-event-chip {
@@ -458,26 +458,28 @@
     overflow: hidden;
     cursor: pointer;
     white-space: nowrap;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    max-width: 100%;
+    box-sizing: border-box;
     transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), border-color 180ms var(--ease);
 }
 
 .week-slot.has-single-event .week-event-chip {
     width: auto;
-    max-width: min(92%, 260px);
-    min-height: 34px;
-    border-radius: 10px;
-    padding: 6px 10px 6px 11px;
+    max-width: 100%;
+    min-height: 0;
+    border-radius: var(--radius-full);
+    padding: 3px 10px 3px 10px;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 5px;
 }
 
 .week-slot.has-single-event .week-event-name {
-    font-size: 0.64rem;
+    font-size: 0.58rem;
 }
 
 .week-slot.has-single-event .week-event-time {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
 }
 
 .week-event-chip:hover {
