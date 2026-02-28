@@ -305,9 +305,11 @@
     }
 
     .calendar-grid {
-        padding: 6px 4px;
-        gap: 0;
-        border-radius: 0 0 var(--radius-md) var(--radius-md);
+        padding: 0;
+        gap: 1px;
+        border-radius: 0;
+        background: color-mix(in oklab, var(--border) 60%, transparent);
+        border: 1px solid var(--border);
     }
 
     .day-header {
@@ -325,7 +327,7 @@
         min-height: 0;
         align-items: center;
         justify-content: flex-start;
-        border-radius: var(--radius-sm);
+        border-radius: 0;
         overflow: hidden;
     }
 
