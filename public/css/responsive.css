@@ -502,16 +502,18 @@
 
     .week-slot-content {
         display: flex;
-        flex-direction: column;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        align-items: flex-start;
         gap: 2px;
         min-height: 24px;
         min-width: 0;
     }
 
     .week-event-chip {
-        width: 100%;
+        width: auto;
         max-width: 100%;
+        flex: 0 1 auto;
         font-size: 0.56rem;
         padding: 2px 7px 2px 8px;
         min-height: 0;
@@ -523,11 +525,11 @@
     }
 
     .week-slot.has-single-event .week-slot-content {
-        align-items: stretch;
+        align-items: flex-start;
     }
 
     .week-slot.has-single-event .week-event-chip {
-        width: 100%;
+        width: auto;
         max-width: 100%;
         min-height: 0;
         padding: 2px 7px 2px 8px;
