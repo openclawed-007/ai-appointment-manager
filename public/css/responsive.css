@@ -940,9 +940,9 @@
     }
 
     .day-cell {
-        aspect-ratio: 1 / 1.1;
-        padding: 4px 2px 5px;
-        min-height: 72px;
+        aspect-ratio: 1 / 1;
+        padding: 4px 2px;
+        min-height: 0;
     }
 
     .week-slot {
