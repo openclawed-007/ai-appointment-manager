@@ -506,6 +506,7 @@
     font-weight: 700;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
 }
 
 .week-event-name {
@@ -518,6 +519,7 @@
     line-height: 1.15;
     letter-spacing: 0.01em;
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 .week-event-more {

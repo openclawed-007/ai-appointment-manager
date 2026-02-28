@@ -374,12 +374,8 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
               data-appointment-reminder-offset="${Number(a.reminderOffsetMinutes == null ? 10 : a.reminderOffsetMinutes)}"
               data-appointment-location="${escapeHtml(a.location || 'office')}"
               data-appointment-source="${escapeHtml(a.source || 'owner')}">
+              <span class="week-event-time">${escapeHtml(toTimeCompact(a.time))}</span>
               <span class="week-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
-              <span class="week-event-time">${escapeHtml(
-          isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0
-            ? toTimeCompact(a.time)
-            : `${toTimeCompact(a.time)} - ${toTimeCompact(addMinutesToTime(a.time, a.durationMinutes))}`
-        )}</span>
             </div>
           `).join('');
       return `
