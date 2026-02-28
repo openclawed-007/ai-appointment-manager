@@ -358,6 +358,8 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
       if (isToday) classes.push('today');
       if (isSelectedDate) classes.push('selected-day');
       if (appointments.length) classes.push('has-event');
+      if (appointments.length === 1) classes.push('has-single-event');
+      if (appointments.length > 1) classes.push('has-multiple-events');
       const chips = loading
         ? '<div class="week-slot-skeleton"></div>'
         : appointments.map((a) => `
@@ -537,8 +539,8 @@ function bindCalendarNav() {
         const btn = document.getElementById('btn-view-all');
         if (btn) btn.textContent = 'View All';
         closeDayMenu();
-        void loadDashboard(appointment.date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
-        void openQuickCreateMenu(eventCard, appointment.date, appointment.time, appointment).catch(swallowBackgroundAsyncError);
+        closeQuickCreateMenu();
+        startEditAppointment(appointment);
         updateTimeGridSelectionUi();
         return;
       }
@@ -552,9 +554,9 @@ function bindCalendarNav() {
       state.viewAll = false;
       const btn = document.getElementById('btn-view-all');
       if (btn) btn.textContent = 'View All';
-      closeDayMenu();
+      closeQuickCreateMenu();
       void loadDashboard(date, { refreshDots: false }).catch(swallowBackgroundAsyncError);
-      void openQuickCreateMenu(slot, date, time).catch(swallowBackgroundAsyncError);
+      void openDayMenu(slot, date, { prefillTime: time }).catch(swallowBackgroundAsyncError);
       updateTimeGridSelectionUi();
       return;
     }
@@ -1296,6 +1298,8 @@ function renderCompletedAppointments(appointments = []) {
 function renderTypes(types = []) {
   const root = document.getElementById('type-list');
   const adminRoot = document.getElementById('type-admin-list');
+  const countPill = document.getElementById('types-count-pill');
+  if (countPill) countPill.textContent = String(Array.isArray(types) ? types.length : 0);
 
   const html =
     types.length === 0
@@ -1326,38 +1330,35 @@ function renderTypes(types = []) {
       : types
         .map(
           (t) => `
-	            <div class="type-admin-card" data-type-id="${t.id}">
-	              <div class="type-admin-card__head">
-	                <div class="type-admin-card__identity">
-	                  <span class="type-color" style="background:${escapeHtml(t.color)}"></span>
-	                  <div>
-	                    <strong>${escapeHtml(t.name)}</strong>
-	                    <div class="pill">${t.durationMinutes} min • ${toMoney(t.priceCents)}</div>
-	                  </div>
-	                </div>
-	                <div class="type-admin-card__head-right">
-	                  <span class="pill">Active</span>
-	                  <div class="type-admin-card__actions">
-	                    <button class="btn-edit-type" type="button" aria-label="Edit Type" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: var(--radius-sm); transition: all var(--transition-fast);">
-	                      <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
-	                    </button>
-	                    <button class="btn-delete-type" type="button" aria-label="Delete Type">
-	                      <svg viewBox="0 0 24 24" style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-	                    </button>
-	                  </div>
-	                </div>
-	              </div>
-	              <div class="type-admin-card__meta">
-	                <span class="type-meta-item">
-	                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-	                  ${escapeHtml(t.locationMode)}
-                </span>
-                <span class="type-meta-item">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  ${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}
-                </span>
+            <article class="service-type-card" data-type-id="${t.id}">
+              <div class="service-type-main">
+                <span class="service-type-color" style="background:${escapeHtml(t.color)}"></span>
+                <div class="service-type-copy">
+                  <strong>${escapeHtml(t.name)}</strong>
+                  <div class="service-type-meta">
+                    <span class="service-chip">${t.durationMinutes} min</span>
+                    <span class="service-chip">${toMoney(t.priceCents)}</span>
+                    <span class="service-chip">${escapeHtml(t.locationMode)}</span>
+                    <span class="service-chip service-chip-count">${t.bookingCount || 0} booking${(t.bookingCount || 0) === 1 ? '' : 's'}</span>
+                  </div>
+                </div>
               </div>
-	            </div>`
+              <div class="service-type-actions">
+                <button class="btn-secondary btn-sm btn-edit-type" type="button" aria-label="Edit Type">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"/></svg>
+                  Edit
+                </button>
+                <div class="service-type-more-wrap">
+                  <button class="btn-secondary btn-sm btn-type-more" type="button" aria-expanded="false">More</button>
+                  <div class="service-type-more-menu hidden">
+                    <button class="btn-secondary btn-sm btn-delete-type" type="button" aria-label="Delete Type">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      Archive
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>`
         )
         .join('');
 
@@ -1365,16 +1366,40 @@ function renderTypes(types = []) {
   if (adminRoot) {
     adminRoot.innerHTML = adminHtml;
 
+    adminRoot.querySelectorAll('.service-type-card').forEach((card) => {
+      card.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        const typeId = card.dataset.typeId;
+        if (typeId) setTypeFormForEditing(typeId);
+      });
+    });
+
+    adminRoot.querySelectorAll('.btn-type-more').forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const wrap = btn.closest('.service-type-more-wrap');
+        const menu = wrap?.querySelector('.service-type-more-menu');
+        if (!menu) return;
+        const opening = menu.classList.contains('hidden');
+        adminRoot.querySelectorAll('.service-type-more-menu').forEach((node) => node.classList.add('hidden'));
+        adminRoot.querySelectorAll('.btn-type-more').forEach((node) => node.setAttribute('aria-expanded', 'false'));
+        if (opening) {
+          menu.classList.remove('hidden');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
     adminRoot.querySelectorAll('.btn-edit-type').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const typeId = btn.closest('.type-admin-card')?.dataset.typeId;
+        const typeId = btn.closest('.service-type-card')?.dataset.typeId;
         if (typeId) setTypeFormForEditing(typeId);
       });
     });
 
     adminRoot.querySelectorAll('.btn-delete-type').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const typeId = btn.closest('.type-admin-card')?.dataset.typeId;
+        const typeId = btn.closest('.service-type-card')?.dataset.typeId;
         if (!typeId) return;
 
         const ok = await showConfirm('Delete Appointment Type', 'Existing bookings remain, but this type will no longer be selectable.');
@@ -1394,27 +1419,109 @@ function renderTypes(types = []) {
         }
       });
     });
+
   }
 }
 
+function getInsightPriority(insight = {}) {
+  const icon = String(insight.icon || '');
+  const text = String(insight.text || '').toLowerCase();
+  const action = String(insight.action || '').toLowerCase();
+  const time = String(insight.time || '').toLowerCase();
+  const combined = `${text} ${action} ${time}`;
+
+  if (time.includes('action now')) return 'high';
+  if (/⚠️|📉|📬|🧱|🧭|🔥/.test(icon)) return 'high';
+  if (/pending|cancel|down|risk|overload|heaviest|declin|churn|recover/.test(combined)) return 'high';
+  if (/optimiz|protect|prioritize|fit|slot|buffer|momentum|utili/.test(combined)) return 'medium';
+  return 'low';
+}
+
+function cleanInsightTitle(text = '') {
+  const safe = String(text || '').trim();
+  if (!safe) return 'Insight';
+  const sentence = safe.split('. ')[0] || safe;
+  return sentence.replace(/\.$/, '');
+}
+
+function isLowValueInsight(insight = {}) {
+  const text = String(insight.text || '').toLowerCase();
+  const action = String(insight.action || '').toLowerCase();
+  return /timezone/.test(text) || /timezone/.test(action) || /configuration/.test(String(insight.time || '').toLowerCase());
+}
+
+function renderInsightSection(title, subtitle, priority, items = []) {
+  if (!items.length) return '';
+  const cards = items
+    .map((i) => `
+      <article class="insight-card insight-card-${escapeHtml(priority)}">
+        <div class="insight-card-head">
+          <span class="insight-card-icon">${escapeHtml(i.icon || '•')}</span>
+          ${i.time ? `<span class="insight-card-time">${escapeHtml(i.time)}</span>` : ''}
+        </div>
+        <p class="insight-card-title">${escapeHtml(cleanInsightTitle(i.text || ''))}</p>
+        ${i.action ? `<p class="insight-card-action">${escapeHtml(i.action)}</p>` : ''}
+      </article>
+    `)
+    .join('');
+
+  return `
+    <section class="insight-section insight-section-${escapeHtml(priority)}">
+      <header class="insight-section-head">
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(subtitle)}</p>
+      </header>
+      <div class="insight-card-list">
+        ${cards}
+      </div>
+    </section>
+  `;
+}
+
 function renderInsights(insights = []) {
+  const prioritized = (Array.isArray(insights) ? insights : [])
+    .map((i) => ({ ...i, priority: getInsightPriority(i) }))
+    .filter((i) => !isLowValueInsight(i))
+    .sort((a, b) => {
+      const rank = { high: 0, medium: 1, low: 2 };
+      return (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3);
+    });
+
+  const useful = prioritized.length ? prioritized.slice(0, 9) : [];
+  const groups = {
+    high: useful.filter((i) => i.priority === 'high').slice(0, 3),
+    medium: useful.filter((i) => i.priority === 'medium').slice(0, 3),
+    low: useful.filter((i) => i.priority === 'low').slice(0, 3)
+  };
+  const sections = [
+    renderInsightSection('Needs Attention', 'Resolve these first', 'high', groups.high),
+    renderInsightSection('Opportunities', 'Actions that can improve results', 'medium', groups.medium),
+    renderInsightSection('Watchlist', 'Useful context while planning', 'low', groups.low)
+  ].filter(Boolean).join('');
+  const summaryLabel = groups.high.length > 0
+    ? `${groups.high.length} priority item${groups.high.length === 1 ? '' : 's'} to handle now`
+    : 'No urgent issues detected today';
+
   const html =
-    insights.length === 0
-      ? '<div class="empty-state">AI insights will appear as bookings are created.</div>'
-      : insights
-        .map(
-          (i) => `
-          <div class="insight-item">
-            <div class="insight-icon">${escapeHtml(i.icon || '💡')}</div>
-            <div class="insight-content">
-              <p>${escapeHtml(i.text)}</p>
-              ${i.action ? `<div class="insight-action">${escapeHtml(i.action)}</div>` : ''}
-              ${i.confidence ? `<div class="insight-confidence">${escapeHtml(i.confidence)}</div>` : ''}
-              <span class="insight-time">${escapeHtml(i.time || 'Live')}</span>
+    useful.length === 0
+      ? '<div class="empty-state">No urgent insights right now. You are on track.</div>'
+      : `
+        <div class="insights-layout">
+          <div class="insights-overview">
+            <div class="insights-overview-main">
+              <h3>Daily Focus</h3>
+              <p>${escapeHtml(summaryLabel)}</p>
             </div>
-          </div>`
-        )
-        .join('');
+            <div class="insights-overview-metrics">
+              <div class="insight-metric metric-high"><strong>${groups.high.length}</strong><span>High</span></div>
+              <div class="insight-metric metric-medium"><strong>${groups.medium.length}</strong><span>Medium</span></div>
+              <div class="insight-metric metric-low"><strong>${groups.low.length}</strong><span>Low</span></div>
+            </div>
+          </div>
+          <div class="insights-sections">
+            ${sections}
+          </div>
+        </div>`;
 
   const fullRoot = document.getElementById('ai-full-list');
   if (fullRoot) fullRoot.innerHTML = html;
@@ -1423,6 +1530,8 @@ function renderInsights(insights = []) {
 function renderAppointmentsTable(appointments = []) {
   const root = document.getElementById('appointments-table');
   if (!root) return;
+  const countPill = document.getElementById('appointments-count-pill');
+  if (countPill) countPill.textContent = String(Array.isArray(appointments) ? appointments.length : 0);
 
   // Store appointments in state so detail view can access them
   state.appointments = appointments;
@@ -1439,15 +1548,24 @@ function renderAppointmentsTable(appointments = []) {
       const isActive = Number(a.id) === Number(state.selectedAppointmentId) ? 'active' : '';
       return `
         <div class="data-row ${isActive}" data-id="${a.id}">
-          <div>
-            <strong class="client-name">${escapeHtml(a.clientName)}</strong>
-            <div class="appointment-type-tag" style="margin-top: 4px;">${escapeHtml(a.typeName)}</div>
-          </div>
-          <div style="text-align: right;">
-            <span class="status-badge ${statusClass}" style="margin-bottom: 4px; display: inline-block;">${escapeHtml(a.status)}</span>
-            <div class="client-note-preview">
-                ${escapeHtml(formatScheduleDate(a.date))} • ${toTime12(a.time)}
+          <div class="appointment-row-main">
+            <strong class="client-name appointment-row-title">${escapeHtml(a.clientName)}</strong>
+            <div class="appointment-row-meta">
+              <span class="appointment-type-tag">${escapeHtml(a.typeName)}</span>
+              <span class="appointment-row-location">${escapeHtml(a.location || 'Office')}</span>
             </div>
+          </div>
+          <div class="appointment-row-side">
+            <span class="status-badge ${statusClass} appointment-row-status">${escapeHtml(a.status)}</span>
+            <div class="client-note-preview appointment-row-when">
+                ${escapeHtml(formatScheduleDate(a.date))}
+            </div>
+            <div class="appointment-row-time">${escapeHtml(formatEntryTimeRange(a))}</div>
+          </div>
+          <div class="appointment-row-chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </div>
         </div>`;
     })
@@ -1552,8 +1670,8 @@ function renderAppointmentDetail(appointment = null) {
   `;
 
   root.innerHTML = `
-    <div class="card detail-panel-header-card">
-      <div class="detail-panel-top-actions" style="flex-wrap: wrap; justify-content: flex-end;">
+    <div class="card detail-panel-header-card appointment-detail-card">
+      <div class="detail-panel-top-actions appointment-detail-actions">
         ${actionsHtml}
       </div>
 
@@ -1572,6 +1690,10 @@ function renderAppointmentDetail(appointment = null) {
             <span>Time</span>
             <strong>${escapeHtml(formatEntryTimeRange(appointment))}</strong>
           </div>
+          <div class="detail-panel-stat">
+            <span>Location</span>
+            <strong>${escapeHtml(appointment.location || 'office')}</strong>
+          </div>
           ${!reminderModeEnabled && appointment.clientEmail ? `
           <div class="detail-panel-stat">
             <span>Email</span>
@@ -1580,14 +1702,14 @@ function renderAppointmentDetail(appointment = null) {
         </div>
       </div>
     </div>
-    
+
     ${appointment.notes ? `
-    <div class="card" style="margin-top: 16px;">
+    <div class="card appointment-notes-card">
         <div class="card-header">
             <h2>Notes</h2>
         </div>
-        <div style="padding: 16px;">
-            <p style="white-space: pre-wrap; margin: 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5;">${escapeHtml(appointment.notes)}</p>
+        <div class="appointment-notes-body">
+            <p class="appointment-notes-copy">${escapeHtml(appointment.notes)}</p>
         </div>
     </div>` : ''}
   `;
@@ -1694,7 +1816,7 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     : 'No upcoming appointment';
 
   const notesHtml = notes.length
-    ? `<div class="client-note-list">${notes.map((item) => `
+    ? `<div class="client-note-list">${notes.slice(0, 3).map((item) => `
       <article class="client-note-item">
         <p>${escapeHtml(item.note || '')}</p>
         <small>${escapeHtml(formatScheduleDate(String(item.createdAt || '').slice(0, 10)))}</small>
@@ -1703,7 +1825,7 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     : '<div class="empty-state">No notes yet.</div>';
 
   const appointmentsHtml = appointments.length
-    ? `<div class="client-note-list">${appointments.slice(0, 5).map((item) => `
+    ? `<div class="client-note-list">${appointments.slice(0, 3).map((item) => `
       <article class="client-note-item client-appointment-item">
         <p><strong>${escapeHtml(item.typeName || 'Appointment')}</strong></p>
         <small>${escapeHtml(formatScheduleDate(item.date || ''))} • ${escapeHtml(toTime12(item.time || '09:00'))} • ${escapeHtml(formatClientStage(item.status || 'pending'))}</small>
@@ -1712,20 +1834,29 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     : '<div class="empty-state">No related appointments yet.</div>';
 
   root.innerHTML = `
-    <div class="card detail-panel-header-card">
-      <div class="detail-panel-top-actions">
-        <button class="btn-secondary btn-sm" id="btn-edit-client" data-id="${client.id}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
-          Edit
-        </button>
+    <div class="card detail-panel-header-card client-detail-card">
+      <div class="detail-panel-top-actions client-detail-actions">
         <button class="btn-secondary btn-sm" id="btn-book-for-client" data-name="${escapeHtml(client.name)}" data-email="${escapeHtml(client.email || '')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           Book
         </button>
-        <button class="btn-secondary btn-sm btn-danger" id="btn-delete-client" data-id="${client.id}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          Delete
+        <button class="btn-secondary btn-sm" id="btn-focus-client-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          Add Note
         </button>
+        <div class="client-more-wrap">
+          <button class="btn-secondary btn-sm" id="btn-client-more" aria-expanded="false">More</button>
+          <div class="client-more-menu hidden" id="client-more-menu">
+            <button class="btn-secondary btn-sm" id="btn-edit-client" data-id="${client.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4L18.5 2.5z"></path></svg>
+              Edit
+            </button>
+            <button class="btn-secondary btn-sm btn-danger" id="btn-delete-client" data-id="${client.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Archive
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="detail-panel-summary">
@@ -1751,18 +1882,21 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card client-activity-card">
         <div class="card-header">
             <h2>Activity & Notes</h2>
         </div>
-        
-        <form class="modal-form" id="client-note-form" data-client-id="${client.id}" style="border-bottom: 1px solid var(--border); border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: 0;">
-            <div class="form-group" style="margin-bottom: 12px;">
+
+        <form class="modal-form client-note-form" id="client-note-form" data-client-id="${client.id}">
+            <div class="form-group client-note-text-group">
                 <textarea id="client-note-text" name="note" rows="2" placeholder="Write a new progress note..." maxlength="5000" required></textarea>
             </div>
-            <div class="form-row" style="margin-bottom: 12px;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="client-note-stage" style="font-size: 0.65rem;">Update Stage (Optional)</label>
+            <div class="client-note-toolbar">
+                <button type="button" class="btn-text client-note-stage-toggle" id="btn-toggle-client-stage">Update stage</button>
+            </div>
+            <div class="form-row client-note-controls hidden" id="client-note-controls-advanced">
+                <div class="form-group client-note-stage-group">
+                    <label for="client-note-stage" class="client-note-stage-label">Update Stage (Optional)</label>
                     <select id="client-note-stage" name="stage">
                         <option value="">No change</option>
                         <option value="new">New</option>
@@ -1772,17 +1906,22 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
                         <option value="on_hold">On Hold</option>
                     </select>
                 </div>
-                <div class="form-actions" style="border-top: none; padding-top: 0; align-items: flex-end;">
-                    <button type="submit" class="btn-primary">Post Note</button>
+                <div class="form-actions client-note-actions">
+                    <button type="button" class="btn-secondary btn-sm" id="btn-cancel-client-stage">Close</button>
                 </div>
+            </div>
+            <div class="form-actions client-note-submit-row">
+                <button type="submit" class="btn-primary">Post Note</button>
             </div>
         </form>
 
-        <div style="padding: var(--spacing-lg); background: var(--bg-base); border-bottom-left-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl);">
-            <h3 style="font-size: 0.85rem; margin-bottom: 10px; color: var(--text-secondary);">Recent Notes</h3>
+        <div class="client-activity-body">
+            <h3 class="client-activity-heading">Recent Notes</h3>
             ${notesHtml}
-            <h3 style="font-size: 0.85rem; margin-top: 20px; margin-bottom: 10px; color: var(--text-secondary);">Recent Appointments</h3>
-            ${appointmentsHtml}
+            <details class="client-appointments-collapse">
+              <summary>Recent Appointments</summary>
+              ${appointmentsHtml}
+            </details>
         </div>
     </div>
   `;
@@ -1815,12 +1954,34 @@ function renderClientDetail(client = null, notes = [], appointments = []) {
     }
   });
 
+  document.getElementById('btn-focus-client-note')?.addEventListener('click', () => {
+    document.getElementById('client-note-text')?.focus();
+  });
+
+  const moreBtn = document.getElementById('btn-client-more');
+  const moreMenu = document.getElementById('client-more-menu');
+  moreBtn?.addEventListener('click', () => {
+    if (!moreMenu) return;
+    const opening = moreMenu.classList.contains('hidden');
+    moreMenu.classList.toggle('hidden', !opening);
+    moreBtn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  });
+
+  const stageToggle = document.getElementById('btn-toggle-client-stage');
+  const stageControls = document.getElementById('client-note-controls-advanced');
+  const cancelStage = document.getElementById('btn-cancel-client-stage');
+  const closeStageControls = () => stageControls?.classList.add('hidden');
+  stageToggle?.addEventListener('click', () => stageControls?.classList.remove('hidden'));
+  cancelStage?.addEventListener('click', closeStageControls);
+
   document.getElementById('client-note-form')?.addEventListener('submit', submitClientNote);
 }
 
 function renderClientsTable(clients = []) {
   const root = document.getElementById('clients-table');
   if (!root) return;
+  const countPill = document.getElementById('clients-count-pill');
+  if (countPill) countPill.textContent = String(Array.isArray(clients) ? clients.length : 0);
   if (!clients.length) {
     root.innerHTML = '<div class="empty-state">No clients found.</div>';
     renderClientDetail(null, [], []);
@@ -1829,15 +1990,20 @@ function renderClientsTable(clients = []) {
 
   root.innerHTML = clients.map((client) => `
     <div class="data-row ${Number(client.id) === Number(state.selectedClientId) ? 'active' : ''}" data-client-id="${Number(client.id)}">
-      <div>
-        <strong class="client-name">${escapeHtml(client.name || '')}</strong>
-        <span class="client-note-preview">${escapeHtml(client.lastNote || client.progressSummary || 'No notes yet')}</span>
+      <div class="client-row-main">
+        <strong class="client-name client-row-title">${escapeHtml(client.name || '')}</strong>
+        <span class="client-note-preview client-row-note">${escapeHtml(client.lastNote || client.progressSummary || 'No notes yet')}</span>
       </div>
-      <div style="text-align: right;">
-        <span class="client-stage-pill" style="font-size: 0.6rem; padding: 2px 8px;">${escapeHtml(formatClientStage(client.stage))}</span>
-        <div class="client-note-preview" style="margin-top: 4px;">
-            ${client.nextAppointmentDate ? formatScheduleDate(client.nextAppointmentDate) : 'No upcoming'}
+      <div class="client-row-side">
+        <span class="client-stage-pill client-row-stage">${escapeHtml(formatClientStage(client.stage))}</span>
+        <div class="client-note-preview client-row-next">
+            ${client.nextAppointmentDate ? formatScheduleDate(client.nextAppointmentDate) : 'No upcoming appointment'}
         </div>
+      </div>
+      <div class="client-row-chevron" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
       </div>
     </div>
   `).join('');
@@ -2778,4 +2944,3 @@ function triggerCsvDownload(filename, rows) {
 }
 
 // ── Filtered export ───────────────────────────────────────────────────────────
-

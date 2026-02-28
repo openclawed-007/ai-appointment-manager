@@ -11,11 +11,12 @@
 .empty-state {
     text-align: center;
     color: var(--text-muted);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-2xl) var(--spacing-xl);
     border: 1px dashed var(--border-strong);
-    border-radius: var(--radius-md);
-    background: var(--bg-raised);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--bg-raised) 0%, var(--bg-surface) 100%);
     font-size: 0.85rem;
+    line-height: 1.5;
 }
 
 /* ── Utility: anchor button that renders like a button ── */
@@ -33,6 +34,11 @@
     align-items: center;
     padding: 8px 12px;
     border-radius: var(--radius-md);
+    transition: background 150ms var(--ease);
+}
+
+.data-row:hover {
+    background: var(--bg-hover);
 }
 
 .data-row+.data-row {
@@ -164,10 +170,15 @@
     padding: 10px 14px;
     gap: 12px;
     border-bottom: 1px solid var(--border);
+    transition: all 150ms var(--ease);
 }
 
 .split-table-container .data-row:last-child {
     border-bottom: none;
+}
+
+.split-table-container .data-row:hover {
+    background: var(--bg-hover);
 }
 
 .split-table-container .data-row.active {
@@ -186,6 +197,396 @@
     gap: var(--spacing-lg);
 }
 
+/* ── Appointments View ── */
+.appointments-view .appointments-split {
+    grid-template-columns: minmax(360px, 0.95fr) minmax(520px, 1.4fr);
+    height: calc(100vh - 220px);
+    min-height: 560px;
+}
+
+.appointments-view .split-list-card,
+.appointments-view .split-detail-pane {
+    background: color-mix(in oklab, var(--bg-surface) 94%, var(--bg-raised));
+}
+
+.appointments-list-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--bg-input) 88%, transparent);
+}
+
+.appointments-list-header h3 {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.appointments-list-header p {
+    margin: 4px 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+.appointments-count-pill {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    border: 1px solid color-mix(in oklab, var(--gold) 26%, var(--border));
+    background: color-mix(in oklab, var(--gold) 12%, var(--bg-raised));
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.appointments-table {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.appointments-table .data-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: var(--bg-raised);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 150ms var(--ease), transform 150ms var(--ease), box-shadow 150ms var(--ease), background 150ms var(--ease);
+}
+
+.appointments-table .data-row:hover {
+    border-color: color-mix(in oklab, var(--gold) 24%, var(--border-strong));
+    background: color-mix(in oklab, var(--gold) 8%, var(--bg-raised));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.appointments-table .data-row.active {
+    border-color: color-mix(in oklab, var(--gold) 42%, var(--border-strong));
+    background: color-mix(in oklab, var(--gold) 12%, var(--bg-raised));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--gold) 30%, transparent);
+}
+
+.appointment-row-main {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.appointment-row-title {
+    font-size: 0.88rem;
+    line-height: 1.25;
+}
+
+.appointment-row-meta {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.appointment-row-location {
+    font-size: 0.67rem;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+}
+
+.appointment-row-side {
+    text-align: right;
+    display: grid;
+    gap: 2px;
+}
+
+.appointment-row-status {
+    justify-self: end;
+    margin-bottom: 2px;
+}
+
+.appointment-row-when {
+    font-size: 0.67rem;
+    color: var(--text-muted);
+}
+
+.appointment-row-time {
+    font-size: 0.73rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.appointment-row-chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+}
+
+.appointment-row-chevron svg {
+    width: 100%;
+    height: 100%;
+}
+
+.appointment-detail-card {
+    padding: 14px;
+}
+
+.appointment-detail-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.appointment-notes-card {
+    margin-top: 12px;
+}
+
+.appointment-notes-body {
+    padding: 14px 16px;
+}
+
+.appointment-notes-copy {
+    white-space: pre-wrap;
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+/* ── Clients View ── */
+.clients-view .clients-split {
+    grid-template-columns: minmax(360px, 0.95fr) minmax(560px, 1.35fr);
+    height: calc(100vh - 220px);
+    min-height: 560px;
+}
+
+.clients-view .split-list-card,
+.clients-view .split-detail-pane {
+    background: color-mix(in oklab, var(--bg-surface) 94%, var(--bg-raised));
+}
+
+.clients-view .split-search-header {
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+}
+
+.clients-count-pill {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    border: 1px solid color-mix(in oklab, var(--info) 28%, var(--border));
+    background: color-mix(in oklab, var(--info) 12%, var(--bg-raised));
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.clients-table {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.clients-table .data-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: var(--bg-raised);
+    cursor: pointer;
+    transition: border-color 150ms var(--ease), transform 150ms var(--ease), box-shadow 150ms var(--ease), background 150ms var(--ease);
+}
+
+.clients-table .data-row:hover {
+    border-color: color-mix(in oklab, var(--info) 28%, var(--border-strong));
+    background: color-mix(in oklab, var(--info) 8%, var(--bg-raised));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.clients-table .data-row.active {
+    border-color: color-mix(in oklab, var(--info) 42%, var(--border-strong));
+    background: color-mix(in oklab, var(--info) 12%, var(--bg-raised));
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--info) 28%, transparent);
+}
+
+.client-row-main {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.client-row-title {
+    font-size: 0.88rem;
+    line-height: 1.25;
+}
+
+.client-row-note {
+    font-size: 0.72rem;
+}
+
+.client-row-side {
+    text-align: right;
+    display: grid;
+    gap: 3px;
+}
+
+.client-row-stage {
+    justify-self: end;
+    font-size: 0.64rem;
+    padding: 2px 8px;
+}
+
+.client-row-next {
+    font-size: 0.68rem;
+}
+
+.client-row-chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+}
+
+.client-row-chevron svg {
+    width: 100%;
+    height: 100%;
+}
+
+.client-detail-card {
+    padding: 14px;
+}
+
+.client-detail-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.client-more-wrap {
+    position: relative;
+}
+
+.client-more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 150px;
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-md);
+    z-index: 4;
+}
+
+.client-activity-card {
+    overflow: hidden;
+}
+
+.client-note-form {
+    border-bottom: 1px solid var(--border);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-bottom: 0;
+}
+
+.client-note-text-group {
+    margin-bottom: 12px;
+}
+
+.client-note-controls {
+    margin-bottom: 12px;
+}
+
+.client-note-toolbar {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 8px;
+}
+
+.client-note-stage-toggle {
+    padding: 0;
+    font-size: 0.72rem;
+}
+
+.client-note-stage-group {
+    margin-bottom: 0;
+}
+
+.client-note-stage-label {
+    font-size: 0.65rem;
+}
+
+.client-note-actions {
+    border-top: none;
+    padding-top: 0;
+    align-items: flex-end;
+}
+
+.client-note-submit-row {
+    border-top: none;
+    padding-top: 0;
+    justify-content: flex-end;
+}
+
+.client-activity-body {
+    padding: var(--spacing-lg);
+    background: var(--bg-base);
+}
+
+.client-activity-heading {
+    font-size: 0.85rem;
+    margin: 0 0 10px;
+    color: var(--text-secondary);
+}
+
+.client-activity-heading-spaced {
+    margin-top: 20px;
+}
+
+.client-appointments-collapse {
+    margin-top: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    background: var(--bg-raised);
+}
+
+.client-appointments-collapse > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.client-appointments-collapse > summary::-webkit-details-marker {
+    display: none;
+}
+
+.client-appointments-collapse > .client-note-list {
+    margin-top: 8px;
+}
+
 @media (max-width: 1024px) {
     .split-view-content {
         grid-template-columns: 1fr;
@@ -194,6 +595,26 @@
 
     .split-list-pane {
         height: clamp(350px, 50vh, 600px);
+    }
+
+    .appointments-view .appointments-split {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+    }
+
+    .appointments-view .split-list-pane {
+        height: auto;
+    }
+
+    .clients-view .clients-split {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+    }
+
+    .clients-view .split-list-pane {
+        height: auto;
     }
 }
 
@@ -214,9 +635,10 @@
     gap: 12px;
     margin-bottom: 14px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--bg-raised);
     padding: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .detail-panel-head {
@@ -251,9 +673,14 @@
     display: grid;
     gap: 4px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: var(--bg-surface);
-    padding: 10px;
+    padding: 10px 12px;
+    transition: border-color 150ms var(--ease);
+}
+
+.detail-panel-stat:hover {
+    border-color: var(--border-strong);
 }
 
 .detail-panel-stat span {
@@ -309,6 +736,11 @@
     background: var(--bg-raised);
     border-radius: var(--radius-md);
     padding: 12px 14px;
+    transition: border-color 200ms var(--ease);
+}
+
+.client-note-item:hover {
+    border-color: var(--border-strong);
 }
 
 .client-note-item p {
@@ -377,13 +809,13 @@
     background: var(--bg-surface);
     border-radius: var(--radius-xl);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .booking-header {
     padding: var(--spacing-xl);
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(135deg, rgba(226, 168, 75, 0.03) 0%, transparent 100%);
+    background: linear-gradient(135deg, color-mix(in oklab, var(--gold) 3%, transparent) 0%, transparent 100%);
 }
 
 .booking-header-content {
@@ -567,19 +999,21 @@
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: all 180ms var(--ease);
 }
 
 .booking-slot-btn:hover {
     border-color: var(--gold);
     color: var(--text);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
 }
 
 .booking-slot-btn.active {
     background: var(--gold-dim);
     border-color: var(--gold);
     color: var(--gold);
-    box-shadow: inset 0 0 0 1px var(--gold-glow);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--gold) 20%, transparent);
 }
 
 .booking-slots-empty {
@@ -623,10 +1057,10 @@
     position: relative;
     width: min(520px, 100%);
     background: var(--bg-surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-xl);
     padding: var(--spacing-xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .auth-close-btn {
@@ -690,6 +1124,12 @@
     cursor: pointer;
     font-family: var(--font-display);
     font-size: 0.85rem;
+    transition: all 180ms var(--ease);
+}
+
+.auth-tab:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
 }
 
 .auth-tab.active {
@@ -814,29 +1254,29 @@
     width: min(560px, calc(100vw - 14px));
     bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     z-index: 75;
-    padding: 8px;
-    background: rgba(26, 26, 31, 0.92);
-    backdrop-filter: blur(18px) saturate(1.25);
+    padding: 6px;
+    background: rgba(26, 26, 31, 0.88);
+    backdrop-filter: blur(24px) saturate(1.4);
     border: 1px solid var(--border-strong);
     border-radius: 18px;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.03);
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
-    gap: 4px;
+    gap: 3px;
 }
 
 .mobile-nav-item {
     border: 1px solid transparent;
-    border-radius: 14px;
-    min-height: 54px;
-    padding: 6px 3px;
+    border-radius: 13px;
+    min-height: 52px;
+    padding: 5px 3px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
     color: var(--text-secondary);
-    transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition: color 180ms var(--ease), background-color 180ms var(--ease), border-color 180ms var(--ease), box-shadow 180ms var(--ease), transform 180ms var(--ease);
 }
 
 .mobile-nav-item svg {

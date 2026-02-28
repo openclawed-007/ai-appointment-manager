@@ -1069,7 +1069,9 @@ async function init() {
       const clickedInMenu = event.target.closest('#calendar-day-menu');
       const clickedOnDay = event.target.closest('.day-cell[data-day]');
       const clickedOnWeekHeader = event.target.closest('.week-day-header[data-week-date]');
-      if (!clickedInMenu && !clickedOnDay && !clickedOnWeekHeader) closeDayMenu();
+      const clickedOnWeekSlot = event.target.closest('.week-slot[data-slot-date][data-slot-time]');
+      const clickedOnWeekEvent = event.target.closest('.week-event-chip[data-appointment-id]');
+      if (!clickedInMenu && !clickedOnDay && !clickedOnWeekHeader && !clickedOnWeekSlot && !clickedOnWeekEvent) closeDayMenu();
     }
 
     const quickCreateMenu = document.getElementById('calendar-quick-create-menu');

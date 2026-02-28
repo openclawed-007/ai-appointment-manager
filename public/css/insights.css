@@ -1,60 +1,230 @@
 /* ── AI Insights ── */
 .ai-insights {
-    background: linear-gradient(135deg, rgba(226, 168, 75, 0.02) 0%, rgba(92, 184, 122, 0.02) 100%);
+    background:
+        radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--gold) 12%, transparent) 0%, transparent 55%),
+        radial-gradient(100% 120% at 0% 100%, color-mix(in oklab, var(--info) 10%, transparent) 0%, transparent 60%),
+        var(--bg-surface);
+    border: 1px solid var(--border);
 }
 
 .insights-list {
     padding: var(--spacing-md);
+}
+
+.insights-layout {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
+    gap: 14px;
 }
 
-.insight-item {
-    display: flex;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--bg-raised);
-    border-radius: var(--radius-md);
+.insights-overview {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    padding: 12px;
     border: 1px solid var(--border);
-    transition: all var(--transition-fast);
+    border-radius: 12px;
+    background: color-mix(in oklab, var(--bg-raised) 80%, var(--bg-base));
 }
 
-.insight-item:hover {
-    border-color: var(--border-strong);
-    transform: translateY(-1px);
-}
-
-.insight-icon {
-    font-size: 1.1rem;
-    flex-shrink: 0;
-}
-
-.insight-content p {
-    font-size: 0.82rem;
+.insights-overview-main h3 {
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 800;
     color: var(--text);
-    line-height: 1.5;
-    margin-bottom: 3px;
 }
 
-.insight-action {
-    font-size: 0.75rem;
-    color: var(--gold);
-    margin-bottom: 3px;
-}
-
-.insight-confidence {
-    display: inline-block;
-    font-size: 0.65rem;
+.insights-overview-main p {
+    margin: 5px 0 0;
+    font-size: 0.74rem;
     color: var(--text-secondary);
-    background: var(--bg-surface);
-    border-radius: var(--radius-full);
-    padding: 2px 8px;
-    margin-bottom: 3px;
-    border: 1px solid var(--border);
+    line-height: 1.35;
 }
 
-.insight-time {
-    font-size: 0.7rem;
+.insights-overview-metrics {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.insight-metric {
+    min-width: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+}
+
+.insight-metric strong {
+    font-size: 0.9rem;
+    line-height: 1;
+    color: var(--text);
+}
+
+.insight-metric span {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--text-muted);
+}
+
+.metric-high {
+    border-color: color-mix(in oklab, var(--error) 26%, var(--border));
+    background: color-mix(in oklab, var(--error) 10%, var(--bg-raised));
+}
+
+.metric-medium {
+    border-color: color-mix(in oklab, var(--warning) 24%, var(--border));
+    background: color-mix(in oklab, var(--warning) 10%, var(--bg-raised));
+}
+
+.metric-low {
+    border-color: color-mix(in oklab, var(--info) 24%, var(--border));
+    background: color-mix(in oklab, var(--info) 10%, var(--bg-raised));
+}
+
+.insights-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 10px;
+}
+
+.insight-section {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-raised);
+    overflow: hidden;
+    min-height: 180px;
+}
+
+.insight-section-high {
+    border-color: color-mix(in oklab, var(--error) 34%, var(--border));
+}
+
+.insight-section-medium {
+    border-color: color-mix(in oklab, var(--warning) 30%, var(--border));
+}
+
+.insight-section-low {
+    border-color: color-mix(in oklab, var(--info) 30%, var(--border));
+}
+
+.insight-section-head {
+    padding: 10px 11px 8px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--bg-input) 88%, transparent);
+}
+
+.insight-section-head h3 {
+    margin: 0;
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+}
+
+.insight-section-head p {
+    margin: 3px 0 0;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.insight-card-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+    padding: 10px;
+}
+
+.insight-card {
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: 10px;
+    padding: 9px 9px 8px;
+    background: var(--bg-surface);
+}
+
+.insight-card-high {
+    border-left-color: var(--error);
+    background: color-mix(in oklab, var(--error) 8%, var(--bg-surface));
+}
+
+.insight-card-medium {
+    border-left-color: var(--warning);
+    background: color-mix(in oklab, var(--warning) 8%, var(--bg-surface));
+}
+
+.insight-card-low {
+    border-left-color: var(--info);
+    background: color-mix(in oklab, var(--info) 8%, var(--bg-surface));
+}
+
+.insight-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.insight-card-icon {
+    font-size: 0.8rem;
+}
+
+.insight-card-time {
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
+.insight-card-title {
+    margin: 0;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.35;
+}
+
+.insight-card-action {
+    margin: 5px 0 0;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
+@media (max-width: 1100px) {
+    .insights-sections {
+        grid-template-columns: 1fr;
+    }
+
+    .insight-card-list {
+        grid-template-columns: 1fr;
+    }
+
+    .insight-section {
+        min-height: 0;
+    }
+}
+
+@media (max-width: 680px) {
+    .insights-overview {
+        grid-template-columns: 1fr;
+    }
+
+    .insights-overview-metrics {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .insight-metric {
+        flex: 1;
+        min-width: 0;
+    }
 }

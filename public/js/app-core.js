@@ -1488,11 +1488,13 @@ function openNewAppointmentModalForSlot(date, time) {
   updateAppointmentPreview();
 }
 
-async function openDayMenu(anchorEl, date) {
+async function openDayMenu(anchorEl, date, options = {}) {
   closeQuickCreateMenu();
   const menu = ensureDayMenu();
   state.dayMenuDate = date;
   state.dayMenuAnchorEl = anchorEl;
+  const prefillTimeRaw = String(options?.prefillTime || '').slice(0, 5);
+  const prefillTime = /^\d{2}:\d{2}$/.test(prefillTimeRaw) ? prefillTimeRaw : '';
   menu.innerHTML = '<div class="day-menu-loading">Loading...</div>';
   positionDayMenu(anchorEl, menu);
 
@@ -1505,35 +1507,52 @@ async function openDayMenu(anchorEl, date) {
       return status === 'confirmed' || source === 'reminder';
     });
     if (state.dayMenuDate !== date) return;
+    const entryWord = getEntryWordSingularTitle();
+    const entryWordLower = entryWord.toLowerCase();
+    const statusClass = (s) => `day-menu-status-${String(s || 'pending').toLowerCase()}`;
+    const statusLabel = (s) => {
+      const st = String(s || 'pending').toLowerCase();
+      return st.charAt(0).toUpperCase() + st.slice(1);
+    };
+    const isReminder = (a) => isReminderEntry(a) || Number(a.durationMinutes || 0) <= 0;
+    const timeDisplay = (a) => isReminder(a)
+      ? escapeHtml(toTime12(a.time))
+      : `${escapeHtml(toTime12(a.time))} – ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}`;
+    const typeColor = (a) => a.color || a.typeColor || 'var(--gold)';
+
     const items = visibleAppointments
       .map(
         (a) => `
-          <div class="day-menu-item">
-            <div class="day-menu-item-copy">
-              <strong>${escapeHtml(toTime12(a.time))} - ${escapeHtml(toTime12(addMinutesToTime(a.time, a.durationMinutes)))}</strong>
-              <span>${escapeHtml(a.clientName)} • ${escapeHtml(a.typeName)} • ${escapeHtml(a.status)}</span>
+          <div class="day-menu-item" style="--type-color: ${escapeHtml(typeColor(a))}">
+            <div class="day-menu-item-header">
+              <div class="day-menu-item-time">${timeDisplay(a)}</div>
+              <span class="day-menu-status ${statusClass(a.status)}">${statusLabel(a.status)}</span>
+            </div>
+            <div class="day-menu-item-body">
+              <div class="day-menu-item-client">${escapeHtml(a.clientName)}</div>
+              <div class="day-menu-item-type">${escapeHtml(a.typeName)}${!isReminder(a) ? ` · ${a.durationMinutes}min` : ''}</div>
             </div>
             <div class="day-menu-client-notes" data-client-notes-for="${a.id}">
               <div class="day-menu-client-notes-state">Open actions to view client notes.</div>
             </div>
             <div class="day-menu-item-actions-wrap">
               <div class="day-menu-top-actions">
-                <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">Show actions</button>
-                <button type="button" class="day-menu-open-client" data-appointment-id="${a.id}" aria-label="Open client info">Client info</button>
+                <button type="button" class="day-menu-open-client" data-appointment-id="${a.id}" aria-label="Open client info">Client</button>
+                <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit ${escapeHtml(entryWordLower)}">Edit</button>
+                <button type="button" class="day-menu-show-actions" data-appointment-id="${a.id}" aria-expanded="false">More ▾</button>
               </div>
               <div class="day-menu-item-actions hidden" data-actions-for="${a.id}">
                 ${a.clientEmail
-            ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email ${escapeHtml(getEntryWordSingularTitle().toLowerCase())} details">Email</button>`
+            ? `<button type="button" class="day-menu-email" data-appointment-id="${a.id}" aria-label="Email ${escapeHtml(entryWordLower)} details">Email</button>`
             : ''
           }
                 ${a.status === 'pending'
-            ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Confirm</button>`
+            ? `<button type="button" class="day-menu-confirm" data-appointment-id="${a.id}" aria-label="Confirm ${escapeHtml(entryWordLower)}">Confirm</button>`
             : ''
           }
                 <button type="button" class="day-menu-note" data-appointment-id="${a.id}" aria-label="Add client note">Add note</button>
-                <button type="button" class="day-menu-edit" data-appointment-id="${a.id}" aria-label="Edit ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Edit</button>
-                <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
-                <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete ${escapeHtml(getEntryWordSingularTitle().toLowerCase())}">Delete</button>
+                <button type="button" class="day-menu-cancel" data-appointment-id="${a.id}" ${a.status === 'cancelled' ? 'disabled' : ''} aria-label="Cancel ${escapeHtml(entryWordLower)}">${a.status === 'cancelled' ? 'Cancelled' : 'Cancel'}</button>
+                <button type="button" class="day-menu-delete" data-appointment-id="${a.id}" aria-label="Delete ${escapeHtml(entryWordLower)}">Delete</button>
               </div>
               <div class="day-menu-note-editor hidden" data-note-editor-for="${a.id}">
                 <textarea class="day-menu-note-input" rows="3" placeholder="Add a progress note..."></textarea>
@@ -1557,16 +1576,22 @@ async function openDayMenu(anchorEl, date) {
       )
       .join('');
 
+    const count = visibleAppointments.length;
+    const countLabel = count === 1 ? `1 ${entryWordLower}` : `${count} ${getEntryWordPlural().toLowerCase()}`;
+
     menu.innerHTML = `
       <div class="day-menu-header">
-        <h3>${escapeHtml(formatMenuDate(date))}</h3>
+        <div class="day-menu-header-info">
+          <h3>${escapeHtml(formatMenuDate(date))}</h3>
+          ${count > 0 ? `<span class="day-menu-count">${countLabel}</span>` : ''}
+        </div>
         <button type="button" class="day-menu-close" aria-label="Close day menu">×</button>
       </div>
       <div class="day-menu-actions">
-        <button type="button" class="btn-primary day-menu-add">Add ${escapeHtml(getEntryWordSingularTitle())}</button>
+        <button type="button" class="btn-primary day-menu-add">Add ${escapeHtml(entryWord)}</button>
       </div>
       <div class="day-menu-list">
-        ${items || `<div class="day-menu-empty">No ${escapeHtml(getEntryWordPlural())} for this day.</div>`}
+        ${items || `<div class="day-menu-empty">No ${escapeHtml(getEntryWordPlural())} scheduled</div>`}
       </div>
     `;
 
@@ -1574,6 +1599,10 @@ async function openDayMenu(anchorEl, date) {
 
     menu.querySelector('.day-menu-close')?.addEventListener('click', closeDayMenu);
     menu.querySelector('.day-menu-add')?.addEventListener('click', () => {
+      if (prefillTime) {
+        openNewAppointmentModalForSlot(date, prefillTime);
+        return;
+      }
       openNewAppointmentModalForDate(date);
     });
 
@@ -1587,12 +1616,12 @@ async function openDayMenu(anchorEl, date) {
         menu.querySelectorAll('.day-menu-item-actions').forEach((n) => n.classList.add('hidden'));
         menu.querySelectorAll('.day-menu-show-actions').forEach((n) => {
           n.setAttribute('aria-expanded', 'false');
-          n.textContent = 'Show actions';
+          n.textContent = 'More ▾';
         });
         if (opening) {
           target.classList.remove('hidden');
           btn.setAttribute('aria-expanded', 'true');
-          btn.textContent = 'Hide actions';
+          btn.textContent = 'Less ▴';
           const appointment = visibleAppointments.find((item) => Number(item.id) === Number(id));
           const notesRoot = menu.querySelector(`.day-menu-client-notes[data-client-notes-for="${id}"]`);
           if (appointment && notesRoot && !notesRoot.dataset.loaded) {
@@ -2390,4 +2419,3 @@ function applyInitialViewPreference(view) {
   applyViewSelection(activeView);
   return activeView;
 }
-

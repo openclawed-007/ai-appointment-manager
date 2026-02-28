@@ -21,8 +21,8 @@
     display: inline-grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 6px;
-    padding: 2px 5px;
+    gap: 4px;
+    padding: 3px 5px;
     border-radius: 12px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
@@ -126,8 +126,9 @@
     grid-template-columns: repeat(7, 1fr);
     padding: var(--spacing-sm);
     gap: 1px;
-    background: var(--border);
+    background: color-mix(in oklab, var(--border) 60%, transparent);
     border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .day-header {
@@ -142,13 +143,14 @@
 }
 
 .day-cell {
-    aspect-ratio: 1 / 1.2;
+    aspect-ratio: 1 / 1.1;
     background: var(--bg-surface);
     display: flex;
     flex-direction: column;
-    padding: 6px;
+    align-items: center;
+    padding: 5px 4px 6px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background 150ms var(--ease), box-shadow 150ms var(--ease), z-index 0ms;
     position: relative;
     overflow: hidden;
     container-type: inline-size;
@@ -163,7 +165,6 @@
 .day-cell:hover {
     background: var(--bg-hover);
     z-index: 2;
-    box-shadow: inset 0 0 0 1px var(--gold-glow);
 }
 
 .day-cell.empty {
@@ -176,27 +177,18 @@
 }
 
 .day-cell.today {
-    background: linear-gradient(180deg, var(--bg-surface) 0%, var(--gold-dim) 100%);
+    background: var(--bg-surface);
 }
 
 .day-cell.today .day-number {
-    color: var(--gold);
-    font-weight: 800;
-}
-
-.day-cell.today::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
     background: var(--gold);
+    color: var(--text-inverse);
+    font-weight: 800;
+    box-shadow: 0 2px 8px color-mix(in oklab, var(--gold) 30%, transparent);
 }
 
 .day-cell.selected {
     background: var(--gold-dim);
-    box-shadow: inset 0 0 0 1px var(--gold);
     z-index: 1;
 }
 
@@ -206,11 +198,11 @@
     position: absolute;
     top: 6px;
     right: 6px;
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 999px;
     background: var(--gold);
-    box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px color-mix(in oklab, var(--gold) 35%, transparent);
+    box-shadow: 0 0 0 2px var(--bg-surface), 0 0 6px color-mix(in oklab, var(--gold) 40%, transparent);
     pointer-events: none;
 }
 
@@ -228,18 +220,28 @@
 
 .day-number {
     font-family: var(--font-display);
-    font-size: clamp(0.72rem, 16cqi, 1rem);
+    font-size: clamp(0.72rem, 14cqi, 0.88rem);
     font-weight: 600;
     color: var(--text-secondary);
-    margin-bottom: 2cqi;
+    width: clamp(24px, 28cqi, 32px);
+    height: clamp(24px, 28cqi, 32px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-full);
+    margin-bottom: 3px;
+    flex-shrink: 0;
+    transition: background 180ms var(--ease), color 180ms var(--ease), box-shadow 180ms var(--ease);
 }
 
 .day-events-preview {
     display: flex;
-    flex-direction: column;
-    gap: 2.5cqi;
+    flex-wrap: wrap;
+    gap: 2cqi;
     flex: 1;
     overflow: hidden;
+    align-self: stretch;
+    align-content: start;
 }
 
 .cal-event-skeleton {
@@ -271,19 +273,22 @@
     display: flex;
     align-items: center;
     gap: 3cqi;
-    font-size: clamp(0.62rem, 14cqi, 1.02rem);
+    font-size: clamp(0.6rem, 12cqi, 0.82rem);
     line-height: 1.2;
-    padding: 1.5cqi 0;
+    padding: 0;
     white-space: nowrap;
     overflow: hidden;
+    background: none;
+    border-radius: 0;
+    border-left: none;
 }
 
 .cal-event::before {
     content: '';
     width: 5cqi;
     height: 5cqi;
-    min-width: 3px;
-    min-height: 3px;
+    min-width: 4px;
+    min-height: 4px;
     border-radius: 50%;
     background: var(--event-color, var(--gold));
     flex-shrink: 0;
@@ -292,13 +297,13 @@
 .cal-event-time {
     font-weight: 700;
     color: var(--text-muted);
-    font-size: clamp(0.58rem, 13cqi, 0.96rem);
+    font-size: clamp(0.56rem, 10cqi, 0.74rem);
     font-variant-numeric: tabular-nums;
 }
 
 .cal-event-name {
-    color: var(--text);
-    font-weight: 500;
+    color: var(--text-secondary);
+    font-weight: 600;
     text-overflow: ellipsis;
     overflow: hidden;
 }
@@ -327,15 +332,16 @@
 
 /* Google-style week layout */
 .calendar-grid.google-like {
-    grid-template-columns: 72px repeat(7, minmax(120px, 1fr));
+    grid-template-columns: 48px repeat(7, 1fr);
     gap: 1px;
     padding: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     max-height: min(68vh, 720px);
 }
 
 .calendar-grid.google-like.google-like-day {
-    grid-template-columns: 72px minmax(220px, 1fr);
+    grid-template-columns: 48px 1fr;
 }
 
 .week-grid-corner {
@@ -350,11 +356,11 @@
     background: var(--bg-surface);
     border: 0;
     color: var(--text);
-    padding: 10px 8px;
+    padding: 8px 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 1px;
     cursor: pointer;
     transition: background var(--transition-fast), color var(--transition-fast);
     position: sticky;
@@ -375,26 +381,26 @@
 }
 
 .week-day-name {
-    font-size: 0.65rem;
+    font-size: 0.56rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-muted);
 }
 
 .week-day-num {
     font-family: var(--font-display);
-    font-size: 1.05rem;
+    font-size: 0.88rem;
     font-weight: 700;
 }
 
 .week-time-label {
     background: var(--bg-base);
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     white-space: nowrap;
-    padding: 8px 6px;
+    padding: 6px 3px;
     text-align: center;
     border-right: 1px solid var(--border);
     position: sticky;
@@ -407,7 +413,7 @@
     background: var(--bg-surface);
     min-height: 54px;
     text-align: left;
-    padding: 4px;
+    padding: 2px;
     cursor: pointer;
     transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -425,37 +431,59 @@
 }
 
 .week-slot-content {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
     align-content: start;
+    align-items: start;
     min-height: 44px;
 }
 
+.week-slot.has-single-event .week-slot-content {
+    align-items: stretch;
+}
+
 .week-event-chip {
-    display: grid;
-    gap: 2px;
-    font-size: 0.66rem;
-    padding: 6px 7px 6px 11px;
-    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    padding: 3px 10px 3px 10px;
+    border-radius: var(--radius-full);
     background: var(--bg-raised);
     border: 1px solid var(--border);
-    box-shadow:
-        inset 0 1px 0 color-mix(in oklab, var(--text) 6%, transparent),
-        0 2px 6px rgba(0, 0, 0, 0.16);
-    min-height: 34px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    min-height: 0;
     position: relative;
     overflow: hidden;
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), border-color 180ms var(--ease);
+}
+
+.week-slot.has-single-event .week-event-chip {
+    width: auto;
+    max-width: min(92%, 260px);
+    min-height: 34px;
+    border-radius: 10px;
+    padding: 6px 10px 6px 11px;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+.week-slot.has-single-event .week-event-name {
+    font-size: 0.64rem;
+}
+
+.week-slot.has-single-event .week-event-time {
+    font-size: 0.62rem;
 }
 
 .week-event-chip:hover {
     transform: translateY(-1px);
     border-color: color-mix(in oklab, var(--gold) 26%, var(--border-strong));
-    box-shadow:
-        inset 0 1px 0 color-mix(in oklab, var(--text) 8%, transparent),
-        0 4px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
 }
 
 .week-event-chip::before {
@@ -464,13 +492,12 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 3px;
     background: var(--gold);
-    box-shadow: 0 0 10px color-mix(in oklab, var(--gold) 45%, transparent);
 }
 
 .week-event-time {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
@@ -481,16 +508,17 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text);
-    font-weight: 700;
+    font-weight: 600;
+    font-size: 0.58rem;
     line-height: 1.15;
     letter-spacing: 0.01em;
 }
 
 .week-event-more {
-    grid-column: 1 / -1;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     font-weight: 700;
     color: var(--gold);
+    flex: 0 0 auto;
 }
 
 .week-slot-skeleton {
@@ -506,14 +534,29 @@
 
 @media (max-width: 980px) {
     .calendar-grid.google-like {
-        grid-template-columns: 62px repeat(7, minmax(105px, 1fr));
+        grid-template-columns: 42px repeat(7, 1fr);
     }
 
     .calendar-grid.google-like.google-like-day {
-        grid-template-columns: 62px minmax(180px, 1fr);
+        grid-template-columns: 42px 1fr;
     }
 
     .week-slot {
-        min-height: 48px;
+        min-height: 46px;
+    }
+
+    .week-event-chip {
+        padding: 2px 7px 2px 8px;
+        min-height: 0;
+        font-size: 0.58rem;
+        border-radius: var(--radius-full);
+    }
+
+    .week-event-name {
+        font-size: 0.58rem;
+    }
+
+    .week-event-time {
+        font-size: 0.5rem;
     }
 }

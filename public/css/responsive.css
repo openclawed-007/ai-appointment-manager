@@ -96,7 +96,7 @@
     }
 
     .sidebar.mobile-open {
-        box-shadow: var(--shadow-xl);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
     }
 
     .sidebar-backdrop {
@@ -296,14 +296,223 @@
         padding: var(--spacing-md);
     }
 
+    /* ═══════════════════════════════════════════════
+       Mobile Month View — Apple Calendar-inspired
+       Compact centered grid, circular today, dot indicators
+       ═══════════════════════════════════════════════ */
+    .calendar-card {
+        min-height: 0;
+    }
+
     .calendar-grid {
-        padding: var(--spacing-sm);
+        padding: 6px 4px;
+        gap: 0;
+        border-radius: 0 0 var(--radius-md) var(--radius-md);
+    }
+
+    .day-header {
+        padding: 8px 0 6px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+    }
+
+    /* Month cells — keep readable height but match desktop visual style */
+    .day-cell {
+        aspect-ratio: 1 / 1.1;
+        padding: 5px 4px 6px;
+        min-height: 78px;
+        align-items: center;
+        justify-content: flex-start;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+    }
+
+    .day-cell:hover {
+        box-shadow: none;
+        background: var(--bg-hover);
+    }
+
+    /* Day number matches desktop */
+    .day-number {
+        font-size: 0.86rem;
+        font-weight: 600;
+        margin-bottom: 3px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-full);
+    }
+
+    /* Today: solid accent circle */
+    .day-cell.today {
+        background: transparent;
+    }
+
+    .day-cell.today::before {
+        display: none;
+    }
+
+    .day-cell.today .day-number {
+        background: var(--gold);
+        color: var(--text-inverse);
+        font-weight: 800;
+        box-shadow: 0 2px 8px color-mix(in oklab, var(--gold) 35%, transparent);
+    }
+
+    /* Selected: subtle background only — no circle */
+    .day-cell.selected {
+        background: var(--gold-dim);
+        box-shadow: none;
+    }
+
+    /* Month events match desktop: no card backgrounds */
+    .day-events-preview {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        width: 100%;
+        padding: 0;
+        justify-content: flex-start;
+        align-content: start;
+    }
+
+    .cal-event {
+        font-size: 0.62rem;
+        padding: 0;
+        gap: 2px;
+        border-left: none;
+        background: none;
+        border-radius: 0;
+        overflow: hidden;
+    }
+
+    .cal-event::before {
+        display: block;
+        width: 4px;
+        height: 4px;
+        min-width: 4px;
+        min-height: 4px;
+    }
+
+    .cal-event-time {
+        font-size: 0.56rem;
+        color: var(--text-muted);
+    }
+
+    .cal-event-name {
+        display: inline;
+        font-size: 0.62rem;
+        color: var(--text-secondary);
+    }
+
+    .cal-event-more {
+        font-size: 0.56rem;
+        padding-top: 0;
+    }
+
+    /* Hide separate day dot; event rows already indicate density */
+    .day-cell.has-event::after {
+        display: none;
+    }
+
+    .day-cell.event-med::after,
+    .day-cell.event-high::after {
+        display: none;
+    }
+
+    /* Empty cells */
+    .day-cell.empty {
+        background: transparent;
+    }
+
+    /* ═══════════════════════════════════════════════
+       Mobile Week View — Scrollable time grid
+       Shows ~2.5 days with natural horizontal scroll,
+       sticky time labels, compact event chips
+       ═══════════════════════════════════════════════ */
+    .calendar-grid.google-like {
+        grid-template-columns: 36px repeat(7, 1fr);
+        padding: 0;
+        gap: 1px;
+        max-height: 56vh;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    .calendar-grid.google-like.google-like-day {
+        grid-template-columns: 42px 1fr;
+    }
+
+    .week-grid-corner {
+        min-width: 36px;
+    }
+
+    .week-day-header {
+        padding: 5px 2px;
+        gap: 0;
+        min-width: 0;
+    }
+
+    .week-day-name {
+        font-size: 0.44rem;
+        letter-spacing: 0.03em;
+    }
+
+    .week-day-num {
+        font-size: 0.72rem;
+    }
+
+    .week-day-header.today .week-day-num {
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-full);
+        background: var(--gold);
+        color: var(--text-inverse);
+    }
+
+    .week-time-label {
+        font-size: 0.46rem;
+        padding: 4px 2px;
+        min-width: 36px;
+    }
+
+    .week-slot {
+        min-height: 62px;
+        padding: 3px;
+    }
+
+    .week-slot-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        min-height: 24px;
+    }
+
+    .week-event-chip {
+        font-size: 0.56rem;
+        padding: 2px 7px 2px 8px;
+        min-height: 0;
+        border-radius: var(--radius-full);
         gap: 4px;
     }
 
-    .calendar-grid.google-like {
-        padding: 0;
-        gap: 1px;
+    .week-event-chip::before {
+        width: 2px;
+    }
+
+    .week-event-name {
+        font-size: 0.56rem;
+    }
+
+    .week-event-time {
+        font-size: 0.48rem;
     }
 
     .timeline,
@@ -329,15 +538,69 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .types-view .types-split {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+    }
+
+    .types-view .split-list-pane {
+        height: auto;
+    }
+
+    .types-view .types-list-header {
+        padding: 10px 12px;
+    }
+
+    .types-view .types-list-header h3 {
+        font-size: 0.82rem;
+    }
+
+    .types-view .types-list-header p {
+        font-size: 0.68rem;
+    }
+
+    .types-view .type-admin-list {
+        padding: 8px;
+    }
+
+    .types-view .service-type-card {
+        padding: 10px;
+    }
+
+    .types-view .service-type-actions {
+        flex-wrap: wrap;
+    }
+
+    .types-view .service-type-actions .btn-sm {
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+
+    .types-view .service-type-more-wrap {
+        flex: 1 1 100%;
+    }
+
+    .types-view .service-type-more-wrap > .btn-sm {
+        width: 100%;
+    }
+
+    .types-view .service-type-more-menu {
+        position: static;
+        margin-top: 6px;
+        width: 100%;
+    }
+
     /* Modal adjustments */
     .appointment-layout {
         grid-template-columns: 1fr;
-        gap: var(--spacing-md);
+        gap: 12px;
     }
 
     .appointment-modal {
         max-width: 100%;
-        max-height: 86vh;
+        max-height: 90vh;
+        border-radius: var(--radius-lg);
     }
 
     .appointment-side .side-summary {
@@ -345,24 +608,40 @@
     }
 
     .modal {
-        padding: var(--spacing-md);
+        padding: 10px;
     }
 
     .modal-form {
-        padding: var(--spacing-md);
-        padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+        padding: 14px;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     }
 
     .modal-header {
-        padding: var(--spacing-md);
+        padding: 14px 16px 12px;
+    }
+
+    .modal-header h2 {
+        font-size: 1.05rem;
     }
 
     .type-selector-compact {
-        grid-template-columns: 1fr;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .type-selector-compact .type-option {
+        padding: 7px 12px;
+        font-size: 0.72rem;
     }
 
     .location-selector {
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .radio-label {
+        padding: 7px 12px;
+        font-size: 0.72rem;
     }
 
     .time-builder-main {
@@ -375,11 +654,25 @@
 
     .form-row {
         grid-template-columns: 1fr;
-        gap: var(--spacing-md);
+        gap: 0;
+    }
+
+    .form-group {
+        margin-bottom: 14px;
+    }
+
+    .side-card {
+        padding: 12px;
+    }
+
+    .side-card h3 {
+        margin-bottom: 10px;
+        padding-bottom: 6px;
     }
 
     .form-actions {
         flex-direction: column-reverse;
+        gap: 8px;
     }
 
     .form-actions .btn-primary,
@@ -402,6 +695,149 @@
         grid-template-columns: 1fr 1fr;
     }
 
+    .appointments-view .appointments-list-header {
+        padding: 10px 12px;
+    }
+
+    .appointments-view .appointments-list-header h3 {
+        font-size: 0.82rem;
+    }
+
+    .appointments-view .appointments-list-header p {
+        font-size: 0.68rem;
+    }
+
+    .appointments-view .appointments-table {
+        padding: 8px;
+    }
+
+    .appointments-view .appointments-table .data-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
+        margin-bottom: 0;
+    }
+
+    .appointments-view .appointment-row-side {
+        text-align: left;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        column-gap: 8px;
+        row-gap: 3px;
+    }
+
+    .appointments-view .appointment-row-status {
+        justify-self: start;
+        margin-bottom: 0;
+        grid-column: 1 / 2;
+        grid-row: 1 / 3;
+    }
+
+    .appointments-view .appointment-row-when,
+    .appointments-view .appointment-row-time {
+        grid-column: 2 / 3;
+    }
+
+    .appointments-view .appointment-row-chevron {
+        display: none;
+    }
+
+    .appointments-view .appointment-detail-card {
+        padding: 10px;
+    }
+
+    .appointments-view .appointment-detail-actions {
+        gap: 6px;
+    }
+
+    .appointments-view .appointment-detail-actions .btn-sm {
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+
+    .clients-view .split-search-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .clients-view .split-search-wrapper {
+        width: 100%;
+    }
+
+    .clients-view .clients-count-pill {
+        align-self: flex-end;
+    }
+
+    .clients-view .clients-table {
+        padding: 8px;
+    }
+
+    .clients-view .clients-table .data-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
+        margin-bottom: 0;
+    }
+
+    .clients-view .client-row-side {
+        text-align: left;
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        column-gap: 8px;
+        row-gap: 3px;
+    }
+
+    .clients-view .client-row-stage {
+        justify-self: start;
+        grid-column: 1 / 2;
+        grid-row: 1 / 3;
+    }
+
+    .clients-view .client-row-next {
+        grid-column: 2 / 3;
+    }
+
+    .clients-view .client-row-chevron {
+        display: none;
+    }
+
+    .clients-view .client-detail-card {
+        padding: 10px;
+    }
+
+    .clients-view .client-detail-actions {
+        gap: 6px;
+    }
+
+    .clients-view .client-detail-actions .btn-sm {
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+
+    .clients-view .client-more-wrap {
+        flex: 1 1 100%;
+    }
+
+    .clients-view .client-more-wrap > .btn-sm {
+        width: 100%;
+    }
+
+    .clients-view .client-more-menu {
+        position: static;
+        margin-top: 6px;
+        width: 100%;
+    }
+
+    .clients-view .client-note-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .clients-view .client-note-submit-row .btn-primary {
+        width: 100%;
+        justify-content: center;
+    }
+
     .mobile-nav {
         display: none;
     }
@@ -414,7 +850,50 @@
     .day-menu {
         width: calc(100vw - 12px);
         max-height: calc(100dvh - 12px);
-        padding: 10px;
+        padding: 0;
+        border-radius: var(--radius-lg);
+    }
+
+    .day-menu-header {
+        padding: 12px 14px 8px;
+    }
+
+    .day-menu-header h3 {
+        font-size: 0.86rem;
+    }
+
+    .day-menu-actions {
+        padding: 8px 14px;
+    }
+
+    .day-menu-list {
+        padding: 0 14px 14px;
+        gap: 6px;
+    }
+
+    .day-menu-item {
+        padding: 10px 12px;
+        gap: 6px;
+    }
+
+    .day-menu-item-time {
+        font-size: 0.78rem;
+    }
+
+    .day-menu-item-client {
+        font-size: 0.76rem;
+    }
+
+    .day-menu-item-type {
+        font-size: 0.68rem;
+    }
+
+    .day-menu-top-actions {
+        flex-wrap: wrap;
+    }
+
+    .day-menu-item-actions {
+        flex-wrap: wrap;
     }
 
     .quick-create-menu {
@@ -444,12 +923,60 @@
         left: 12px;
         bottom: 24px;
         max-width: none;
+        border-radius: var(--radius-lg);
     }
 }
 
 @media (max-width: 480px) {
     .connection-label {
         display: none;
+    }
+
+    /* Slightly smaller day numbers on narrow phones */
+    .day-number {
+        width: 30px;
+        height: 30px;
+        font-size: 0.8rem;
+    }
+
+    .day-cell {
+        aspect-ratio: 1 / 1.1;
+        padding: 4px 2px 5px;
+        min-height: 72px;
+    }
+
+    .week-slot {
+        min-height: 54px;
+    }
+
+    /* Week view fits screen on narrow phones */
+    .calendar-grid.google-like {
+        grid-template-columns: 32px repeat(7, 1fr);
+    }
+
+    .week-time-label {
+        min-width: 32px;
+        font-size: 0.4rem;
+        padding: 3px 1px;
+    }
+
+    .week-grid-corner {
+        min-width: 32px;
+    }
+
+    .week-event-chip {
+        font-size: 0.5rem;
+        padding: 2px 6px 2px 7px;
+        min-height: 0;
+        border-radius: var(--radius-full);
+    }
+
+    .week-event-name {
+        font-size: 0.5rem;
+    }
+
+    .week-event-time {
+        font-size: 0.44rem;
     }
 }
 
