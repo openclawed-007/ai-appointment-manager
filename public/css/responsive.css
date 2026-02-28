@@ -445,7 +445,7 @@
        sticky time labels, compact event chips
        ═══════════════════════════════════════════════ */
     .calendar-grid.google-like {
-        grid-template-columns: 36px repeat(7, 1fr);
+        grid-template-columns: 36px repeat(7, minmax(0, 1fr));
         padding: 0;
         gap: 1px;
         max-height: 56vh;
@@ -496,20 +496,42 @@
     .week-slot {
         min-height: 62px;
         padding: 3px;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .week-slot-content {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
+        flex-wrap: nowrap;
         gap: 2px;
         min-height: 24px;
+        min-width: 0;
     }
 
     .week-event-chip {
+        width: 100%;
+        max-width: 100%;
         font-size: 0.56rem;
         padding: 2px 7px 2px 8px;
         min-height: 0;
-        border-radius: var(--radius-full);
+        border-radius: 8px;
+        gap: 4px;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .week-slot.has-single-event .week-slot-content {
+        align-items: stretch;
+    }
+
+    .week-slot.has-single-event .week-event-chip {
+        width: 100%;
+        max-width: 100%;
+        min-height: 0;
+        padding: 2px 7px 2px 8px;
+        border-radius: 8px;
         gap: 4px;
     }
 
@@ -519,10 +541,13 @@
 
     .week-event-name {
         font-size: 0.56rem;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .week-event-time {
-        font-size: 0.48rem;
+        display: none;
     }
 
     .timeline,
@@ -961,7 +986,7 @@
 
     /* Week view fits screen on narrow phones */
     .calendar-grid.google-like {
-        grid-template-columns: 32px repeat(7, 1fr);
+        grid-template-columns: 32px repeat(7, minmax(0, 1fr));
     }
 
     .week-time-label {
@@ -978,7 +1003,7 @@
         font-size: 0.5rem;
         padding: 2px 6px 2px 7px;
         min-height: 0;
-        border-radius: var(--radius-full);
+        border-radius: 8px;
     }
 
     .week-event-name {
@@ -986,7 +1011,7 @@
     }
 
     .week-event-time {
-        font-size: 0.44rem;
+        display: none;
     }
 }
 
