@@ -450,13 +450,13 @@
 .week-event-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-size: 0.68rem;
-    padding: 3px 10px 3px 10px;
-    border-radius: var(--radius-full);
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    gap: 4px;
+    font-size: 0.64rem;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
     min-height: 0;
     position: relative;
     overflow: hidden;
@@ -466,17 +466,16 @@
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), border-color 180ms var(--ease);
+    transition: opacity 140ms var(--ease);
 }
 
 .week-slot.has-single-event .week-event-chip {
     width: auto;
     max-width: 100%;
     min-height: 0;
-    border-radius: var(--radius-full);
-    padding: 3px 10px 3px 10px;
+    padding: 0;
     justify-content: flex-start;
-    gap: 5px;
+    gap: 4px;
 }
 
 .week-slot.has-single-event .week-event-name {
@@ -484,27 +483,26 @@
 }
 
 .week-slot.has-single-event .week-event-time {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
 }
 
 .week-event-chip:hover {
-    transform: translateY(-1px);
-    border-color: color-mix(in oklab, var(--gold) 26%, var(--border-strong));
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+    opacity: 0.85;
 }
 
 .week-event-chip::before {
     content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
+    position: static;
+    width: 5px;
+    height: 5px;
+    min-width: 5px;
+    min-height: 5px;
+    border-radius: 999px;
     background: var(--gold);
 }
 
 .week-event-time {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 700;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
@@ -542,11 +540,11 @@
 
 @media (max-width: 980px) {
     .calendar-grid.google-like {
-        grid-template-columns: 42px repeat(7, 1fr);
+        grid-template-columns: 42px repeat(7, minmax(0, 1fr));
     }
 
     .calendar-grid.google-like.google-like-day {
-        grid-template-columns: 42px 1fr;
+        grid-template-columns: 42px minmax(0, 1fr);
     }
 
     .week-slot {
@@ -554,10 +552,14 @@
     }
 
     .week-event-chip {
-        padding: 2px 7px 2px 8px;
+        padding: 0;
         min-height: 0;
         font-size: 0.58rem;
-        border-radius: var(--radius-full);
+        border-radius: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        gap: 3px;
     }
 
     .week-event-name {

@@ -108,7 +108,11 @@
         width: auto;
         max-width: 100%;
         flex: 0 1 auto;
-        border-radius: 8px;
+        border-radius: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
         box-sizing: border-box;
         white-space: nowrap;
         overflow: hidden;
@@ -122,13 +126,14 @@
         width: auto;
         max-width: 100%;
         min-height: 0;
-        padding: 2px 7px 2px 8px;
-        border-radius: 8px;
-        gap: 4px;
+        padding: 0;
+        border-radius: 0;
+        gap: 3px;
     }
 
     .week-event-time {
-        display: none;
+        display: inline;
+        font-size: 0.5rem;
     }
 }
 
@@ -561,10 +566,13 @@
         max-width: 100%;
         flex: 0 1 auto;
         font-size: 0.56rem;
-        padding: 2px 7px 2px 8px;
+        padding: 0;
         min-height: 0;
-        border-radius: 8px;
-        gap: 4px;
+        border-radius: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        gap: 3px;
         box-sizing: border-box;
         white-space: nowrap;
         overflow: hidden;
@@ -578,13 +586,16 @@
         width: auto;
         max-width: 100%;
         min-height: 0;
-        padding: 2px 7px 2px 8px;
-        border-radius: 8px;
-        gap: 4px;
+        padding: 0;
+        border-radius: 0;
+        gap: 3px;
     }
 
     .week-event-chip::before {
-        width: 2px;
+        width: 4px;
+        height: 4px;
+        min-width: 4px;
+        min-height: 4px;
     }
 
     .week-event-name {
@@ -595,7 +606,8 @@
     }
 
     .week-event-time {
-        display: none;
+        display: inline;
+        font-size: 0.5rem;
     }
 
     .timeline,
@@ -1072,9 +1084,13 @@
 
     .week-event-chip {
         font-size: 0.5rem;
-        padding: 2px 6px 2px 7px;
+        padding: 0;
         min-height: 0;
-        border-radius: 8px;
+        border-radius: 0;
+        border: 0;
+        background: none;
+        box-shadow: none;
+        gap: 2px;
     }
 
     .week-event-name {
@@ -1082,7 +1098,8 @@
     }
 
     .week-event-time {
-        display: none;
+        display: inline;
+        font-size: 0.46rem;
     }
 }
 
