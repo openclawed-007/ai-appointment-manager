@@ -1135,12 +1135,17 @@ function renderCalendarDotsForMonth(monthAppointments = []) {
     cell.title = count > 0 ? `Day ${day}: ${labelParts.join(' • ')}` : `Day ${day}: No bookings`;
 
     if (preview) {
-      preview.innerHTML = appts.slice(0, 3).map((a) =>
+      const bars = appts.slice(0, 3).map((a) =>
         `<div class="cal-event cal-event-card" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
            <span class="cal-event-time">${toTimeCompact(a.time)}</span>
            <span class="cal-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
          </div>`
       ).join('');
+      const countClass = count >= 5 ? 'is-high' : (count >= 3 ? 'is-med' : 'is-low');
+      const countBadge = count > 0
+        ? `<div class="cal-event-count ${countClass}" aria-hidden="true" title="${count} appointment${count === 1 ? '' : 's'}">${count}</div>`
+        : '';
+      preview.innerHTML = `${countBadge}${bars}`;
       if (count > 3) {
         preview.innerHTML += `<div class="cal-event-more">+${count - 3} more</div>`;
       }

@@ -330,6 +330,10 @@
     letter-spacing: 0.02em;
 }
 
+.cal-event-count {
+    display: none;
+}
+
 /* Density indicators */
 .day-cell.event-low .day-number { color: var(--text); }
 .day-cell.event-med .day-number { color: var(--gold); }

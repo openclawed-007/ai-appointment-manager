@@ -422,113 +422,62 @@
         box-shadow: inset 0 0 0 2px var(--gold);
     }
 
-    /* Month events on mobile: compact dots + overflow count */
+    /* Month events on mobile: count-first indicator (no dots) */
     .day-events-preview {
-        display: grid;
-        grid-template-columns: repeat(3, 6px);
-        grid-auto-rows: 6px;
-        gap: 3px;
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
+        align-content: center;
+        gap: 0;
         width: auto;
-        min-height: 15px;
+        min-height: 18px;
         margin-top: auto;
         align-self: center;
-        justify-content: center;
-        align-content: end;
         padding: 0;
     }
 
-    .cal-event {
-        width: 6px;
-        height: 6px;
-        min-width: 6px;
-        min-height: 6px;
-        padding: 0;
-        margin: 0;
-        border: none;
-        background: none;
-        border-radius: 999px;
-        overflow: visible;
-        display: block;
-    }
-
-    .cal-event::before {
-        display: block;
-        width: 6px;
-        height: 6px;
-        min-width: 6px;
-        min-height: 6px;
-        margin: 0;
-    }
-
-    .cal-event-time,
-    .cal-event-name {
-        display: none;
-    }
-
-    /* Restore adaptive month event rendering when JS marks card/name-only states */
-    .cal-event.cal-event-card,
-    .cal-event.cal-event-name-only {
-        width: auto;
-        height: auto;
-        min-width: 0;
-        min-height: 0;
-        display: flex;
+    .cal-event-count {
+        display: inline-flex;
         align-items: center;
-        gap: 3px;
-        padding: 0 4px;
-        margin: 0;
-        border-radius: 6px;
-        overflow: hidden;
-    }
-
-    .cal-event.cal-event-card {
+        justify-content: center;
+        min-width: 18px;
+        height: 14px;
+        padding: 0 5px;
+        border-radius: 999px;
         border: 1px solid var(--border-strong);
         background: var(--bg-raised);
-        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border-strong) 35%, transparent);
+        color: var(--text);
+        font-size: 0.62rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.01em;
+        box-shadow: var(--shadow-sm);
     }
 
+    .cal-event-count.is-low {
+        border-color: color-mix(in oklab, var(--info) 40%, var(--border-strong));
+        background: color-mix(in oklab, var(--info) 12%, var(--bg-raised));
+    }
+
+    .cal-event-count.is-med {
+        border-color: color-mix(in oklab, var(--warning) 45%, var(--border-strong));
+        background: color-mix(in oklab, var(--warning) 14%, var(--bg-raised));
+    }
+
+    .cal-event-count.is-high {
+        border-color: color-mix(in oklab, var(--error) 45%, var(--border-strong));
+        background: color-mix(in oklab, var(--error) 14%, var(--bg-raised));
+    }
+
+    .cal-event,
+    .cal-event.cal-event-card,
     .cal-event.cal-event-name-only {
-        border: none;
-        background: none;
-        padding: 0;
-    }
-
-    .cal-event.cal-event-card::before,
-    .cal-event.cal-event-name-only::before {
-        width: 4px;
-        height: 4px;
-        min-width: 4px;
-        min-height: 4px;
-        margin: 0;
-    }
-
-    .cal-event.cal-event-card .cal-event-time {
-        display: inline;
-        font-size: 0.52rem;
-    }
-
-    .cal-event.cal-event-card .cal-event-name,
-    .cal-event.cal-event-name-only .cal-event-name {
-        display: inline;
-        font-size: 0.52rem;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .cal-event.cal-event-name-only .cal-event-time {
         display: none;
     }
 
     .cal-event-more {
-        grid-column: 1 / -1;
-        font-size: 0.52rem;
-        line-height: 1;
-        padding-top: 2px;
-        text-align: center;
-        color: var(--text-muted);
-        letter-spacing: 0.02em;
+        display: none;
     }
 
     /* Hide separate day dot; event rows already indicate density */
