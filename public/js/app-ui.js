@@ -305,6 +305,65 @@ function getCalendarDisplayRangeMinutes() {
   return { start: openMinutes, end: closeMinutes };
 }
 
+let calendarEventFitResizeBound = false;
+let calendarEventFitRafId = 0;
+
+function isNodeTruncated(node) {
+  if (!node) return false;
+  return node.scrollWidth > (node.clientWidth + 1);
+}
+
+function syncCalendarEventLabelFit() {
+  document.querySelectorAll('.week-event-chip').forEach((chip) => {
+    chip.classList.remove('week-event-chip-card');
+    chip.classList.remove('week-event-chip-name-only');
+    chip.classList.add('week-event-chip-card');
+    const nameNode = chip.querySelector('.week-event-name');
+    if (!isNodeTruncated(nameNode)) return;
+
+    // First fallback: keep the card but hide the time.
+    chip.classList.add('week-event-chip-name-only');
+    if (!isNodeTruncated(nameNode)) return;
+
+    // Final fallback: remove card chrome if even name-only still truncates.
+    chip.classList.remove('week-event-chip-card');
+  });
+
+  document.querySelectorAll('.cal-event').forEach((eventNode) => {
+    eventNode.classList.remove('cal-event-card');
+    eventNode.classList.remove('cal-event-name-only');
+    const rowWidth = eventNode.clientWidth;
+    // Month view sizing rule:
+    // wide enough => card; medium => card + name-only; very narrow => plain name.
+    if (rowWidth >= 64) {
+      eventNode.classList.add('cal-event-card');
+      if (rowWidth < 92) {
+        eventNode.classList.add('cal-event-name-only');
+      }
+      return;
+    }
+    eventNode.classList.add('cal-event-name-only');
+  });
+}
+
+function scheduleCalendarEventLabelFitSync() {
+  if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    syncCalendarEventLabelFit();
+    return;
+  }
+  if (calendarEventFitRafId) window.cancelAnimationFrame(calendarEventFitRafId);
+  calendarEventFitRafId = window.requestAnimationFrame(() => {
+    calendarEventFitRafId = 0;
+    syncCalendarEventLabelFit();
+  });
+}
+
+function bindCalendarEventFitResize() {
+  if (calendarEventFitResizeBound || typeof window === 'undefined') return;
+  calendarEventFitResizeBound = true;
+  window.addEventListener('resize', scheduleCalendarEventLabelFitSync);
+}
+
 function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } = {}) {
   const grid = document.getElementById('calendar-grid');
   if (!grid) return;
@@ -396,6 +455,8 @@ function renderCalendarTimeGrid(timeGridAppointments = [], { loading = false } =
     ${headerCells}
     ${rows}
   `;
+  bindCalendarEventFitResize();
+  scheduleCalendarEventLabelFitSync();
 }
 
 function syncCalendarViewSelector() {
@@ -1075,7 +1136,7 @@ function renderCalendarDotsForMonth(monthAppointments = []) {
 
     if (preview) {
       preview.innerHTML = appts.slice(0, 3).map((a) =>
-        `<div class="cal-event" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
+        `<div class="cal-event cal-event-card" style="--event-color: ${escapeHtml(a.color || 'var(--gold)')}">
            <span class="cal-event-time">${toTimeCompact(a.time)}</span>
            <span class="cal-event-name">${escapeHtml(getCalendarPreviewLabel(a))}</span>
          </div>`
@@ -1085,6 +1146,8 @@ function renderCalendarDotsForMonth(monthAppointments = []) {
       }
     }
   });
+  bindCalendarEventFitResize();
+  scheduleCalendarEventLabelFitSync();
 }
 
 async function fetchCalendarMonth(monthParam, { force = false } = {}) {

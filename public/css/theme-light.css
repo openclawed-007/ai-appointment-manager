@@ -130,6 +130,28 @@
     background: rgba(58, 123, 181, 0.06);
 }
 
+[data-theme="light"] .day-menu-open-client {
+    border-color: rgba(5, 150, 105, 0.28);
+    background: rgba(5, 150, 105, 0.10);
+    color: #065f46;
+}
+
+[data-theme="light"] .day-menu-open-client:hover {
+    border-color: rgba(5, 150, 105, 0.4);
+    background: rgba(5, 150, 105, 0.16);
+    color: #064e3b;
+}
+
+[data-theme="light"] .day-menu-open-client:active {
+    background: rgba(5, 150, 105, 0.2);
+    transform: translateY(1px);
+}
+
+[data-theme="light"] .day-menu-open-client:focus-visible {
+    outline: 2px solid rgba(5, 150, 105, 0.35);
+    outline-offset: 1px;
+}
+
 [data-theme="light"] .booking-logo {
     background: linear-gradient(180deg, rgba(255, 253, 248, 0.88) 0%, rgba(232, 226, 216, 0.72) 100%);
     box-shadow:
