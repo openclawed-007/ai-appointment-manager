@@ -441,33 +441,30 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 18px;
-        height: 14px;
-        padding: 0 5px;
+        min-width: 17px;
+        height: 13px;
+        padding: 0 4px;
         border-radius: 999px;
-        border: 1px solid var(--border-strong);
-        background: var(--bg-raised);
-        color: var(--text);
-        font-size: 0.62rem;
-        font-weight: 800;
+        border: 1px solid var(--border);
+        background: color-mix(in oklab, var(--bg-surface) 88%, var(--bg-raised));
+        color: var(--text-secondary);
+        font-size: 0.58rem;
+        font-weight: 700;
         line-height: 1;
         letter-spacing: 0.01em;
-        box-shadow: var(--shadow-sm);
+        box-shadow: none;
     }
 
     .cal-event-count.is-low {
-        border-color: color-mix(in oklab, var(--info) 40%, var(--border-strong));
-        background: color-mix(in oklab, var(--info) 12%, var(--bg-raised));
+        color: var(--text-muted);
     }
 
     .cal-event-count.is-med {
-        border-color: color-mix(in oklab, var(--warning) 45%, var(--border-strong));
-        background: color-mix(in oklab, var(--warning) 14%, var(--bg-raised));
+        color: var(--text-secondary);
     }
 
     .cal-event-count.is-high {
-        border-color: color-mix(in oklab, var(--error) 45%, var(--border-strong));
-        background: color-mix(in oklab, var(--error) 14%, var(--bg-raised));
+        color: var(--text);
     }
 
     .cal-event,
@@ -585,10 +582,10 @@
 
     .week-event-chip.week-event-chip-card {
         padding: 1px 5px;
-        border-radius: 6px;
-        border: 1px solid var(--border-strong);
-        background: var(--bg-raised);
-        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border-strong) 35%, transparent);
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: color-mix(in oklab, var(--bg-surface) 88%, var(--bg-raised));
+        box-shadow: none;
     }
 
     .week-slot.has-single-event .week-slot-content {
@@ -606,7 +603,7 @@
 
     .week-slot.has-single-event .week-event-chip.week-event-chip-card {
         padding: 1px 5px;
-        border-radius: 6px;
+        border-radius: 5px;
     }
 
     .week-event-chip::before {
@@ -1113,10 +1110,10 @@
 
     .week-event-chip.week-event-chip-card {
         padding: 1px 4px;
-        border-radius: 6px;
-        border: 1px solid var(--border-strong);
-        background: var(--bg-raised);
-        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border-strong) 35%, transparent);
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: color-mix(in oklab, var(--bg-surface) 88%, var(--bg-raised));
+        box-shadow: none;
     }
 
     .week-event-name {
