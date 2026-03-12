@@ -177,7 +177,16 @@
 }
 
 .day-cell.today {
-    background: var(--bg-surface);
+    background:
+        linear-gradient(180deg,
+            color-mix(in oklab, var(--gold) 9%, var(--bg-surface)) 0%,
+            color-mix(in oklab, var(--gold) 4%, var(--bg-surface)) 100%);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--gold) 28%, transparent);
+}
+
+.day-cell.today:hover {
+    background: color-mix(in oklab, var(--gold) 8%, var(--bg-hover));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--gold) 34%, transparent);
 }
 
 .day-cell.today .day-number {
@@ -190,6 +199,15 @@
 .day-cell.selected {
     background: var(--gold-dim);
     z-index: 1;
+}
+
+.day-cell.today.selected {
+    background: color-mix(in oklab, var(--gold) 16%, var(--bg-surface));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--gold) 40%, transparent);
+}
+
+.day-cell.today.selected:hover {
+    background: color-mix(in oklab, var(--gold) 22%, var(--bg-hover));
 }
 
 /* Always-visible booking marker for days with appointments */
@@ -392,6 +410,10 @@
     background: color-mix(in oklab, var(--gold-dim) 70%, var(--bg-surface));
 }
 
+.week-day-header.today:hover {
+    background: color-mix(in oklab, var(--gold-dim) 55%, var(--bg-hover));
+}
+
 .week-day-header.selected {
     box-shadow: inset 0 0 0 1px var(--gold);
 }
@@ -442,6 +464,10 @@
 
 .week-slot.today {
     background: color-mix(in oklab, var(--gold-dim) 45%, var(--bg-surface));
+}
+
+.week-slot.today:hover {
+    background: color-mix(in oklab, var(--gold-dim) 38%, var(--bg-hover));
 }
 
 .week-slot.selected-day {
