@@ -77,6 +77,69 @@ async function ensurePostgresIndex(indexName, ddlSql) {
   }
 }
 
+async function postgresTableExists(tableName) {
+  const result = await pgPool.query('SELECT to_regclass($1) AS table_name', [tableName]);
+  return Boolean(result.rows[0]?.table_name);
+}
+
+function sqliteTableExists(tableName) {
+  const row = sqlite.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
+  ).get(String(tableName));
+  return Boolean(row?.name);
+}
+
+async function backfillBusinessSettingsFromLegacyPostgres() {
+  if (!(await postgresTableExists('settings'))) return;
+  await pgPool.query(`
+    WITH legacy_singleton AS (
+      SELECT business_name, owner_email, timezone
+      FROM settings
+      ORDER BY id
+      LIMIT 1
+    )
+    INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+    SELECT
+      b.id,
+      COALESCE(NULLIF(s.business_name, ''), NULLIF(ls.business_name, ''), b.name),
+      COALESCE(NULLIF(s.owner_email, ''), NULLIF(ls.owner_email, ''), b.owner_email),
+      COALESCE(NULLIF(s.timezone, ''), NULLIF(ls.timezone, ''), b.timezone, 'America/Los_Angeles')
+    FROM businesses b
+    LEFT JOIN settings s ON s.business_id = b.id
+    LEFT JOIN legacy_singleton ls ON TRUE
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM business_settings bs
+      WHERE bs.business_id = b.id
+    )
+  `);
+}
+
+function backfillBusinessSettingsFromLegacySqlite() {
+  if (!sqliteTableExists('settings')) return;
+  sqlite.exec(`
+    INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+    SELECT
+      b.id,
+      COALESCE(NULLIF(s.business_name, ''), NULLIF(ls.business_name, ''), b.name),
+      COALESCE(NULLIF(s.owner_email, ''), NULLIF(ls.owner_email, ''), b.owner_email),
+      COALESCE(NULLIF(s.timezone, ''), NULLIF(ls.timezone, ''), b.timezone, 'America/Los_Angeles')
+    FROM businesses b
+    LEFT JOIN settings s ON s.business_id = b.id
+    LEFT JOIN (
+      SELECT business_name, owner_email, timezone
+      FROM settings
+      ORDER BY id
+      LIMIT 1
+    ) AS ls ON 1 = 1
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM business_settings bs
+      WHERE bs.business_id = b.id
+    )
+  `);
+}
+
 // ── Schema initialisation ──────────────────────────────────────────────────────
 
 const COLORS = [
@@ -165,14 +228,6 @@ async function initDb() {
         token_hash TEXT UNIQUE NOT NULL,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY,
-        business_id INTEGER,
-        business_name TEXT NOT NULL,
-        owner_email TEXT,
-        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles'
       );
 
       CREATE TABLE IF NOT EXISTS appointment_types (
@@ -266,7 +321,6 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_client_notes_business_client ON client_notes(business_id, client_id);
     `);
 
-    await pgPool.query('ALTER TABLE settings ADD COLUMN IF NOT EXISTS business_id INTEGER');
     await pgPool.query('ALTER TABLE appointment_types ADD COLUMN IF NOT EXISTS business_id INTEGER');
     await pgPool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS business_id INTEGER');
     await pgPool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS client_id INTEGER');
@@ -279,7 +333,6 @@ async function initDb() {
     await pgPool.query("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS open_time TEXT NOT NULL DEFAULT '09:00'");
     await pgPool.query("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS close_time TEXT NOT NULL DEFAULT '18:00'");
     await pgPool.query('ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS business_hours_json TEXT');
-    await pgPool.query('CREATE INDEX IF NOT EXISTS idx_settings_business ON settings(business_id)');
     await pgPool.query('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
     await pgPool.query('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
     await pgPool.query('CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments(client_id)');
@@ -319,17 +372,17 @@ async function initDb() {
       )
     ).rows[0];
 
+    await backfillBusinessSettingsFromLegacyPostgres();
     await pgPool.query(
       `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (business_id) DO UPDATE SET
-         business_name = EXCLUDED.business_name,
+         business_name = COALESCE(NULLIF(business_settings.business_name, ''), EXCLUDED.business_name),
          owner_email = COALESCE(business_settings.owner_email, EXCLUDED.owner_email),
          timezone = COALESCE(business_settings.timezone, EXCLUDED.timezone)`,
       [businessRow.id, defaultBusinessName, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles']
     );
 
-    await pgPool.query('UPDATE settings SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
     await pgPool.query('UPDATE appointment_types SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
     await pgPool.query('UPDATE appointments SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
 
@@ -512,14 +565,6 @@ async function initDb() {
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 
-      CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        business_id INTEGER,
-        business_name TEXT NOT NULL,
-        owner_email TEXT,
-        timezone TEXT NOT NULL DEFAULT 'America/Los_Angeles'
-      );
-
       CREATE TABLE IF NOT EXISTS appointment_types (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         business_id INTEGER,
@@ -619,7 +664,6 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_ai_import_usage_business_date ON ai_import_usage(business_id, usage_date);
     `);
 
-    addSqliteColumnIfMissing('settings', 'business_id', 'business_id INTEGER');
     addSqliteColumnIfMissing('appointment_types', 'business_id', 'business_id INTEGER');
     addSqliteColumnIfMissing('appointments', 'business_id', 'business_id INTEGER');
     addSqliteColumnIfMissing('appointments', 'client_id', 'client_id INTEGER');
@@ -632,7 +676,6 @@ async function initDb() {
     addSqliteColumnIfMissing('business_settings', 'open_time', "open_time TEXT NOT NULL DEFAULT '09:00'");
     addSqliteColumnIfMissing('business_settings', 'close_time', "close_time TEXT NOT NULL DEFAULT '18:00'");
     addSqliteColumnIfMissing('business_settings', 'business_hours_json', 'business_hours_json TEXT');
-    sqlite.exec('CREATE INDEX IF NOT EXISTS idx_settings_business ON settings(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments(client_id)');
@@ -651,14 +694,18 @@ async function initDb() {
       )
       .run(defaultBusinessName, defaultSlug, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles');
 
+    backfillBusinessSettingsFromLegacySqlite();
     sqlite
       .prepare(
-        `INSERT OR IGNORE INTO business_settings (business_id, business_name, owner_email, timezone)
-         VALUES (1, ?, ?, ?)`
+        `INSERT INTO business_settings (business_id, business_name, owner_email, timezone)
+         VALUES (1, ?, ?, ?)
+         ON CONFLICT(business_id) DO UPDATE SET
+           business_name = COALESCE(NULLIF(business_settings.business_name, ''), excluded.business_name),
+           owner_email = COALESCE(business_settings.owner_email, excluded.owner_email),
+           timezone = COALESCE(business_settings.timezone, excluded.timezone)`
       )
       .run(defaultBusinessName, process.env.OWNER_EMAIL || null, process.env.TIMEZONE || 'America/Los_Angeles');
 
-    sqlite.prepare('UPDATE settings SET business_id = 1 WHERE business_id IS NULL').run();
     sqlite.prepare('UPDATE appointment_types SET business_id = 1 WHERE business_id IS NULL').run();
     sqlite.prepare('UPDATE appointments SET business_id = 1 WHERE business_id IS NULL').run();
 

@@ -19,6 +19,11 @@ describe('DB hardening', () => {
 
     const pragmaValue = dbModule.sqlite().pragma('foreign_keys', { simple: true });
     expect(pragmaValue).toBe(1);
+
+    const legacySettingsTable = dbModule.sqlite()
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings' LIMIT 1")
+      .get();
+    expect(legacySettingsTable || null).toBeNull();
   });
 
   it('defines additive Postgres constraints and composite indexes for tenant safety', () => {
@@ -42,5 +47,6 @@ describe('DB hardening', () => {
 
     expect(source.includes("sqlite.pragma('foreign_keys = ON')")).toBe(true);
     expect(source.includes("PRAGMA foreign_key_check")).toBe(true);
+    expect(source.includes('CREATE TABLE IF NOT EXISTS settings')).toBe(false);
   });
 });
