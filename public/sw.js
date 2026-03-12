@@ -18,14 +18,19 @@ const APP_SHELL = [
   '/favicon.svg',
   '/manifest.webmanifest',
   '/css/base.css',
+  '/css/calendar.css',
   '/css/content.css',
   '/css/forms.css',
   '/css/header.css',
+  '/css/insights.css',
   '/css/menus.css',
   '/css/pages.css',
   '/css/responsive.css',
   '/css/sidebar.css',
-  '/css/theme-light.css'
+  '/css/settings.css',
+  '/css/theme-light.css',
+  '/css/timeline.css',
+  '/css/types.css'
 ];
 
 self.addEventListener('install', (event) => {

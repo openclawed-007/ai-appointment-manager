@@ -21,6 +21,7 @@ if (USE_POSTGRES) {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   sqlite = new Database(DB_PATH);
   sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('foreign_keys = ON');
 }
 
 // ── Query helpers ──────────────────────────────────────────────────────────────
@@ -56,6 +57,23 @@ function addSqliteColumnIfMissing(tableName, columnName, definitionSql) {
   const cols = sqlite.prepare(`PRAGMA table_info(${tableName})`).all();
   if (!cols.some((c) => String(c.name) === String(columnName))) {
     sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+  }
+}
+
+async function ensurePostgresConstraint(constraintName, ddlSql) {
+  const result = await pgPool.query(
+    'SELECT 1 FROM pg_constraint WHERE conname = $1 LIMIT 1',
+    [constraintName]
+  );
+  if (!result.rowCount) {
+    await pgPool.query(ddlSql);
+  }
+}
+
+async function ensurePostgresIndex(indexName, ddlSql) {
+  const result = await pgPool.query('SELECT to_regclass($1) AS index_name', [indexName]);
+  if (!result.rows[0]?.index_name) {
+    await pgPool.query(ddlSql);
   }
 }
 
@@ -315,6 +333,82 @@ async function initDb() {
     await pgPool.query('UPDATE appointment_types SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
     await pgPool.query('UPDATE appointments SET business_id = $1 WHERE business_id IS NULL', [businessRow.id]);
 
+    await ensurePostgresIndex(
+      'ux_appointment_types_business_id_id',
+      'CREATE UNIQUE INDEX ux_appointment_types_business_id_id ON appointment_types (business_id, id)'
+    );
+    await ensurePostgresIndex(
+      'ux_clients_business_id_id',
+      'CREATE UNIQUE INDEX ux_clients_business_id_id ON clients (business_id, id)'
+    );
+
+    await ensurePostgresConstraint(
+      'fk_appointment_types_business',
+      `ALTER TABLE appointment_types
+         ADD CONSTRAINT fk_appointment_types_business
+         FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'fk_appointments_business',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT fk_appointments_business
+         FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'fk_appointments_business_type',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT fk_appointments_business_type
+         FOREIGN KEY (business_id, type_id) REFERENCES appointment_types(business_id, id) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'fk_appointments_business_client',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT fk_appointments_business_client
+         FOREIGN KEY (business_id, client_id) REFERENCES clients(business_id, id) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_appointment_types_location_mode',
+      `ALTER TABLE appointment_types
+         ADD CONSTRAINT chk_appointment_types_location_mode
+         CHECK (location_mode IN ('office', 'hybrid', 'virtual', 'phone')) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_appointments_status',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT chk_appointments_status
+         CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_appointments_source',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT chk_appointments_source
+         CHECK (source IN ('owner', 'public', 'reminder')) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_appointments_duration_minutes',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT chk_appointments_duration_minutes
+         CHECK (duration_minutes >= 0) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_appointments_reminder_offset_minutes',
+      `ALTER TABLE appointments
+         ADD CONSTRAINT chk_appointments_reminder_offset_minutes
+         CHECK (reminder_offset_minutes BETWEEN 0 AND 10080) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_clients_stage',
+      `ALTER TABLE clients
+         ADD CONSTRAINT chk_clients_stage
+         CHECK (stage IN ('new', 'in_progress', 'waiting', 'completed', 'on_hold')) NOT VALID`
+    );
+    await ensurePostgresConstraint(
+      'chk_business_settings_workspace_mode',
+      `ALTER TABLE business_settings
+         ADD CONSTRAINT chk_business_settings_workspace_mode
+         CHECK (workspace_mode IN ('appointments', 'reminders', 'clients')) NOT VALID`
+    );
+
     const existingTypeCount = Number(
       (await pgPool.query('SELECT COUNT(*)::int AS c FROM appointment_types WHERE business_id = $1', [businessRow.id])).rows[0].c
     );
@@ -542,6 +636,11 @@ async function initDb() {
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_business ON appointments(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_types_business ON appointment_types(business_id)');
     sqlite.exec('CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments(client_id)');
+
+    const foreignKeyViolations = sqlite.prepare('PRAGMA foreign_key_check').all();
+    if (foreignKeyViolations.length) {
+      console.warn(`[db] SQLite foreign key check found ${foreignKeyViolations.length} violation(s). Existing rows were left untouched.`);
+    }
 
     const defaultBusinessName = process.env.BUSINESS_NAME || 'IntelliBook';
     const defaultSlug = slugifyBusinessName(defaultBusinessName);

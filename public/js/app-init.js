@@ -68,6 +68,7 @@ async function runSearch(query) {
 function hideGlobalSearchSuggestions() {
   const suggestions = document.getElementById('global-search-suggestions');
   if (!suggestions) return;
+  document.getElementById('global-search')?.setAttribute('aria-expanded', 'false');
   suggestions.innerHTML = '';
   suggestions.classList.add('hidden');
 }
@@ -123,11 +124,17 @@ function renderGlobalSearchSuggestions(query) {
   }
 
   suggestions.innerHTML = matches.map((option, idx) => `
-    <button type="button" class="search-suggestion" data-settings-match-index="${idx}">
+    <button
+      type="button"
+      class="search-suggestion"
+      data-settings-match-index="${idx}"
+      aria-label="Open ${escapeHtml(option.label)} setting"
+    >
       <span>${escapeHtml(option.label)}</span>
       <small>Settings</small>
     </button>
   `).join('');
+  document.getElementById('global-search')?.setAttribute('aria-expanded', 'true');
   suggestions.classList.remove('hidden');
 
   suggestions.querySelectorAll('.search-suggestion[data-settings-match-index]').forEach((btn) => {

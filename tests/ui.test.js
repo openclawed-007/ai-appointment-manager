@@ -63,6 +63,41 @@ describe('UI helpers and tab behavior', () => {
     expect(index.includes('id="appt-reminder-offset"')).toBe(true);
   });
 
+  it('index exposes an accessible global search field and popup wiring', () => {
+    const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+    expect(index.includes('for="global-search"')).toBe(true);
+    expect(index.includes('aria-controls="global-search-suggestions"')).toBe(true);
+    expect(index.includes('aria-expanded="false"')).toBe(true);
+    expect(index.includes('id="global-search-suggestions" class="search-suggestions hidden"')).toBe(true);
+    expect(index.includes('id="global-search-suggestions" class="search-suggestions hidden" role="listbox"')).toBe(false);
+  });
+
+  it('app shell HTML links CSS partials directly instead of relying on styles.css imports', () => {
+    const htmlFiles = ['index.html', 'booking.html', 'reset-password.html'];
+    const expectedLinks = [
+      'css/base.css',
+      'css/sidebar.css',
+      'css/header.css',
+      'css/content.css',
+      'css/calendar.css',
+      'css/timeline.css',
+      'css/types.css',
+      'css/insights.css',
+      'css/forms.css',
+      'css/menus.css',
+      'css/pages.css',
+      'css/settings.css',
+      'css/responsive.css',
+      'css/theme-light.css'
+    ];
+
+    for (const file of htmlFiles) {
+      const source = fs.readFileSync(path.join(__dirname, '..', 'public', file), 'utf8');
+      expect(source.includes('href="styles.css"')).toBe(false);
+      expectedLinks.forEach((href) => expect(source.includes(`href="${href}"`)).toBe(true));
+    }
+  });
+
   it('app source applies reminder-mode hiding for AI and types navigation/views', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
     expect(source.includes('.nav-item[data-view="ai"], .mobile-nav-item[data-view="ai"]')).toBe(true);
@@ -78,5 +113,32 @@ describe('UI helpers and tab behavior', () => {
     expect(source.includes("document.getElementById('settings-browser-notifications')?.addEventListener('change'")).toBe(true);
     expect(source.includes("document.getElementById('btn-test-browser-notification')?.addEventListener('click'")).toBe(true);
     expect(source.includes('startReminderNotificationPolling()')).toBe(true);
+  });
+
+  it('service worker precaches all directly linked CSS partials', () => {
+    const sw = fs.readFileSync(path.join(__dirname, '..', 'public', 'sw.js'), 'utf8');
+    [
+      '/css/base.css',
+      '/css/sidebar.css',
+      '/css/header.css',
+      '/css/content.css',
+      '/css/calendar.css',
+      '/css/timeline.css',
+      '/css/types.css',
+      '/css/insights.css',
+      '/css/forms.css',
+      '/css/menus.css',
+      '/css/pages.css',
+      '/css/settings.css',
+      '/css/responsive.css',
+      '/css/theme-light.css'
+    ].forEach((href) => expect(sw.includes(`'${href}'`)).toBe(true));
+  });
+
+  it('search suggestions source updates aria-expanded and renders button labels', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'app-init.js'), 'utf8');
+    expect(source.includes("document.getElementById('global-search')?.setAttribute('aria-expanded', 'false')")).toBe(true);
+    expect(source.includes("document.getElementById('global-search')?.setAttribute('aria-expanded', 'true')")).toBe(true);
+    expect(source.includes('aria-label="Open ${escapeHtml(option.label)} setting"')).toBe(true);
   });
 });

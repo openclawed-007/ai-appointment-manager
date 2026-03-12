@@ -13,7 +13,20 @@
     <link rel="shortcut icon" href="/logo/favicons/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/logo/favicons/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/header.css">
+    <link rel="stylesheet" href="css/content.css">
+    <link rel="stylesheet" href="css/calendar.css">
+    <link rel="stylesheet" href="css/timeline.css">
+    <link rel="stylesheet" href="css/types.css">
+    <link rel="stylesheet" href="css/insights.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/menus.css">
+    <link rel="stylesheet" href="css/pages.css">
+    <link rel="stylesheet" href="css/settings.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <link rel="stylesheet" href="css/theme-light.css">
 </head>
 
 <body>
@@ -126,9 +139,10 @@
                             <circle cx="11" cy="11" r="8" />
                             <path d="m21 21-4.35-4.35" />
                         </svg>
-                        <input id="global-search" type="text" placeholder="Search appointments, clients, or types…">
-                        <div id="global-search-suggestions" class="search-suggestions hidden" role="listbox"
-                            aria-label="Search suggestions"></div>
+                        <label class="sr-only" for="global-search">Search appointments, clients, or settings</label>
+                        <input id="global-search" type="text" placeholder="Search appointments, clients, or types…"
+                            autocomplete="off" aria-controls="global-search-suggestions" aria-expanded="false">
+                        <div id="global-search-suggestions" class="search-suggestions hidden"></div>
                     </div>
                 </div>
                 <div class="header-right">
