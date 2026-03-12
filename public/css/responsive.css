@@ -499,7 +499,7 @@
        sticky time labels, compact event chips
        ═══════════════════════════════════════════════ */
     .calendar-grid.google-like {
-        grid-template-columns: 36px repeat(7, minmax(0, 1fr));
+        grid-template-columns: 54px repeat(7, minmax(0, 1fr));
         padding: 0;
         gap: 1px;
         max-height: 56vh;
@@ -508,11 +508,12 @@
     }
 
     .calendar-grid.google-like.google-like-day {
-        grid-template-columns: 42px 1fr;
+        grid-template-columns: 54px 1fr;
     }
 
     .week-grid-corner {
-        min-width: 36px;
+        width: 54px;
+        min-width: 54px;
     }
 
     .week-day-header {
@@ -542,9 +543,11 @@
     }
 
     .week-time-label {
-        font-size: 0.46rem;
+        width: 54px;
+        min-width: 54px;
+        font-size: 0.56rem;
         padding: 4px 2px;
-        min-width: 36px;
+        text-align: center;
     }
 
     .week-slot {
@@ -1085,17 +1088,20 @@
 
     /* Week view fits screen on narrow phones */
     .calendar-grid.google-like {
-        grid-template-columns: 32px repeat(7, minmax(0, 1fr));
+        grid-template-columns: 48px repeat(7, minmax(0, 1fr));
     }
 
     .week-time-label {
-        min-width: 32px;
-        font-size: 0.4rem;
+        width: 48px;
+        min-width: 48px;
+        font-size: 0.52rem;
         padding: 3px 1px;
+        text-align: center;
     }
 
     .week-grid-corner {
-        min-width: 32px;
+        width: 48px;
+        min-width: 48px;
     }
 
     .week-event-chip {

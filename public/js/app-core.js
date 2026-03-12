@@ -295,8 +295,8 @@ function applyReminderModeUi() {
   const entryPlural = getEntryWordPlural();
 
   setText('#nav-appointments span', entryPluralTitle);
-  setText('.mobile-nav-item[data-view="appointments"] span', reminderMode ? 'Reminders' : 'Appts');
-  setText('section[data-view="appointments"] .page-header-main h2', `All ${entryPluralTitle}`);
+  setText('.mobile-nav-item[data-view="appointments"] span', reminderMode ? 'Reminders' : 'Appointments');
+  setText('section[data-view="appointments"] .page-header-main h2', entryPluralTitle);
   setText('#btn-new-appointment span', `New ${entrySingularTitle}`);
   setText('#stat-card-today .stat-hint', `${entryPlural} today`);
   setText('#stat-card-week .stat-hint', reminderMode ? 'scheduled this week' : 'booked this week');

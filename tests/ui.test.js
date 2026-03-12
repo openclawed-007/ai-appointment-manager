@@ -72,6 +72,35 @@ describe('UI helpers and tab behavior', () => {
     expect(index.includes('id="global-search-suggestions" class="search-suggestions hidden" role="listbox"')).toBe(false);
   });
 
+  it('settings copy uses staff-friendly workspace wording', () => {
+    const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+    expect(index.includes('Workspace mode')).toBe(true);
+    expect(index.includes('Appointments')).toBe(true);
+    expect(index.includes('Reminders')).toBe(true);
+    expect(index.includes('Reminder mode')).toBe(true);
+  });
+
+  it('main navigation uses consistent page naming across desktop and mobile', () => {
+    const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+    const core = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'app-core.js'), 'utf8');
+    expect(index.includes('<span>Dashboard</span>')).toBe(true);
+    expect(index.includes('<h2>Dashboard</h2>')).toBe(true);
+    expect(index.includes('<span>Appointments</span>')).toBe(true);
+    expect(index.includes('<h2>Appointments</h2>')).toBe(true);
+    expect(index.includes('<span>Clients</span>')).toBe(true);
+    expect(index.includes('<h2>Clients</h2>')).toBe(true);
+    expect(index.includes('<span>Services</span>')).toBe(true);
+    expect(index.includes('<h2>Services</h2>')).toBe(true);
+    expect(index.includes('<span>Insights</span>')).toBe(true);
+    expect(index.includes('<h2>Insights</h2>')).toBe(true);
+    expect(index.includes('<span>Settings</span>')).toBe(true);
+    expect(index.includes('<h2>Settings</h2>')).toBe(true);
+    expect(index.includes('aria-label="Services"')).toBe(true);
+    expect(index.includes('aria-label="Insights"')).toBe(true);
+    expect(core.includes("setText('.mobile-nav-item[data-view=\"appointments\"] span', reminderMode ? 'Reminders' : 'Appointments');")).toBe(true);
+    expect(core.includes("setText('section[data-view=\"appointments\"] .page-header-main h2', entryPluralTitle);")).toBe(true);
+  });
+
   it('app shell HTML links CSS partials directly instead of relying on styles.css imports', () => {
     const htmlFiles = ['index.html', 'booking.html', 'reset-password.html'];
     const expectedLinks = [
@@ -140,5 +169,6 @@ describe('UI helpers and tab behavior', () => {
     expect(source.includes("document.getElementById('global-search')?.setAttribute('aria-expanded', 'false')")).toBe(true);
     expect(source.includes("document.getElementById('global-search')?.setAttribute('aria-expanded', 'true')")).toBe(true);
     expect(source.includes('aria-label="Open ${escapeHtml(option.label)} setting"')).toBe(true);
+    expect(source.includes('Settings')).toBe(true);
   });
 });
